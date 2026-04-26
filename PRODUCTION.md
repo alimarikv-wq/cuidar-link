@@ -17,10 +17,16 @@
 
 ## Callbacks OAuth
 
-Troque `https://seudominio.com.br` pelo dominio final:
+URL inicial publicada:
 
-- `https://seudominio.com.br/api/auth/oauth/google/callback`
-- `https://seudominio.com.br/api/auth/oauth/apple/callback`
+```txt
+https://cuidar-link.vercel.app
+```
+
+Troque pelo dominio final quando comprar/apontar um dominio proprio:
+
+- `https://cuidar-link.vercel.app/api/auth/oauth/google/callback`
+- `https://cuidar-link.vercel.app/api/auth/oauth/apple/callback`
 
 ## Health check
 
