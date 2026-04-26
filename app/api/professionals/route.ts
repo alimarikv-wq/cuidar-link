@@ -12,7 +12,19 @@ import { getDemoCareProfessionals, shouldUseDemoFallback } from "@/lib/care-demo
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const center = getCareCenter();
+  const defaultCenter = getCareCenter();
+  const requestedLatitude = Number(searchParams.get("latitude") || defaultCenter.latitude);
+  const requestedLongitude = Number(searchParams.get("longitude") || defaultCenter.longitude);
+  const hasBrowserLocation =
+    searchParams.get("locationSource") === "browser" && Number.isFinite(requestedLatitude) && Number.isFinite(requestedLongitude);
+  const center = hasBrowserLocation
+    ? {
+        ...defaultCenter,
+        neighborhood: "Sua localizacao",
+        latitude: requestedLatitude,
+        longitude: requestedLongitude
+      }
+    : defaultCenter;
   const query = {
     service: parseCareService(searchParams.get("service")),
     professionalType: parseProfessionalType(searchParams.get("professionalType")),
@@ -20,8 +32,8 @@ export async function GET(request: NextRequest) {
     supportNeed: parseSupportLevel(searchParams.get("supportNeed")),
     availability: parseAvailability(searchParams.get("availability")),
     radiusKm: Number(searchParams.get("radiusKm") || "8"),
-    latitude: Number(searchParams.get("latitude") || center.latitude),
-    longitude: Number(searchParams.get("longitude") || center.longitude)
+    latitude: center.latitude,
+    longitude: center.longitude
   };
 
   try {

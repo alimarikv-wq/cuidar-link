@@ -109,6 +109,8 @@ export type CareProfessional = {
   age: number;
   city: string;
   neighborhood: string;
+  latitude: number;
+  longitude: number;
   distanceKm: number;
   photoUrl: string | null;
   rating: number;

@@ -232,6 +232,8 @@ function toCareProfessional(professional: ProfessionalWithRelations, params: Car
     age: professional.age,
     city: professional.city,
     neighborhood: professional.neighborhood,
+    latitude: Number(professional.latitude),
+    longitude: Number(professional.longitude),
     distanceKm: Number(distance.toFixed(1)),
     photoUrl: professional.photoUrl,
     rating: Number(professional.rating),

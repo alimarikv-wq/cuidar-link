@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Map as LeafletMap, Marker } from "leaflet";
 import {
   Accessibility,
   CalendarClock,
@@ -32,6 +33,7 @@ import {
 } from "@/types";
 
 type ProfessionalTypeFilter = "TODOS" | ProfessionalTypeCode;
+type LocationStatus = "idle" | "locating" | "ready" | "denied" | "unsupported" | "error";
 
 const serviceOptions: Array<{ id: CareServiceCode; label: string; icon: typeof HeartHandshake }> = [
   { id: "BANHO", label: "Banho", icon: HeartHandshake },
@@ -85,7 +87,28 @@ function getDefaultScheduledFor() {
   return localDate.toISOString().slice(0, 16);
 }
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+    return entities[character];
+  });
+}
+
+function formatAccuracy(value: number | null) {
+  if (!value) return "";
+  return value >= 1000 ? `aprox. ${(value / 1000).toFixed(1)} km` : `aprox. ${Math.round(value)} m`;
+}
+
 export function CareMatchApp() {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const markerRefs = useRef<Marker[]>([]);
   const [service, setService] = useState<CareServiceCode>("BANHO");
   const [professionalType, setProfessionalType] = useState<ProfessionalTypeFilter>("TODOS");
   const [genderPreference, setGenderPreference] = useState<GenderPreferenceCode>("FEMININO");
@@ -99,6 +122,10 @@ export function CareMatchApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dataWarning, setDataWarning] = useState("");
+  const [mapError, setMapError] = useState("");
+  const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [locationError, setLocationError] = useState("");
   const [requestSent, setRequestSent] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [requestWarning, setRequestWarning] = useState("");
@@ -119,7 +146,8 @@ export function CareMatchApp() {
       availability,
       radiusKm: String(radius),
       latitude: String(center.latitude),
-      longitude: String(center.longitude)
+      longitude: String(center.longitude),
+      locationSource: locationStatus === "ready" ? "browser" : "default"
     });
 
     if (professionalType !== "TODOS") {
@@ -154,7 +182,7 @@ export function CareMatchApp() {
       });
 
     return () => controller.abort();
-  }, [availability, center.latitude, center.longitude, genderPreference, professionalType, radius, searchVersion, service, supportNeed]);
+  }, [availability, center.latitude, center.longitude, genderPreference, locationStatus, professionalType, radius, searchVersion, service, supportNeed]);
 
   const selected = useMemo(() => {
     return results.find((professional) => professional.id === selectedId) ?? results[0] ?? null;
@@ -165,6 +193,137 @@ export function CareMatchApp() {
     setRequestSent(false);
     setRequestError("");
   }
+
+  function useCurrentLocation() {
+    if (!("geolocation" in navigator)) {
+      setLocationStatus("unsupported");
+      setLocationError("Seu navegador nao liberou geolocalizacao.");
+      return;
+    }
+
+    setLocationStatus("locating");
+    setLocationError("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextCenter = {
+          city: "Porto Alegre",
+          neighborhood: "Sua localizacao",
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+
+        setCenter(nextCenter);
+        setLocationAccuracy(position.coords.accuracy);
+        setLocationStatus("ready");
+        setAddressLine("Localizacao atual aproximada");
+        setSearchVersion((current) => current + 1);
+      },
+      (locationProblem) => {
+        if (locationProblem.code === locationProblem.PERMISSION_DENIED) {
+          setLocationStatus("denied");
+          setLocationError("Permissao de localizacao negada no navegador.");
+          return;
+        }
+
+        setLocationStatus("error");
+        setLocationError("Nao foi possivel obter sua localizacao agora.");
+      },
+      { enableHighAccuracy: true, maximumAge: 60_000, timeout: 12_000 }
+    );
+  }
+
+  useEffect(() => {
+    let disposed = false;
+
+    async function renderMap() {
+      if (!mapContainerRef.current) return;
+
+      try {
+        const L = await import("leaflet");
+        if (disposed || !mapContainerRef.current) return;
+
+        const centerPoint: [number, number] = [center.latitude, center.longitude];
+
+        if (!mapRef.current) {
+          mapRef.current = L.map(mapContainerRef.current, {
+            scrollWheelZoom: false,
+            zoomControl: true
+          }).setView(centerPoint, 13);
+
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          }).addTo(mapRef.current);
+        }
+
+        const map = mapRef.current;
+        markerRefs.current.forEach((marker) => marker.remove());
+        markerRefs.current = [];
+
+        const patientIcon = L.divIcon({
+          className: "",
+          html: '<span class="care-map-marker care-map-marker--patient">Voce</span>',
+          iconSize: [54, 34],
+          iconAnchor: [27, 17]
+        });
+        const patientMarker = L.marker(centerPoint, { icon: patientIcon, zIndexOffset: 1000 })
+          .addTo(map)
+          .bindPopup(locationStatus === "ready" ? "Sua localizacao aproximada" : "Centro inicial da busca");
+        markerRefs.current.push(patientMarker);
+
+        const bounds = L.latLngBounds([centerPoint]);
+
+        results.forEach((professional) => {
+          const isSelected = selectedId === professional.id;
+          const professionalIcon = L.divIcon({
+            className: "",
+            html: `<span class="care-map-marker ${isSelected ? "care-map-marker--selected" : "care-map-marker--professional"}">${professional.distanceKm.toFixed(1)} km</span>`,
+            iconSize: [58, 34],
+            iconAnchor: [29, 17]
+          });
+          const professionalPoint: [number, number] = [professional.latitude, professional.longitude];
+          const marker = L.marker(professionalPoint, {
+            icon: professionalIcon,
+            zIndexOffset: isSelected ? 900 : 500
+          })
+            .addTo(map)
+            .bindPopup(
+              `<strong>${escapeHtml(professional.name)}</strong><br>${escapeHtml(professional.roleLabel)}<br>${professional.distanceKm.toFixed(1)} km`
+            );
+
+          marker.on("click", () => selectProfessional(professional.id));
+          markerRefs.current.push(marker);
+          bounds.extend(professionalPoint);
+        });
+
+        if (results.length > 0) {
+          map.fitBounds(bounds.pad(0.28), { animate: true, maxZoom: radius <= 5 ? 14 : 13 });
+        } else {
+          map.setView(centerPoint, radius <= 5 ? 14 : 13);
+        }
+
+        setMapError("");
+      } catch {
+        if (!disposed) setMapError("Nao foi possivel carregar o mapa agora.");
+      }
+    }
+
+    renderMap();
+
+    return () => {
+      disposed = true;
+    };
+  }, [center.latitude, center.longitude, locationStatus, radius, results, selectedId]);
+
+  useEffect(() => {
+    return () => {
+      markerRefs.current.forEach((marker) => marker.remove());
+      markerRefs.current = [];
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, []);
 
   async function submitRequest() {
     if (!selected) return;
@@ -227,7 +386,19 @@ export function CareMatchApp() {
               <LocateFixed aria-hidden="true" className="h-4 w-4" />
               {center.neighborhood}, {center.city}
             </div>
-            <p className="mt-1 text-sm text-emerald-900">Busca com geolocalizacao persistida no banco.</p>
+            <p className="mt-1 text-sm text-emerald-900">
+              {locationStatus === "ready" ? `GPS ativo, precisao ${formatAccuracy(locationAccuracy)}.` : "Busca inicial na Zona Sul."}
+            </p>
+            <button
+              type="button"
+              onClick={useCurrentLocation}
+              disabled={locationStatus === "locating"}
+              className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
+            >
+              <LocateFixed aria-hidden="true" className="h-4 w-4" />
+              {locationStatus === "locating" ? "Localizando..." : "Usar minha localizacao"}
+            </button>
+            {locationError ? <p className="mt-2 text-sm font-medium text-rose-700">{locationError}</p> : null}
           </div>
 
           <div className="mt-5 space-y-5">
@@ -382,33 +553,10 @@ export function CareMatchApp() {
                 </div>
               </div>
 
-              <div className="mt-4 h-56 overflow-hidden rounded-lg border border-slate-200 bg-[#f6f8f4]">
-                <div className="relative h-full w-full">
-                  <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.06)_1px,transparent_1px),linear-gradient(0deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[length:46px_46px]" />
-                  <div className="absolute left-5 top-5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm">
-                    {center.neighborhood}
-                  </div>
-                  <div className="absolute bottom-5 left-10 h-24 w-52 rounded-full border-2 border-emerald-400 bg-emerald-200/30" />
-                  <div className="absolute right-8 top-8 h-28 w-44 rounded-full border-2 border-violet-300 bg-violet-200/30" />
-                  {results.map((professional, index) => (
-                    <button
-                      key={professional.id}
-                      type="button"
-                      onClick={() => selectProfessional(professional.id)}
-                      title={`${professional.name}, ${professional.distanceKm} km`}
-                      className={`absolute grid h-9 w-9 place-items-center rounded-lg border text-white shadow-sm transition ${
-                        selected?.id === professional.id ? "border-white bg-violet-700" : "border-white bg-emerald-700"
-                      }`}
-                      style={{
-                        left: `${18 + ((index * 17) % 64)}%`,
-                        top: `${25 + ((index * 23) % 48)}%`
-                      }}
-                    >
-                      <MapPin aria-hidden="true" className="h-5 w-5" />
-                    </button>
-                  ))}
-                </div>
+              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-[#eef4ef]">
+                <div ref={mapContainerRef} className="h-72 w-full" aria-label="Mapa com sua localizacao e profissionais proximos" />
               </div>
+              {mapError ? <p className="mt-2 text-sm text-rose-700">{mapError}</p> : null}
             </div>
 
             {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div> : null}

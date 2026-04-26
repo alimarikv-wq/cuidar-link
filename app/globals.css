@@ -54,3 +54,35 @@ a {
 .section-title {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
+
+.care-map-marker {
+  display: inline-flex;
+  min-width: 48px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.care-map-marker--patient {
+  background: #0f172a;
+}
+
+.care-map-marker--professional {
+  background: #047857;
+}
+
+.care-map-marker--selected {
+  background: #6d28d9;
+}
+
+.leaflet-container {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
