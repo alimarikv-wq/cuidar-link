@@ -88,3 +88,4 @@ Veja [PRODUCTION.md](./PRODUCTION.md).
 ## Plano cronologico
 
 Veja [LAUNCH_PLAN.md](./LAUNCH_PLAN.md).
+Deploy atualizado em 26/04/2026.
