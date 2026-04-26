@@ -56,6 +56,17 @@ function servicesForType(type: ProfessionalType) {
   return [CareService.BANHO, CareService.TRANSFERENCIA, CareService.COMPANHIA, CareService.REFEICAO];
 }
 
+function defaultAvailabilitySlots() {
+  return [
+    { weekday: 1, startTime: "08:00", endTime: "18:00" },
+    { weekday: 2, startTime: "08:00", endTime: "18:00" },
+    { weekday: 3, startTime: "08:00", endTime: "18:00" },
+    { weekday: 4, startTime: "08:00", endTime: "18:00" },
+    { weekday: 5, startTime: "08:00", endTime: "18:00" },
+    { weekday: 6, startTime: "09:00", endTime: "13:00" }
+  ];
+}
+
 export function buildUserCreateData(input: OnboardingInput): Prisma.UserCreateInput {
   const accountType = input.accountType || AccountType.PATIENT;
   const neighborhood = input.neighborhood || "Tristeza";
@@ -85,7 +96,10 @@ export function buildUserCreateData(input: OnboardingInput): Prisma.UserCreateIn
           bio: input.bio || "Profissional disponivel para cuidado domiciliar.",
           mobilitySupport: input.mobilitySupport || "Apoio em rotina domiciliar e transferencia conforme avaliacao.",
           supportLevel: transferNeed,
-          services: servicesForType(professionalType)
+          services: servicesForType(professionalType),
+          availability: {
+            create: defaultAvailabilitySlots()
+          }
         }
       }
     };

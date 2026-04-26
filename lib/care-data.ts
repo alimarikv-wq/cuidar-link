@@ -183,11 +183,17 @@ function slotMatchesAvailability(slot: { weekday: number; startTime: string; end
 }
 
 function availabilityLabel(professional: ProfessionalWithRelations, filter: AvailabilityFilter) {
+  if (professional.availability.length === 0) return "Sob consulta";
   if (filter === "agora") return "Agora";
   if (filter === "hoje") return "Hoje";
   const matchingSlot = professional.availability.find((slot) => slotMatchesAvailability(slot, filter));
   if (!matchingSlot) return "Sob consulta";
   return `${matchingSlot.startTime} - ${matchingSlot.endTime}`;
+}
+
+function professionalMatchesAvailability(professional: ProfessionalWithRelations, filter: AvailabilityFilter) {
+  if (professional.availability.length === 0) return filter !== "agora";
+  return professional.availability.some((slot) => slotMatchesAvailability(slot, filter));
 }
 
 function calculateScore(
@@ -268,7 +274,7 @@ export async function searchCareProfessionals(params: CareSearchParams) {
     .map((professional) => ({
       professional,
       distance: distanceKm(latitude, longitude, Number(professional.latitude), Number(professional.longitude)),
-      hasAvailability: professional.availability.some((slot) => slotMatchesAvailability(slot, params.availability))
+      hasAvailability: professionalMatchesAvailability(professional, params.availability)
     }))
     .filter(({ distance, professional, hasAvailability }) => {
       return distance <= params.radiusKm && canSupport(professional.supportLevel, params.supportNeed) && hasAvailability;
