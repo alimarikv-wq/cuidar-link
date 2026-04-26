@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HeartHandshake, LogIn, PanelRightOpen, UserPlus } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { buttonStyles } from "@/components/ui/button";
+import { LogoutButton } from "@/components/ui/logout-button";
 
 export async function Header() {
   const user = await getCurrentUser();
@@ -27,10 +28,13 @@ export async function Header() {
 
         <div className="flex items-center gap-2">
           {user ? (
-            <Link href="/dashboard" className={`${buttonStyles()} gap-2`}>
-              <PanelRightOpen aria-hidden="true" className="h-4 w-4" />
-              Meu painel
-            </Link>
+            <>
+              <Link href="/dashboard" className={`${buttonStyles()} gap-2`}>
+                <PanelRightOpen aria-hidden="true" className="h-4 w-4" />
+                Meu painel
+              </Link>
+              <LogoutButton />
+            </>
           ) : (
             <>
               <Link href="/login" className={`${buttonStyles("ghost")} hidden gap-2 sm:inline-flex`}>

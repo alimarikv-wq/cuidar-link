@@ -76,6 +76,15 @@ const emptyCenter = {
   longitude: -51.256708
 };
 
+function getDefaultScheduledFor() {
+  const scheduled = new Date();
+  scheduled.setDate(scheduled.getDate() + 1);
+  scheduled.setHours(14, 30, 0, 0);
+
+  const localDate = new Date(scheduled.getTime() - scheduled.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+
 export function CareMatchApp() {
   const [service, setService] = useState<CareServiceCode>("BANHO");
   const [professionalType, setProfessionalType] = useState<ProfessionalTypeFilter>("TODOS");
@@ -98,7 +107,7 @@ export function CareMatchApp() {
   const [requesterPhone, setRequesterPhone] = useState("(51) 99999-0101");
   const [addressLine, setAddressLine] = useState("Zona Sul, Porto Alegre");
   const [neighborhood, setNeighborhood] = useState("Tristeza");
-  const [scheduledFor, setScheduledFor] = useState("2026-04-25T14:30");
+  const [scheduledFor, setScheduledFor] = useState(getDefaultScheduledFor);
   const [notes, setNotes] = useState("Preciso de banho assistido e transferencia segura cadeira-cama.");
 
   useEffect(() => {
