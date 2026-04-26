@@ -97,7 +97,7 @@ export type ProfessionalTypeCode = "CUIDADOR" | "TECNICO_ENFERMAGEM" | "FISIOTER
 export type GenderCode = "FEMININO" | "MASCULINO" | "OUTRO";
 export type GenderPreferenceCode = "FEMININO" | "MASCULINO" | "QUALQUER";
 export type TransferSupportCode = "MODERADO" | "ALTO" | "DUPLA";
-export type AvailabilityFilter = "agora" | "hoje" | "manha" | "tarde" | "noite" | "fim-de-semana";
+export type AvailabilityFilter = "qualquer" | "agora" | "hoje" | "manha" | "tarde" | "noite" | "fim-de-semana";
 
 export type CareProfessional = {
   id: string;

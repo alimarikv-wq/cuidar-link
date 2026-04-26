@@ -60,6 +60,7 @@ const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
 ];
 
 const availabilityOptions: Array<{ value: AvailabilityFilter; label: string }> = [
+  { value: "qualquer", label: "Qualquer horario" },
   { value: "agora", label: "Agora" },
   { value: "hoje", label: "Hoje" },
   { value: "manha", label: "Manha" },
@@ -80,7 +81,7 @@ export function CareMatchApp() {
   const [professionalType, setProfessionalType] = useState<ProfessionalTypeFilter>("TODOS");
   const [genderPreference, setGenderPreference] = useState<GenderPreferenceCode>("FEMININO");
   const [supportNeed, setSupportNeed] = useState<TransferSupportCode>("ALTO");
-  const [availability, setAvailability] = useState<AvailabilityFilter>("hoje");
+  const [availability, setAvailability] = useState<AvailabilityFilter>("qualquer");
   const [radius, setRadius] = useState(8);
   const [searchVersion, setSearchVersion] = useState(0);
   const [results, setResults] = useState<CareProfessional[]>([]);

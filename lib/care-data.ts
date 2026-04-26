@@ -127,8 +127,8 @@ export function parseSupportLevel(value: string | null): TransferSupportLevel {
 }
 
 export function parseAvailability(value: string | null): AvailabilityFilter {
-  const allowed: AvailabilityFilter[] = ["agora", "hoje", "manha", "tarde", "noite", "fim-de-semana"];
-  return allowed.includes(value as AvailabilityFilter) ? (value as AvailabilityFilter) : "hoje";
+  const allowed: AvailabilityFilter[] = ["qualquer", "agora", "hoje", "manha", "tarde", "noite", "fim-de-semana"];
+  return allowed.includes(value as AvailabilityFilter) ? (value as AvailabilityFilter) : "qualquer";
 }
 
 export function getServiceLabel(service: CareService) {
@@ -167,6 +167,8 @@ function timeToMinutes(value: string) {
 }
 
 function slotMatchesAvailability(slot: { weekday: number; startTime: string; endTime: string }, filter: AvailabilityFilter) {
+  if (filter === "qualquer") return true;
+
   const now = new Date();
   const weekday = now.getDay();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -184,6 +186,7 @@ function slotMatchesAvailability(slot: { weekday: number; startTime: string; end
 
 function availabilityLabel(professional: ProfessionalWithRelations, filter: AvailabilityFilter) {
   if (professional.availability.length === 0) return "Sob consulta";
+  if (filter === "qualquer") return "Agenda flexivel";
   if (filter === "agora") return "Agora";
   if (filter === "hoje") return "Hoje";
   const matchingSlot = professional.availability.find((slot) => slotMatchesAvailability(slot, filter));
@@ -192,6 +195,7 @@ function availabilityLabel(professional: ProfessionalWithRelations, filter: Avai
 }
 
 function professionalMatchesAvailability(professional: ProfessionalWithRelations, filter: AvailabilityFilter) {
+  if (filter === "qualquer") return true;
   if (professional.availability.length === 0) return filter !== "agora";
   return professional.availability.some((slot) => slotMatchesAvailability(slot, filter));
 }
