@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AccountType {
+  PATIENT
+  PROFESSIONAL
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+enum CabinClass {
+  ECONOMY
+  BUSINESS
+}
+
+enum Program {
+  LATAM_PASS
+  SMILES
+  AZUL_FIDELIDADE
+  TAP_MILES_GO
+  LIVELO
+  ESFERA
+  C6_ATOMOS
+}
+
+enum Gender {
+  FEMININO
+  MASCULINO
+  OUTRO
+}
+
+enum GenderPreference {
+  FEMININO
+  MASCULINO
+  QUALQUER
+}
+
+enum ProfessionalType {
+  CUIDADOR
+  TECNICO_ENFERMAGEM
+  FISIOTERAPEUTA
+}
+
+enum CareService {
+  BANHO
+  TRANSFERENCIA
+  MEDICACAO
+  CURATIVOS
+  FISIOTERAPIA
+  COMPANHIA
+  REFEICAO
+  SINAIS_VITAIS
+  AVALIACAO
+  FORTALECIMENTO
+}
+
+enum TransferSupportLevel {
+  MODERADO
+  ALTO
+  DUPLA
+}
+
+enum DocumentType {
+  RG
+  CPF
+  COREN
+  CREFITO
+  CERTIFICADO
+  REFERENCIA
+}
+
+enum VerificationStatus {
+  PENDENTE
+  VERIFICADO
+  RECUSADO
+}
+
+enum CareRequestStatus {
+  RASCUNHO
+  ENVIADO
+  ACEITO
+  AGENDADO
+  CONCLUIDO
+  CANCELADO
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  role                UserRole             @default(USER)
+  accountType         AccountType          @default(PATIENT)
+  subscriptionTier    SubscriptionTier     @default(FREE)
+  monthlySearches     Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  favorites           Favorite[]
+  alerts              Alert[]
+  patientProfile      PatientProfile?
+  professionalProfile ProfessionalProfile?
+  oauthAccounts       OAuthAccount[]
+}
+
+model OAuthAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  email             String?
+  createdAt         DateTime      @default(now())
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model PatientProfile {
+  id                  String               @id @default(cuid())
+  userId              String               @unique
+  phone               String?
+  city                String               @default("Porto Alegre")
+  neighborhood        String
+  addressLine         String?
+  latitude            Decimal?             @db.Decimal(9, 6)
+  longitude           Decimal?             @db.Decimal(9, 6)
+  approximateWeightKg Int?
+  mobilityNotes       String?
+  preferredGender     GenderPreference     @default(FEMININO)
+  transferNeed        TransferSupportLevel @default(ALTO)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  careRequests        CareRequest[]
+}
+
+model ProfessionalProfile {
+  id               String                 @id @default(cuid())
+  userId           String                 @unique
+  professionalType ProfessionalType
+  gender           Gender
+  age              Int
+  phone            String?
+  city             String                 @default("Porto Alegre")
+  neighborhood     String
+  addressLine      String?
+  latitude         Decimal                @db.Decimal(9, 6)
+  longitude        Decimal                @db.Decimal(9, 6)
+  serviceRadiusKm  Int                    @default(8)
+  hourlyRate       Decimal                @db.Decimal(10, 2)
+  sessionRate      Decimal?               @db.Decimal(10, 2)
+  photoUrl         String?
+  bio              String
+  mobilitySupport  String
+  supportLevel     TransferSupportLevel
+  services         CareService[]
+  rating           Decimal                @default(0) @db.Decimal(3, 2)
+  reviewCount      Int                    @default(0)
+  responseMinutes  Int                    @default(15)
+  isVerified       Boolean                @default(false)
+  isActive         Boolean                @default(true)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents        ProfessionalDocument[]
+  availability     AvailabilitySlot[]
+  careRequests     CareRequest[]
+
+  @@index([professionalType])
+  @@index([gender])
+  @@index([neighborhood])
+  @@index([isActive])
+}
+
+model ProfessionalDocument {
+  id             String              @id @default(cuid())
+  professionalId String
+  type           DocumentType
+  status         VerificationStatus  @default(PENDENTE)
+  label          String
+  documentNumber String?
+  fileUrl        String?
+  expiresAt      DateTime?
+  createdAt      DateTime            @default(now())
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId])
+  @@index([status])
+}
+
+model AvailabilitySlot {
+  id             String              @id @default(cuid())
+  professionalId String
+  weekday        Int
+  startTime      String
+  endTime        String
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, weekday])
+}
+
+model CareRequest {
+  id               String               @id @default(cuid())
+  patientProfileId String?
+  professionalId   String
+  requesterName    String
+  requesterEmail   String?
+  requesterPhone   String?
+  service          CareService
+  supportNeed      TransferSupportLevel
+  preferredGender  GenderPreference
+  scheduledFor     DateTime?
+  durationHours    Decimal              @default(2) @db.Decimal(4, 2)
+  addressLine      String
+  neighborhood     String
+  city             String               @default("Porto Alegre")
+  latitude         Decimal?             @db.Decimal(9, 6)
+  longitude        Decimal?             @db.Decimal(9, 6)
+  notes            String?
+  status           CareRequestStatus    @default(ENVIADO)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  patientProfile   PatientProfile?      @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  professional     ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, status])
+  @@index([patientProfileId])
+  @@index([scheduledFor])
+}
+
+model AwardOffer {
+  id            String         @id @default(cuid())
+  origin        String
+  destination   String
+  departureDate DateTime
+  returnDate    DateTime?
+  cabinClass    CabinClass
+  program       Program
+  milesRequired Int
+  taxesAmount   Decimal        @db.Decimal(10, 2)
+  cashPrice     Decimal        @db.Decimal(10, 2)
+  affiliateUrl  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  priceHistory  PriceHistory[]
+  favorites     Favorite[]
+  alerts        Alert[]
+}
+
+model PriceHistory {
+  id          String     @id @default(cuid())
+  offerId     String
+  recordedAt  DateTime   @default(now())
+  milesValue  Int
+  taxesAmount Decimal    @db.Decimal(10, 2)
+  offer       AwardOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+}
+
+model Favorite {
+  id        String     @id @default(cuid())
+  userId    String
+  offerId   String
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer     AwardOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, offerId])
+}
+
+model Alert {
+  id          String     @id @default(cuid())
+  userId      String
+  offerId     String
+  targetMiles Int
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer       AwardOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, offerId])
+}

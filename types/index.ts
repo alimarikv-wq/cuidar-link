@@ -1,0 +1,182 @@
+export type TripType = "ROUND_TRIP" | "ONE_WAY";
+
+export const PROGRAM_OPTIONS = [
+  { label: "Latam Pass", value: "LATAM_PASS" },
+  { label: "Smiles", value: "SMILES" },
+  { label: "Azul Fidelidade", value: "AZUL_FIDELIDADE" },
+  { label: "TAP Miles&Go", value: "TAP_MILES_GO" },
+  { label: "Livelo", value: "LIVELO" },
+  { label: "Esfera", value: "ESFERA" },
+  { label: "C6 Atomos", value: "C6_ATOMOS" }
+] as const;
+
+export type SearchHistoryPoint = {
+  date: string;
+  label: string;
+  miles: number;
+};
+
+export type SearchResult = {
+  id: string;
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate: string | null;
+  program: string;
+  programLabel: string;
+  milesRequired: number;
+  taxesAmount: number;
+  cashPrice: number;
+  valuePerMile: number;
+  bestValueScore: number;
+  affiliateUrl: string | null;
+  history: SearchHistoryPoint[];
+};
+
+export type DashboardData = {
+  summary: {
+    tier: string;
+    tierLabel: string;
+    searches: number;
+    favoriteCount: number;
+    alertCount: number;
+  };
+  favorites: Array<{
+    id: string;
+    programLabel: string;
+    origin: string;
+    destination: string;
+    milesRequired: number;
+  }>;
+  alerts: Array<{
+    id: string;
+    programLabel: string;
+    origin: string;
+    destination: string;
+    targetMiles: number;
+  }>;
+  history: Array<{
+    label: string;
+    miles: number;
+  }>;
+  programMix: Array<{
+    label: string;
+    count: number;
+  }>;
+};
+
+export type AdminOverview = {
+  users: number;
+  premiumUsers: number;
+  trackedOffers: number;
+  activeAlerts: number;
+  premiumRevenueEstimate: number;
+  programDistribution: Array<{
+    label: string;
+    count: number;
+  }>;
+  subscriptionMix: Array<{
+    label: string;
+    value: number;
+  }>;
+};
+
+export type CareServiceCode =
+  | "BANHO"
+  | "TRANSFERENCIA"
+  | "MEDICACAO"
+  | "CURATIVOS"
+  | "FISIOTERAPIA"
+  | "COMPANHIA"
+  | "REFEICAO"
+  | "SINAIS_VITAIS"
+  | "AVALIACAO"
+  | "FORTALECIMENTO";
+
+export type ProfessionalTypeCode = "CUIDADOR" | "TECNICO_ENFERMAGEM" | "FISIOTERAPEUTA";
+export type GenderCode = "FEMININO" | "MASCULINO" | "OUTRO";
+export type GenderPreferenceCode = "FEMININO" | "MASCULINO" | "QUALQUER";
+export type TransferSupportCode = "MODERADO" | "ALTO" | "DUPLA";
+export type AvailabilityFilter = "agora" | "hoje" | "manha" | "tarde" | "noite" | "fim-de-semana";
+
+export type CareProfessional = {
+  id: string;
+  name: string;
+  professionalType: ProfessionalTypeCode;
+  roleLabel: string;
+  gender: GenderCode;
+  genderLabel: string;
+  age: number;
+  city: string;
+  neighborhood: string;
+  distanceKm: number;
+  photoUrl: string | null;
+  rating: number;
+  reviewCount: number;
+  priceLabel: string;
+  availableIn: string;
+  responseTimeLabel: string;
+  supportLevel: TransferSupportCode;
+  supportLevelLabel: string;
+  mobilitySupport: string;
+  services: CareServiceCode[];
+  serviceLabels: string[];
+  credentials: string[];
+  bio: string;
+  isVerified: boolean;
+  matchScore: number;
+};
+
+export type CareSearchResponse = {
+  results: CareProfessional[];
+  source?: "database" | "demo";
+  warning?: string;
+  center: {
+    city: string;
+    neighborhood: string;
+    latitude: number;
+    longitude: number;
+  };
+};
+
+export type CareRequestRecord = {
+  id: string;
+  status: string;
+  statusLabel: string;
+  serviceLabel: string;
+  scheduledFor: string | null;
+  createdAt: string;
+  professionalName: string;
+  professionalRole: string;
+  neighborhood: string;
+};
+
+export type CareDashboardData = {
+  summary: {
+    accountType: string;
+    accountTypeLabel: string;
+    requests: number;
+    scheduled: number;
+    completed: number;
+    verifiedDocuments: number;
+  };
+  requests: CareRequestRecord[];
+  profile: {
+    name: string;
+    email: string;
+    neighborhood: string | null;
+    transferNeedLabel: string | null;
+    professionalTypeLabel: string | null;
+  };
+};
+
+export type CareAdminOverview = {
+  users: number;
+  patients: number;
+  professionals: number;
+  verifiedProfessionals: number;
+  openRequests: number;
+  completedRequests: number;
+  professionalsByType: Array<{ label: string; count: number }>;
+  requestsByStatus: Array<{ label: string; count: number }>;
+};
