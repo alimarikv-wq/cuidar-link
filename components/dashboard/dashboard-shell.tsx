@@ -43,7 +43,7 @@ const weekdayOptions = [
 ];
 
 const fieldClass =
-  "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+  "h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
 const statusStyles: Record<RequestStatus, string> = {
   RASCUNHO: "bg-slate-100 text-slate-700",
@@ -187,7 +187,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             Telefone
             <input
@@ -258,7 +258,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
           </label>
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           <div>
             <p className="text-sm font-semibold text-slate-700">Servicos</p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">

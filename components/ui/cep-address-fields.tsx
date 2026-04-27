@@ -24,7 +24,7 @@ type CepAddressFieldsProps = {
 };
 
 const fieldClass =
-  "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+  "h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
 function onlyDigits(value: string) {
   return value.replace(/\D/g, "").slice(0, 8);
@@ -85,9 +85,9 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
   }
 
   return (
-    <div className={`grid gap-3 ${className}`}>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+    <div className={`grid min-w-0 gap-3 ${className}`}>
+      <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
           CEP
           <input
             value={value.postalCode}
@@ -101,15 +101,15 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
           type="button"
           onClick={searchCep}
           disabled={isSearching || cepDigits.length !== 8}
-          className="mt-auto inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-700 bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+          className="mt-auto inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-emerald-700 bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
         >
           {isSearching ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Search aria-hidden="true" className="h-4 w-4" />}
           Buscar CEP
         </button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
-        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+        <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
           Endereco
           <input
             value={value.addressLine}
@@ -118,7 +118,7 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
             className={fieldClass}
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+        <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
           Numero
           <input
             value={value.addressNumber}
@@ -129,7 +129,7 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
         </label>
       </div>
 
-      <label className="grid gap-1 text-sm font-semibold text-slate-700">
+      <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
         Complemento
         <input
           value={value.addressComplement}
@@ -139,8 +139,8 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
         />
       </label>
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_80px]">
-        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_80px]">
+        <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
           Bairro
           <input
             value={value.neighborhood}
@@ -149,7 +149,7 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
             className={fieldClass}
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+        <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
           Cidade
           <input
             value={value.city}
@@ -158,7 +158,7 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
             className={fieldClass}
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+        <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
           UF
           <input
             value={value.state}
