@@ -103,8 +103,12 @@ export type CreateCareRequestInput = {
   scheduledFor?: string;
   durationHours?: number;
   addressLine: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  postalCode?: string;
   neighborhood: string;
   city?: string;
+  state?: string;
   latitude?: number;
   longitude?: number;
   notes?: string;
@@ -122,6 +126,11 @@ type UpdateProfessionalProfileInput = {
   phone?: string;
   neighborhood: string;
   addressLine?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  postalCode?: string;
+  city?: string;
+  state?: string;
   serviceRadiusKm: number;
   hourlyRate: number;
   sessionRate?: number | null;
@@ -359,8 +368,12 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       scheduledFor: input.scheduledFor ? new Date(input.scheduledFor) : null,
       durationHours: input.durationHours ?? 2,
       addressLine: input.addressLine,
+      addressNumber: input.addressNumber,
+      addressComplement: input.addressComplement,
+      postalCode: input.postalCode,
       neighborhood: input.neighborhood,
       city: input.city || defaultCenter.city,
+      state: input.state,
       latitude: input.latitude,
       longitude: input.longitude,
       notes: input.notes,
@@ -385,7 +398,11 @@ function toRequestRecord(request: Prisma.CareRequestGetPayload<{ include: { prof
     requesterName: request.requesterName,
     requesterPhone: request.requesterPhone,
     addressLine: request.addressLine,
+    addressNumber: request.addressNumber,
+    addressComplement: request.addressComplement,
+    postalCode: request.postalCode,
     city: request.city,
+    state: request.state,
     notes: request.notes,
     professionalName: request.professional.user.name,
     professionalRole: professionalTypeLabel[request.professional.professionalType],
@@ -474,6 +491,11 @@ export async function updateProfessionalProfileForUser(userId: string, input: Up
         phone: input.phone || null,
         neighborhood: input.neighborhood,
         addressLine: input.addressLine || null,
+        addressNumber: input.addressNumber || null,
+        addressComplement: input.addressComplement || null,
+        postalCode: input.postalCode || null,
+        city: input.city || defaultCenter.city,
+        state: input.state || null,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
         serviceRadiusKm: input.serviceRadiusKm,
@@ -570,6 +592,11 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
           phone: user.professionalProfile.phone,
           neighborhood: user.professionalProfile.neighborhood,
           addressLine: user.professionalProfile.addressLine,
+          addressNumber: user.professionalProfile.addressNumber,
+          addressComplement: user.professionalProfile.addressComplement,
+          postalCode: user.professionalProfile.postalCode,
+          city: user.professionalProfile.city,
+          state: user.professionalProfile.state,
           serviceRadiusKm: user.professionalProfile.serviceRadiusKm,
           hourlyRate: Number(user.professionalProfile.hourlyRate),
           sessionRate: user.professionalProfile.sessionRate ? Number(user.professionalProfile.sessionRate) : null,

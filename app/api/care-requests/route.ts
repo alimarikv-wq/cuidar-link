@@ -16,8 +16,12 @@ const createSchema = z.object({
   scheduledFor: z.string().optional().or(z.literal("")),
   durationHours: z.coerce.number().min(1).max(24).optional(),
   addressLine: z.string().min(3),
+  addressNumber: z.string().optional().or(z.literal("")),
+  addressComplement: z.string().optional().or(z.literal("")),
+  postalCode: z.string().optional().or(z.literal("")),
   neighborhood: z.string().min(2),
   city: z.string().min(2).optional(),
+  state: z.string().min(2).max(2).optional().or(z.literal("")),
   latitude: z.coerce.number().optional(),
   longitude: z.coerce.number().optional(),
   notes: z.string().max(1000).optional().or(z.literal(""))
@@ -49,6 +53,10 @@ export async function POST(request: NextRequest) {
         ...parsed.data,
         requesterEmail: parsed.data.requesterEmail || undefined,
         requesterPhone: parsed.data.requesterPhone || undefined,
+        addressNumber: parsed.data.addressNumber || undefined,
+        addressComplement: parsed.data.addressComplement || undefined,
+        postalCode: parsed.data.postalCode || undefined,
+        state: parsed.data.state || undefined,
         scheduledFor: parsed.data.scheduledFor || undefined,
         notes: parsed.data.notes || undefined
       },

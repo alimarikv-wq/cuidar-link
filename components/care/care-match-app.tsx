@@ -22,6 +22,7 @@ import {
   Weight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
 import {
   AvailabilityFilter,
   CareProfessional,
@@ -133,7 +134,12 @@ export function CareMatchApp() {
   const [requesterName, setRequesterName] = useState("Joao Paciente");
   const [requesterPhone, setRequesterPhone] = useState("(51) 99999-0101");
   const [addressLine, setAddressLine] = useState("Zona Sul, Porto Alegre");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [addressComplement, setAddressComplement] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [neighborhood, setNeighborhood] = useState("Tristeza");
+  const [city, setCity] = useState("Porto Alegre");
+  const [stateCode, setStateCode] = useState("RS");
   const [scheduledFor, setScheduledFor] = useState(getDefaultScheduledFor);
   const [notes, setNotes] = useState("Preciso de banho assistido e transferencia segura cadeira-cama.");
 
@@ -217,6 +223,8 @@ export function CareMatchApp() {
         setLocationAccuracy(position.coords.accuracy);
         setLocationStatus("ready");
         setAddressLine("Localizacao atual aproximada");
+        setNeighborhood("Sua localizacao");
+        setCity(nextCenter.city);
         setSearchVersion((current) => current + 1);
       },
       (locationProblem) => {
@@ -345,8 +353,12 @@ export function CareMatchApp() {
         scheduledFor,
         durationHours: 2,
         addressLine,
+        addressNumber,
+        addressComplement,
+        postalCode,
         neighborhood,
-        city: center.city,
+        city,
+        state: stateCode,
         latitude: center.latitude,
         longitude: center.longitude,
         notes
@@ -363,6 +375,16 @@ export function CareMatchApp() {
 
     setRequestWarning(data.warning || "");
     setRequestSent(true);
+  }
+
+  function updateRequestAddress(nextAddress: CepAddressValue) {
+    setPostalCode(nextAddress.postalCode);
+    setAddressLine(nextAddress.addressLine);
+    setAddressNumber(nextAddress.addressNumber);
+    setAddressComplement(nextAddress.addressComplement);
+    setNeighborhood(nextAddress.neighborhood);
+    setCity(nextAddress.city);
+    setStateCode(nextAddress.state);
   }
 
   return (
@@ -723,17 +745,17 @@ export function CareMatchApp() {
                     onChange={(event) => setScheduledFor(event.target.value)}
                     className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
                   />
-                  <input
-                    value={addressLine}
-                    onChange={(event) => setAddressLine(event.target.value)}
-                    placeholder="Endereco"
-                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                  />
-                  <input
-                    value={neighborhood}
-                    onChange={(event) => setNeighborhood(event.target.value)}
-                    placeholder="Bairro"
-                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
+                  <CepAddressFields
+                    value={{
+                      postalCode,
+                      addressLine,
+                      addressNumber,
+                      addressComplement,
+                      neighborhood,
+                      city,
+                      state: stateCode
+                    }}
+                    onChange={updateRequestAddress}
                   />
                   <textarea
                     value={notes}

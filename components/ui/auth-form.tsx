@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Apple, BriefcaseMedical, Eye, EyeOff, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
 import { isStrongPassword, validatePassword } from "@/lib/password-policy";
 
 type AccountType = "PATIENT" | "PROFESSIONAL";
@@ -34,6 +35,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [phone, setPhone] = useState("");
   const [neighborhood, setNeighborhood] = useState("Tristeza");
   const [addressLine, setAddressLine] = useState("Zona Sul, Porto Alegre");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [addressComplement, setAddressComplement] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("Porto Alegre");
+  const [stateCode, setStateCode] = useState("RS");
   const [approximateWeightKg, setApproximateWeightKg] = useState("118");
   const [preferredGender, setPreferredGender] = useState("FEMININO");
   const [transferNeed, setTransferNeed] = useState("ALTO");
@@ -78,10 +84,30 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     return `/api/auth/oauth/${provider}?${params.toString()}`;
   }
 
+  function updateAddress(nextAddress: CepAddressValue) {
+    setPostalCode(nextAddress.postalCode);
+    setAddressLine(nextAddress.addressLine);
+    setAddressNumber(nextAddress.addressNumber);
+    setAddressComplement(nextAddress.addressComplement);
+    setNeighborhood(nextAddress.neighborhood);
+    setCity(nextAddress.city);
+    setStateCode(nextAddress.state);
+  }
+
   function handleSubmit() {
     setError("");
 
     startTransition(async () => {
+      const addressPayload = {
+        phone,
+        neighborhood,
+        addressLine,
+        addressNumber,
+        addressComplement,
+        postalCode,
+        city,
+        state: stateCode
+      };
       const registerPayload =
         accountType === "PROFESSIONAL"
           ? {
@@ -89,9 +115,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               email,
               password,
               accountType,
-              phone,
-              neighborhood,
-              addressLine,
+              ...addressPayload,
               professionalType,
               gender,
               age,
@@ -104,9 +128,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               email,
               password,
               accountType,
-              phone,
-              neighborhood,
-              addressLine,
+              ...addressPayload,
               approximateWeightKg,
               preferredGender,
               transferNeed,
@@ -353,21 +375,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Telefone" className={fieldClass} />
-            <select value={neighborhood} onChange={(event) => setNeighborhood(event.target.value)} className={fieldClass}>
-              <option>Tristeza</option>
-              <option>Cavalhada</option>
-              <option>Cristal</option>
-              <option>Ipanema</option>
-              <option>Menino Deus</option>
-              <option>Azenha</option>
-            </select>
           </div>
 
-          <input
-            value={addressLine}
-            onChange={(event) => setAddressLine(event.target.value)}
-            placeholder="Endereco ou referencia"
-            className={fieldClass}
+          <CepAddressFields
+            value={{
+              postalCode,
+              addressLine,
+              addressNumber,
+              addressComplement,
+              neighborhood,
+              city,
+              state: stateCode
+            }}
+            onChange={updateAddress}
           />
 
           {accountType === "PROFESSIONAL" ? (

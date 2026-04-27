@@ -9,6 +9,11 @@ const updateSchema = z.object({
   phone: z.string().optional().or(z.literal("")),
   neighborhood: z.string().min(2),
   addressLine: z.string().optional().or(z.literal("")),
+  addressNumber: z.string().optional().or(z.literal("")),
+  addressComplement: z.string().optional().or(z.literal("")),
+  postalCode: z.string().optional().or(z.literal("")),
+  city: z.string().min(2).optional().or(z.literal("")),
+  state: z.string().min(2).max(2).optional().or(z.literal("")),
   serviceRadiusKm: z.coerce.number().int().min(1).max(50),
   hourlyRate: z.coerce.number().min(1).max(1000),
   sessionRate: z.coerce.number().min(1).max(5000).nullable().optional(),
@@ -48,6 +53,11 @@ export async function PATCH(request: NextRequest) {
     ...parsed.data,
     phone: parsed.data.phone || undefined,
     addressLine: parsed.data.addressLine || undefined,
+    addressNumber: parsed.data.addressNumber || undefined,
+    addressComplement: parsed.data.addressComplement || undefined,
+    postalCode: parsed.data.postalCode || undefined,
+    city: parsed.data.city || undefined,
+    state: parsed.data.state || undefined,
     sessionRate: parsed.data.sessionRate ?? null
   });
 

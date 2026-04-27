@@ -151,7 +151,11 @@ export type CareRequestRecord = {
   requesterName: string;
   requesterPhone: string | null;
   addressLine: string;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  postalCode: string | null;
   city: string;
+  state: string | null;
   notes: string | null;
   professionalName: string;
   professionalRole: string;
@@ -171,7 +175,12 @@ export type ProfessionalSettingsData = {
   phone: string | null;
   neighborhood: string;
   addressLine: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  postalCode: string | null;
   serviceRadiusKm: number;
+  city: string;
+  state: string | null;
   hourlyRate: number;
   sessionRate: number | null;
   bio: string;

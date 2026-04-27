@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarCheck, Check, ClipboardList, FileBadge, Save, UserRoundCheck, X } from "lucide-react";
+import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
 import { AvailabilitySlotData, CareDashboardData, CareServiceCode, ProfessionalSettingsData, TransferSupportCode } from "@/types";
 
 type RequestStatus = "RASCUNHO" | "ENVIADO" | "ACEITO" | "AGENDADO" | "CONCLUIDO" | "CANCELADO";
@@ -31,7 +32,6 @@ const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
   { value: "DUPLA", label: "Duas pessoas" }
 ];
 
-const neighborhoodOptions = ["Tristeza", "Cavalhada", "Cristal", "Ipanema", "Menino Deus", "Azenha"];
 const weekdayOptions = [
   { value: 0, label: "Dom" },
   { value: 1, label: "Seg" },
@@ -133,6 +133,19 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
     }));
   }
 
+  function updateAddress(nextAddress: CepAddressValue) {
+    setForm((current) => ({
+      ...current,
+      postalCode: nextAddress.postalCode,
+      addressLine: nextAddress.addressLine,
+      addressNumber: nextAddress.addressNumber,
+      addressComplement: nextAddress.addressComplement,
+      neighborhood: nextAddress.neighborhood,
+      city: nextAddress.city,
+      state: nextAddress.state
+    }));
+  }
+
   function saveProfile() {
     setMessage("");
     setError("");
@@ -183,26 +196,19 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
               className={fieldClass}
             />
           </label>
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Bairro
-            <select
-              value={form.neighborhood}
-              onChange={(event) => setForm((current) => ({ ...current, neighborhood: event.target.value }))}
-              className={fieldClass}
-            >
-              {neighborhoodOptions.map((neighborhood) => (
-                <option key={neighborhood}>{neighborhood}</option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
-            Endereco base
-            <input
-              value={form.addressLine || ""}
-              onChange={(event) => setForm((current) => ({ ...current, addressLine: event.target.value }))}
-              className={fieldClass}
-            />
-          </label>
+          <CepAddressFields
+            className="sm:col-span-2"
+            value={{
+              postalCode: form.postalCode || "",
+              addressLine: form.addressLine || "",
+              addressNumber: form.addressNumber || "",
+              addressComplement: form.addressComplement || "",
+              neighborhood: form.neighborhood,
+              city: form.city || "Porto Alegre",
+              state: form.state || "RS"
+            }}
+            onChange={updateAddress}
+          />
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             Valor por hora
             <input
@@ -437,8 +443,9 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                     : `${request.professionalName} - ${request.professionalRole}`}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  {request.addressLine}, {request.neighborhood}
+                  {[request.addressLine, request.addressNumber].filter(Boolean).join(", ")} - {request.neighborhood}
                 </p>
+                {request.addressComplement ? <p className="mt-1 text-sm text-slate-500">{request.addressComplement}</p> : null}
                 {request.requesterPhone ? <p className="mt-1 text-sm text-slate-500">Telefone: {request.requesterPhone}</p> : null}
                 {request.notes ? <p className="mt-2 text-sm leading-6 text-slate-600">{request.notes}</p> : null}
               </div>

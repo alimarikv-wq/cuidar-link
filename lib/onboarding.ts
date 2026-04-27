@@ -17,6 +17,11 @@ type OnboardingInput = {
   phone?: string;
   neighborhood?: string;
   addressLine?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  postalCode?: string;
+  city?: string;
+  state?: string;
   approximateWeightKg?: number;
   preferredGender?: GenderPreference;
   transferNeed?: TransferSupportLevel;
@@ -70,6 +75,8 @@ function defaultAvailabilitySlots() {
 export function buildUserCreateData(input: OnboardingInput): Prisma.UserCreateInput {
   const accountType = input.accountType || AccountType.PATIENT;
   const neighborhood = input.neighborhood || "Tristeza";
+  const city = input.city || "Porto Alegre";
+  const state = input.state || "RS";
   const coordinates = coordinatesFor(neighborhood);
   const transferNeed = input.transferNeed || TransferSupportLevel.ALTO;
 
@@ -87,9 +94,13 @@ export function buildUserCreateData(input: OnboardingInput): Prisma.UserCreateIn
           gender: input.gender || Gender.FEMININO,
           age: input.age || 30,
           phone: input.phone,
-          city: "Porto Alegre",
+          city,
           neighborhood,
           addressLine: input.addressLine,
+          addressNumber: input.addressNumber,
+          addressComplement: input.addressComplement,
+          postalCode: input.postalCode,
+          state,
           latitude: coordinates.latitude,
           longitude: coordinates.longitude,
           hourlyRate: input.hourlyRate || 50,
@@ -113,9 +124,13 @@ export function buildUserCreateData(input: OnboardingInput): Prisma.UserCreateIn
     patientProfile: {
       create: {
         phone: input.phone,
-        city: "Porto Alegre",
+        city,
         neighborhood,
         addressLine: input.addressLine,
+        addressNumber: input.addressNumber,
+        addressComplement: input.addressComplement,
+        postalCode: input.postalCode,
+        state,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
         approximateWeightKg: input.approximateWeightKg,

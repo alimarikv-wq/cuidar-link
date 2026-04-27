@@ -142,6 +142,10 @@ model PatientProfile {
   city                String               @default("Porto Alegre")
   neighborhood        String
   addressLine         String?
+  addressNumber       String?
+  addressComplement   String?
+  postalCode          String?
+  state               String?
   latitude            Decimal?             @db.Decimal(9, 6)
   longitude           Decimal?             @db.Decimal(9, 6)
   approximateWeightKg Int?
@@ -155,36 +159,40 @@ model PatientProfile {
 }
 
 model ProfessionalProfile {
-  id               String                 @id @default(cuid())
-  userId           String                 @unique
-  professionalType ProfessionalType
-  gender           Gender
-  age              Int
-  phone            String?
-  city             String                 @default("Porto Alegre")
-  neighborhood     String
-  addressLine      String?
-  latitude         Decimal                @db.Decimal(9, 6)
-  longitude        Decimal                @db.Decimal(9, 6)
-  serviceRadiusKm  Int                    @default(8)
-  hourlyRate       Decimal                @db.Decimal(10, 2)
-  sessionRate      Decimal?               @db.Decimal(10, 2)
-  photoUrl         String?
-  bio              String
-  mobilitySupport  String
-  supportLevel     TransferSupportLevel
-  services         CareService[]
-  rating           Decimal                @default(0) @db.Decimal(3, 2)
-  reviewCount      Int                    @default(0)
-  responseMinutes  Int                    @default(15)
-  isVerified       Boolean                @default(false)
-  isActive         Boolean                @default(true)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents        ProfessionalDocument[]
-  availability     AvailabilitySlot[]
-  careRequests     CareRequest[]
+  id                String                 @id @default(cuid())
+  userId            String                 @unique
+  professionalType  ProfessionalType
+  gender            Gender
+  age               Int
+  phone             String?
+  city              String                 @default("Porto Alegre")
+  neighborhood      String
+  addressLine       String?
+  addressNumber     String?
+  addressComplement String?
+  postalCode        String?
+  state             String?
+  latitude          Decimal                @db.Decimal(9, 6)
+  longitude         Decimal                @db.Decimal(9, 6)
+  serviceRadiusKm   Int                    @default(8)
+  hourlyRate        Decimal                @db.Decimal(10, 2)
+  sessionRate       Decimal?               @db.Decimal(10, 2)
+  photoUrl          String?
+  bio               String
+  mobilitySupport   String
+  supportLevel      TransferSupportLevel
+  services          CareService[]
+  rating            Decimal                @default(0) @db.Decimal(3, 2)
+  reviewCount       Int                    @default(0)
+  responseMinutes   Int                    @default(15)
+  isVerified        Boolean                @default(false)
+  isActive          Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents         ProfessionalDocument[]
+  availability      AvailabilitySlot[]
+  careRequests      CareRequest[]
 
   @@index([professionalType])
   @@index([gender])
@@ -220,28 +228,32 @@ model AvailabilitySlot {
 }
 
 model CareRequest {
-  id               String               @id @default(cuid())
-  patientProfileId String?
-  professionalId   String
-  requesterName    String
-  requesterEmail   String?
-  requesterPhone   String?
-  service          CareService
-  supportNeed      TransferSupportLevel
-  preferredGender  GenderPreference
-  scheduledFor     DateTime?
-  durationHours    Decimal              @default(2) @db.Decimal(4, 2)
-  addressLine      String
-  neighborhood     String
-  city             String               @default("Porto Alegre")
-  latitude         Decimal?             @db.Decimal(9, 6)
-  longitude        Decimal?             @db.Decimal(9, 6)
-  notes            String?
-  status           CareRequestStatus    @default(ENVIADO)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  patientProfile   PatientProfile?      @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
-  professional     ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  id                String               @id @default(cuid())
+  patientProfileId  String?
+  professionalId    String
+  requesterName     String
+  requesterEmail    String?
+  requesterPhone    String?
+  service           CareService
+  supportNeed       TransferSupportLevel
+  preferredGender   GenderPreference
+  scheduledFor      DateTime?
+  durationHours     Decimal              @default(2) @db.Decimal(4, 2)
+  addressLine       String
+  addressNumber     String?
+  addressComplement String?
+  postalCode        String?
+  neighborhood      String
+  city              String               @default("Porto Alegre")
+  state             String?
+  latitude          Decimal?             @db.Decimal(9, 6)
+  longitude         Decimal?             @db.Decimal(9, 6)
+  notes             String?
+  status            CareRequestStatus    @default(ENVIADO)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  patientProfile    PatientProfile?      @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  professional      ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
   @@index([professionalId, status])
   @@index([patientProfileId])
