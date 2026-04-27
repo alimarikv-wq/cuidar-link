@@ -209,6 +209,8 @@ model ProfessionalDocument {
   documentNumber String?
   fileUrl        String?
   expiresAt      DateTime?
+  reviewNote     String?
+  reviewedAt     DateTime?
   createdAt      DateTime            @default(now())
   professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 

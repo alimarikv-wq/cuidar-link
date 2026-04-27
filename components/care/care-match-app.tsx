@@ -621,6 +621,12 @@ export function CareMatchApp() {
                         <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                           {professional.age} anos
                         </span>
+                        {professional.isVerified ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">
+                            <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" />
+                            Verificado
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-sm font-medium text-slate-700">{professional.roleLabel}</p>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">

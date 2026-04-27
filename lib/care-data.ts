@@ -2,21 +2,27 @@ import {
   AccountType,
   CareRequestStatus,
   CareService,
+  DocumentType,
   Gender,
   GenderPreference,
   Prisma,
   ProfessionalType,
-  TransferSupportLevel
+  TransferSupportLevel,
+  VerificationStatus
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatMoney } from "@/lib/utils";
 import {
   AvailabilityFilter,
   AvailabilitySlotData,
+  AdminDocumentReviewData,
   CareAdminOverview,
   CareDashboardData,
   CareProfessional,
-  CareRequestRecord
+  CareRequestRecord,
+  DocumentTypeCode,
+  VerificationStatusCode,
+  ProfessionalDocumentData
 } from "@/types";
 
 const defaultCenter = {
@@ -81,6 +87,21 @@ const statusLabel: Record<CareRequestStatus, string> = {
   CANCELADO: "Cancelado"
 };
 
+const documentTypeLabel: Record<DocumentType, string> = {
+  RG: "RG",
+  CPF: "CPF",
+  COREN: "COREN",
+  CREFITO: "CREFITO",
+  CERTIFICADO: "Certificado",
+  REFERENCIA: "Referencia"
+};
+
+const verificationStatusLabel: Record<VerificationStatus, string> = {
+  PENDENTE: "Pendente",
+  VERIFICADO: "Verificado",
+  RECUSADO: "Recusado"
+};
+
 export type CareSearchParams = {
   service: CareService;
   professionalType?: ProfessionalType;
@@ -141,8 +162,90 @@ type UpdateProfessionalProfileInput = {
   availability: AvailabilitySlotData[];
 };
 
+type CreateProfessionalDocumentInput = {
+  type: DocumentType;
+  label?: string;
+  documentNumber?: string;
+  fileUrl?: string;
+  expiresAt?: string;
+};
+
 function coordinatesFor(neighborhood: string) {
   return neighborhoodCoordinates[neighborhood] ?? { latitude: defaultCenter.latitude, longitude: defaultCenter.longitude };
+}
+
+function requiredDocumentTypesFor(type: ProfessionalType) {
+  if (type === ProfessionalType.TECNICO_ENFERMAGEM) return [DocumentType.CPF, DocumentType.RG, DocumentType.COREN];
+  if (type === ProfessionalType.FISIOTERAPEUTA) return [DocumentType.CPF, DocumentType.RG, DocumentType.CREFITO];
+  return [DocumentType.CPF, DocumentType.RG, DocumentType.CERTIFICADO];
+}
+
+function toProfessionalDocumentData(document: {
+  id: string;
+  type: DocumentType;
+  status: VerificationStatus;
+  label: string;
+  documentNumber: string | null;
+  fileUrl: string | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+  reviewNote: string | null;
+  reviewedAt: Date | null;
+}): ProfessionalDocumentData {
+  return {
+    id: document.id,
+    type: document.type,
+    typeLabel: documentTypeLabel[document.type],
+    status: document.status,
+    statusLabel: verificationStatusLabel[document.status],
+    label: document.label,
+    documentNumber: document.documentNumber,
+    fileUrl: document.fileUrl,
+    expiresAt: document.expiresAt ? document.expiresAt.toISOString() : null,
+    createdAt: document.createdAt.toISOString(),
+    reviewNote: document.reviewNote,
+    reviewedAt: document.reviewedAt ? document.reviewedAt.toISOString() : null
+  };
+}
+
+function requiredDocumentStatus(
+  professionalType: ProfessionalType,
+  documents: Array<{ type: DocumentType; status: VerificationStatus }>
+): Array<{ type: DocumentTypeCode; label: string; status: VerificationStatusCode | "FALTANDO" }> {
+  return requiredDocumentTypesFor(professionalType).map((type) => {
+    const matchingDocuments = documents.filter((document) => document.type === type);
+    const status: VerificationStatusCode | "FALTANDO" = matchingDocuments.some((document) => document.status === VerificationStatus.VERIFICADO)
+      ? "VERIFICADO"
+      : matchingDocuments.some((document) => document.status === VerificationStatus.PENDENTE)
+        ? "PENDENTE"
+        : matchingDocuments.some((document) => document.status === VerificationStatus.RECUSADO)
+          ? "RECUSADO"
+          : "FALTANDO";
+
+    return {
+      type: type as DocumentTypeCode,
+      label: documentTypeLabel[type],
+      status
+    };
+  });
+}
+
+async function refreshProfessionalVerification(professionalId: string) {
+  const professional = await prisma.professionalProfile.findUnique({
+    where: { id: professionalId },
+    include: { documents: true }
+  });
+
+  if (!professional) return;
+
+  const isVerified = requiredDocumentTypesFor(professional.professionalType).every((type) =>
+    professional.documents.some((document) => document.type === type && document.status === VerificationStatus.VERIFICADO)
+  );
+
+  await prisma.professionalProfile.update({
+    where: { id: professionalId },
+    data: { isVerified }
+  });
 }
 
 export function getCareCenter() {
@@ -528,6 +631,48 @@ export async function updateProfessionalProfileForUser(userId: string, input: Up
   return { ok: true as const };
 }
 
+export async function createProfessionalDocumentForUser(userId: string, input: CreateProfessionalDocumentInput) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { professionalProfile: true }
+  });
+
+  if (!user?.professionalProfile) {
+    return { ok: false as const, status: 403, error: "Perfil profissional nao encontrado." };
+  }
+
+  const document = await prisma.professionalDocument.create({
+    data: {
+      professionalId: user.professionalProfile.id,
+      type: input.type,
+      label: input.label?.trim() || documentTypeLabel[input.type],
+      documentNumber: input.documentNumber?.trim() || null,
+      fileUrl: input.fileUrl || null,
+      expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+      status: VerificationStatus.PENDENTE
+    }
+  });
+
+  await refreshProfessionalVerification(user.professionalProfile.id);
+
+  return { ok: true as const, document: toProfessionalDocumentData(document) };
+}
+
+export async function reviewProfessionalDocument(documentId: string, status: VerificationStatus, reviewNote?: string) {
+  const document = await prisma.professionalDocument.update({
+    where: { id: documentId },
+    data: {
+      status,
+      reviewNote: reviewNote?.trim() || null,
+      reviewedAt: new Date()
+    }
+  });
+
+  await refreshProfessionalVerification(document.professionalId);
+
+  return toProfessionalDocumentData(document);
+}
+
 export async function getCareRequestsForUser(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -608,7 +753,11 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
             weekday: slot.weekday,
             startTime: slot.startTime,
             endTime: slot.endTime
-          }))
+          })),
+          documents: user.professionalProfile.documents
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+            .map(toProfessionalDocumentData),
+          requiredDocuments: requiredDocumentStatus(user.professionalProfile.professionalType, user.professionalProfile.documents)
         }
       : null,
     profile: {
@@ -622,14 +771,25 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
 }
 
 export async function getCareAdminOverview(): Promise<CareAdminOverview> {
-  const [users, patients, professionals, verifiedProfessionals, openRequests, completedRequests, professionalsByType, requestsByStatus] =
-    await Promise.all([
+  const [
+    users,
+    patients,
+    professionals,
+    verifiedProfessionals,
+    openRequests,
+    completedRequests,
+    pendingDocuments,
+    professionalsByType,
+    requestsByStatus,
+    documentsForReview
+  ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { accountType: AccountType.PATIENT } }),
       prisma.professionalProfile.count(),
       prisma.professionalProfile.count({ where: { isVerified: true } }),
       prisma.careRequest.count({ where: { status: { in: [CareRequestStatus.ENVIADO, CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO] } } }),
       prisma.careRequest.count({ where: { status: CareRequestStatus.CONCLUIDO } }),
+      prisma.professionalDocument.count({ where: { status: VerificationStatus.PENDENTE } }),
       prisma.professionalProfile.groupBy({
         by: ["professionalType"],
         _count: { _all: true }
@@ -637,6 +797,15 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.careRequest.groupBy({
         by: ["status"],
         _count: { _all: true }
+      }),
+      prisma.professionalDocument.findMany({
+        include: {
+          professional: {
+            include: { user: true }
+          }
+        },
+        orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+        take: 30
       })
     ]);
 
@@ -647,6 +816,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     verifiedProfessionals,
     openRequests,
     completedRequests,
+    pendingDocuments,
     professionalsByType: professionalsByType.map((item) => ({
       label: professionalTypeLabel[item.professionalType],
       count: item._count._all
@@ -654,6 +824,12 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     requestsByStatus: requestsByStatus.map((item) => ({
       label: statusLabel[item.status],
       count: item._count._all
+    })),
+    documentsForReview: documentsForReview.map((document): AdminDocumentReviewData => ({
+      ...toProfessionalDocumentData(document),
+      professionalName: document.professional.user.name,
+      professionalEmail: document.professional.user.email,
+      professionalTypeLabel: professionalTypeLabel[document.professional.professionalType]
     }))
   };
 }

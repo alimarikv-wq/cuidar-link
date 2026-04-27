@@ -2,9 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, Check, ClipboardList, FileBadge, Save, UserRoundCheck, X } from "lucide-react";
+import { CalendarCheck, Check, ClipboardList, FileBadge, FileUp, Save, ShieldCheck, UserRoundCheck, X } from "lucide-react";
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
-import { AvailabilitySlotData, CareDashboardData, CareServiceCode, ProfessionalSettingsData, TransferSupportCode } from "@/types";
+import {
+  AvailabilitySlotData,
+  CareDashboardData,
+  CareServiceCode,
+  DocumentTypeCode,
+  ProfessionalSettingsData,
+  TransferSupportCode
+} from "@/types";
 
 type RequestStatus = "RASCUNHO" | "ENVIADO" | "ACEITO" | "AGENDADO" | "CONCLUIDO" | "CANCELADO";
 type StatusAction = {
@@ -32,6 +39,15 @@ const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
   { value: "DUPLA", label: "Duas pessoas" }
 ];
 
+const documentOptions: Array<{ value: DocumentTypeCode; label: string }> = [
+  { value: "CPF", label: "CPF" },
+  { value: "RG", label: "RG" },
+  { value: "COREN", label: "COREN" },
+  { value: "CREFITO", label: "CREFITO" },
+  { value: "CERTIFICADO", label: "Certificado" },
+  { value: "REFERENCIA", label: "Referencia" }
+];
+
 const weekdayOptions = [
   { value: 0, label: "Dom" },
   { value: 1, label: "Seg" },
@@ -52,6 +68,13 @@ const statusStyles: Record<RequestStatus, string> = {
   AGENDADO: "bg-violet-50 text-violet-800",
   CONCLUIDO: "bg-slate-950 text-white",
   CANCELADO: "bg-rose-50 text-rose-800"
+};
+
+const documentStatusStyles: Record<string, string> = {
+  FALTANDO: "bg-slate-100 text-slate-700",
+  PENDENTE: "bg-amber-50 text-amber-900",
+  VERIFICADO: "bg-emerald-50 text-emerald-800",
+  RECUSADO: "bg-rose-50 text-rose-800"
 };
 
 const buttonStyles: Record<StatusAction["variant"], string> = {
@@ -344,6 +367,184 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
   );
 }
 
+function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSettingsData }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const firstMissing = settings.requiredDocuments.find((document) => document.status !== "VERIFICADO");
+  const [type, setType] = useState<DocumentTypeCode>(firstMissing?.type || "CPF");
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [fileUrl, setFileUrl] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  function readDocumentFile(file: File | undefined) {
+    setError("");
+    setMessage("");
+    setFileUrl("");
+    setFileName("");
+
+    if (!file) return;
+    if (file.size > 2_000_000) {
+      setError("Envie um arquivo de ate 2 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setFileUrl(reader.result);
+        setFileName(file.name);
+      }
+    };
+    reader.onerror = () => setError("Nao foi possivel ler este arquivo.");
+    reader.readAsDataURL(file);
+  }
+
+  function submitDocument() {
+    setError("");
+    setMessage("");
+
+    if (!fileUrl) {
+      setError("Anexe uma imagem ou PDF do documento.");
+      return;
+    }
+
+    startTransition(async () => {
+      const response = await fetch("/api/professional-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          documentNumber,
+          fileUrl,
+          expiresAt
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel enviar o documento.");
+        return;
+      }
+
+      setMessage("Documento enviado para verificacao.");
+      setDocumentNumber("");
+      setExpiresAt("");
+      setFileUrl("");
+      setFileName("");
+      router.refresh();
+    });
+  }
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Verificacao</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Documentos profissionais</h2>
+        </div>
+        <ShieldCheck aria-hidden="true" className="h-6 w-6 text-emerald-700" />
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-700">Obrigatorios para liberar selo</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {settings.requiredDocuments.map((document) => (
+              <span
+                key={document.type}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold ${documentStatusStyles[document.status] || documentStatusStyles.FALTANDO}`}
+              >
+                {document.label}: {document.status === "FALTANDO" ? "Faltando" : document.status === "PENDENTE" ? "Pendente" : document.status === "VERIFICADO" ? "Ok" : "Recusado"}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Tipo de documento
+              <select value={type} onChange={(event) => setType(event.target.value as DocumentTypeCode)} className={fieldClass}>
+                {documentOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Numero ou registro
+              <input
+                value={documentNumber}
+                onChange={(event) => setDocumentNumber(event.target.value)}
+                placeholder="Ex: COREN-RS 123456"
+                className={fieldClass}
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Validade, se houver
+              <input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className={fieldClass} />
+            </label>
+            <label className="grid gap-2 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-700">
+              <span className="inline-flex items-center gap-2">
+                <FileUp aria-hidden="true" className="h-4 w-4 text-emerald-700" />
+                Arquivo do documento
+              </span>
+              <input type="file" accept="image/*,.pdf" onChange={(event) => readDocumentFile(event.target.files?.[0])} className="text-sm" />
+              {fileName ? <span className="text-sm font-medium text-emerald-700">{fileName}</span> : null}
+            </label>
+            <button
+              type="button"
+              onClick={submitDocument}
+              disabled={isPending}
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
+            >
+              {isPending ? "Enviando..." : "Enviar documento"}
+            </button>
+            {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{message}</p> : null}
+            {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+          </div>
+        </div>
+
+        <div className="grid content-start gap-3">
+          {settings.documents.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Nenhum documento enviado ainda.
+            </div>
+          ) : null}
+
+          {settings.documents.map((document) => (
+            <div key={document.id} className="rounded-lg border border-slate-200 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold text-slate-950">{document.label}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {document.typeLabel}
+                    {document.documentNumber ? ` - ${document.documentNumber}` : ""}
+                  </p>
+                </div>
+                <span className={`rounded-lg px-3 py-1 text-xs font-semibold ${documentStatusStyles[document.status]}`}>
+                  {document.statusLabel}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                {document.fileUrl ? (
+                  <a href={document.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700">
+                    Abrir arquivo
+                  </a>
+                ) : null}
+                {document.expiresAt ? <span className="text-slate-500">Validade {new Date(document.expiresAt).toLocaleDateString("pt-BR")}</span> : null}
+              </div>
+              {document.reviewNote ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{document.reviewNote}</p> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -409,6 +610,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       </div>
 
       {dashboard.professionalSettings ? <ProfessionalProfileForm settings={dashboard.professionalSettings} /> : null}
+      {dashboard.professionalSettings ? <ProfessionalDocumentsForm settings={dashboard.professionalSettings} /> : null}
 
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">

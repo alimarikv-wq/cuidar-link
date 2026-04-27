@@ -97,6 +97,8 @@ export type ProfessionalTypeCode = "CUIDADOR" | "TECNICO_ENFERMAGEM" | "FISIOTER
 export type GenderCode = "FEMININO" | "MASCULINO" | "OUTRO";
 export type GenderPreferenceCode = "FEMININO" | "MASCULINO" | "QUALQUER";
 export type TransferSupportCode = "MODERADO" | "ALTO" | "DUPLA";
+export type DocumentTypeCode = "RG" | "CPF" | "COREN" | "CREFITO" | "CERTIFICADO" | "REFERENCIA";
+export type VerificationStatusCode = "PENDENTE" | "VERIFICADO" | "RECUSADO";
 export type AvailabilityFilter = "qualquer" | "agora" | "hoje" | "manha" | "tarde" | "noite" | "fim-de-semana";
 
 export type CareProfessional = {
@@ -168,6 +170,27 @@ export type AvailabilitySlotData = {
   endTime: string;
 };
 
+export type ProfessionalDocumentData = {
+  id: string;
+  type: DocumentTypeCode;
+  typeLabel: string;
+  status: VerificationStatusCode;
+  statusLabel: string;
+  label: string;
+  documentNumber: string | null;
+  fileUrl: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+};
+
+export type AdminDocumentReviewData = ProfessionalDocumentData & {
+  professionalName: string;
+  professionalEmail: string;
+  professionalTypeLabel: string;
+};
+
 export type ProfessionalSettingsData = {
   professionalType: ProfessionalTypeCode;
   gender: GenderCode;
@@ -188,6 +211,12 @@ export type ProfessionalSettingsData = {
   supportLevel: TransferSupportCode;
   services: CareServiceCode[];
   availability: AvailabilitySlotData[];
+  documents: ProfessionalDocumentData[];
+  requiredDocuments: Array<{
+    type: DocumentTypeCode;
+    label: string;
+    status: VerificationStatusCode | "FALTANDO";
+  }>;
 };
 
 export type CareDashboardData = {
@@ -217,6 +246,8 @@ export type CareAdminOverview = {
   verifiedProfessionals: number;
   openRequests: number;
   completedRequests: number;
+  pendingDocuments: number;
   professionalsByType: Array<{ label: string; count: number }>;
   requestsByStatus: Array<{ label: string; count: number }>;
+  documentsForReview: AdminDocumentReviewData[];
 };
