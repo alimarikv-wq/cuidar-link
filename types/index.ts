@@ -148,6 +148,11 @@ export type CareRequestRecord = {
   serviceLabel: string;
   scheduledFor: string | null;
   createdAt: string;
+  requesterName: string;
+  requesterPhone: string | null;
+  addressLine: string;
+  city: string;
+  notes: string | null;
   professionalName: string;
   professionalRole: string;
   neighborhood: string;

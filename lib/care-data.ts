@@ -343,10 +343,78 @@ function toRequestRecord(request: Prisma.CareRequestGetPayload<{ include: { prof
     serviceLabel: serviceLabel[request.service],
     scheduledFor: request.scheduledFor ? request.scheduledFor.toISOString() : null,
     createdAt: request.createdAt.toISOString(),
+    requesterName: request.requesterName,
+    requesterPhone: request.requesterPhone,
+    addressLine: request.addressLine,
+    city: request.city,
+    notes: request.notes,
     professionalName: request.professional.user.name,
     professionalRole: professionalTypeLabel[request.professional.professionalType],
     neighborhood: request.neighborhood
   };
+}
+
+export async function updateCareRequestStatus(requestId: string, userId: string, nextStatus: CareRequestStatus) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const request = await prisma.careRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      professional: true,
+      patientProfile: true
+    }
+  });
+
+  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+
+  const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
+  const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
+
+  if (!isAssignedProfessional && !(isRequestPatient && nextStatus === CareRequestStatus.CANCELADO)) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para alterar esta solicitacao." };
+  }
+
+  const professionalAllowed: Record<CareRequestStatus, CareRequestStatus[]> = {
+    RASCUNHO: [],
+    ENVIADO: [CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO, CareRequestStatus.CANCELADO],
+    ACEITO: [CareRequestStatus.AGENDADO, CareRequestStatus.CANCELADO],
+    AGENDADO: [CareRequestStatus.CONCLUIDO, CareRequestStatus.CANCELADO],
+    CONCLUIDO: [],
+    CANCELADO: []
+  };
+  const patientAllowed: Record<CareRequestStatus, CareRequestStatus[]> = {
+    RASCUNHO: [CareRequestStatus.CANCELADO],
+    ENVIADO: [CareRequestStatus.CANCELADO],
+    ACEITO: [CareRequestStatus.CANCELADO],
+    AGENDADO: [CareRequestStatus.CANCELADO],
+    CONCLUIDO: [],
+    CANCELADO: []
+  };
+  const allowed = isAssignedProfessional ? professionalAllowed[request.status] : patientAllowed[request.status];
+
+  if (!allowed.includes(nextStatus)) {
+    return { ok: false as const, status: 400, error: "Mudanca de status nao permitida para esta solicitacao." };
+  }
+
+  const updatedRequest = await prisma.careRequest.update({
+    where: { id: requestId },
+    data: { status: nextStatus },
+    include: {
+      professional: {
+        include: { user: true }
+      }
+    }
+  });
+
+  return { ok: true as const, request: toRequestRecord(updatedRequest) };
 }
 
 export async function getCareRequestsForUser(userId: string) {
