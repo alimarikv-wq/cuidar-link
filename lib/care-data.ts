@@ -10,13 +10,29 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatMoney } from "@/lib/utils";
-import { AvailabilityFilter, CareAdminOverview, CareDashboardData, CareProfessional, CareRequestRecord } from "@/types";
+import {
+  AvailabilityFilter,
+  AvailabilitySlotData,
+  CareAdminOverview,
+  CareDashboardData,
+  CareProfessional,
+  CareRequestRecord
+} from "@/types";
 
 const defaultCenter = {
   city: "Porto Alegre",
   neighborhood: "Zona Sul",
   latitude: -30.111947,
   longitude: -51.256708
+};
+
+const neighborhoodCoordinates: Record<string, { latitude: number; longitude: number }> = {
+  Tristeza: { latitude: -30.106211, longitude: -51.250588 },
+  Cavalhada: { latitude: -30.109725, longitude: -51.225471 },
+  Cristal: { latitude: -30.084164, longitude: -51.246465 },
+  Ipanema: { latitude: -30.128849, longitude: -51.239726 },
+  "Menino Deus": { latitude: -30.055902, longitude: -51.223197 },
+  Azenha: { latitude: -30.050192, longitude: -51.210693 }
 };
 
 const supportWeight: Record<TransferSupportLevel, number> = {
@@ -101,6 +117,24 @@ type ProfessionalWithRelations = Prisma.ProfessionalProfileGetPayload<{
     availability: true;
   };
 }>;
+
+type UpdateProfessionalProfileInput = {
+  phone?: string;
+  neighborhood: string;
+  addressLine?: string;
+  serviceRadiusKm: number;
+  hourlyRate: number;
+  sessionRate?: number | null;
+  bio: string;
+  mobilitySupport: string;
+  supportLevel: TransferSupportLevel;
+  services: CareService[];
+  availability: AvailabilitySlotData[];
+};
+
+function coordinatesFor(neighborhood: string) {
+  return neighborhoodCoordinates[neighborhood] ?? { latitude: defaultCenter.latitude, longitude: defaultCenter.longitude };
+}
 
 export function getCareCenter() {
   return defaultCenter;
@@ -283,7 +317,12 @@ export async function searchCareProfessionals(params: CareSearchParams) {
       hasAvailability: professionalMatchesAvailability(professional, params.availability)
     }))
     .filter(({ distance, professional, hasAvailability }) => {
-      return distance <= params.radiusKm && canSupport(professional.supportLevel, params.supportNeed) && hasAvailability;
+      return (
+        distance <= params.radiusKm &&
+        distance <= professional.serviceRadiusKm &&
+        canSupport(professional.supportLevel, params.supportNeed) &&
+        hasAvailability
+      );
     })
     .map(({ professional, distance }) => toCareProfessional(professional, params, distance))
     .sort((a, b) => b.matchScore - a.matchScore || a.distanceKm - b.distanceKm);
@@ -417,6 +456,56 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
   return { ok: true as const, request: toRequestRecord(updatedRequest) };
 }
 
+export async function updateProfessionalProfileForUser(userId: string, input: UpdateProfessionalProfileInput) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { professionalProfile: true }
+  });
+
+  if (!user?.professionalProfile) {
+    return { ok: false as const, status: 403, error: "Perfil profissional nao encontrado." };
+  }
+
+  const coordinates = coordinatesFor(input.neighborhood);
+  const operations: Prisma.PrismaPromise<unknown>[] = [
+    prisma.professionalProfile.update({
+      where: { id: user.professionalProfile.id },
+      data: {
+        phone: input.phone || null,
+        neighborhood: input.neighborhood,
+        addressLine: input.addressLine || null,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        serviceRadiusKm: input.serviceRadiusKm,
+        hourlyRate: input.hourlyRate,
+        sessionRate: input.sessionRate,
+        bio: input.bio,
+        mobilitySupport: input.mobilitySupport,
+        supportLevel: input.supportLevel,
+        services: input.services
+      }
+    }),
+    prisma.availabilitySlot.deleteMany({
+      where: { professionalId: user.professionalProfile.id }
+    })
+  ];
+
+  if (input.availability.length > 0) {
+    operations.push(prisma.availabilitySlot.createMany({
+      data: input.availability.map((slot) => ({
+        professionalId: user.professionalProfile!.id,
+        weekday: slot.weekday,
+        startTime: slot.startTime,
+        endTime: slot.endTime
+      }))
+    }));
+  }
+
+  await prisma.$transaction(operations);
+
+  return { ok: true as const };
+}
+
 export async function getCareRequestsForUser(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -452,7 +541,8 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
       patientProfile: true,
       professionalProfile: {
         include: {
-          documents: true
+          documents: true,
+          availability: { orderBy: [{ weekday: "asc" }, { startTime: "asc" }] }
         }
       }
     }
@@ -472,6 +562,28 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
       verifiedDocuments: user.professionalProfile?.documents.filter((document) => document.status === "VERIFICADO").length ?? 0
     },
     requests,
+    professionalSettings: user.professionalProfile
+      ? {
+          professionalType: user.professionalProfile.professionalType,
+          gender: user.professionalProfile.gender,
+          age: user.professionalProfile.age,
+          phone: user.professionalProfile.phone,
+          neighborhood: user.professionalProfile.neighborhood,
+          addressLine: user.professionalProfile.addressLine,
+          serviceRadiusKm: user.professionalProfile.serviceRadiusKm,
+          hourlyRate: Number(user.professionalProfile.hourlyRate),
+          sessionRate: user.professionalProfile.sessionRate ? Number(user.professionalProfile.sessionRate) : null,
+          bio: user.professionalProfile.bio,
+          mobilitySupport: user.professionalProfile.mobilitySupport,
+          supportLevel: user.professionalProfile.supportLevel,
+          services: user.professionalProfile.services,
+          availability: user.professionalProfile.availability.map((slot) => ({
+            weekday: slot.weekday,
+            startTime: slot.startTime,
+            endTime: slot.endTime
+          }))
+        }
+      : null,
     profile: {
       name: user.name,
       email: user.email,

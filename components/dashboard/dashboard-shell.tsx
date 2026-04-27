@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, Check, ClipboardList, FileBadge, UserRoundCheck, X } from "lucide-react";
-import { CareDashboardData } from "@/types";
+import { CalendarCheck, Check, ClipboardList, FileBadge, Save, UserRoundCheck, X } from "lucide-react";
+import { AvailabilitySlotData, CareDashboardData, CareServiceCode, ProfessionalSettingsData, TransferSupportCode } from "@/types";
 
 type RequestStatus = "RASCUNHO" | "ENVIADO" | "ACEITO" | "AGENDADO" | "CONCLUIDO" | "CANCELADO";
 type StatusAction = {
@@ -11,6 +11,39 @@ type StatusAction = {
   status: RequestStatus;
   variant: "primary" | "secondary" | "danger";
 };
+
+const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
+  { value: "BANHO", label: "Banho" },
+  { value: "TRANSFERENCIA", label: "Transferencia" },
+  { value: "MEDICACAO", label: "Medicacao" },
+  { value: "CURATIVOS", label: "Curativos" },
+  { value: "FISIOTERAPIA", label: "Fisioterapia" },
+  { value: "COMPANHIA", label: "Companhia" },
+  { value: "REFEICAO", label: "Refeicao" },
+  { value: "SINAIS_VITAIS", label: "Sinais vitais" },
+  { value: "AVALIACAO", label: "Avaliacao" },
+  { value: "FORTALECIMENTO", label: "Fortalecimento" }
+];
+
+const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
+  { value: "MODERADO", label: "Apoio moderado" },
+  { value: "ALTO", label: "Apoio fisico alto" },
+  { value: "DUPLA", label: "Duas pessoas" }
+];
+
+const neighborhoodOptions = ["Tristeza", "Cavalhada", "Cristal", "Ipanema", "Menino Deus", "Azenha"];
+const weekdayOptions = [
+  { value: 0, label: "Dom" },
+  { value: 1, label: "Seg" },
+  { value: 2, label: "Ter" },
+  { value: 3, label: "Qua" },
+  { value: 4, label: "Qui" },
+  { value: 5, label: "Sex" },
+  { value: 6, label: "Sab" }
+];
+
+const fieldClass =
+  "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
 const statusStyles: Record<RequestStatus, string> = {
   RASCUNHO: "bg-slate-100 text-slate-700",
@@ -59,6 +92,250 @@ function getRequestActions(status: string, accountType: string): StatusAction[] 
   }
 
   return [];
+}
+
+function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsData }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [form, setForm] = useState(settings);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  function toggleService(service: CareServiceCode) {
+    setForm((current) => {
+      const services = current.services.includes(service)
+        ? current.services.filter((item) => item !== service)
+        : [...current.services, service];
+
+      return { ...current, services };
+    });
+  }
+
+  function findSlot(weekday: number) {
+    return form.availability.find((slot) => slot.weekday === weekday);
+  }
+
+  function toggleWeekday(weekday: number) {
+    setForm((current) => {
+      const exists = current.availability.some((slot) => slot.weekday === weekday);
+      const availability = exists
+        ? current.availability.filter((slot) => slot.weekday !== weekday)
+        : [...current.availability, { weekday, startTime: "08:00", endTime: "18:00" }].sort((a, b) => a.weekday - b.weekday);
+
+      return { ...current, availability };
+    });
+  }
+
+  function updateSlot(weekday: number, field: keyof Pick<AvailabilitySlotData, "startTime" | "endTime">, value: string) {
+    setForm((current) => ({
+      ...current,
+      availability: current.availability.map((slot) => (slot.weekday === weekday ? { ...slot, [field]: value } : slot))
+    }));
+  }
+
+  function saveProfile() {
+    setMessage("");
+    setError("");
+
+    startTransition(async () => {
+      const response = await fetch("/api/professional-profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel salvar o perfil.");
+        return;
+      }
+
+      setMessage("Perfil salvo.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Perfil profissional</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Servicos, agenda e valores</h2>
+        </div>
+        <button
+          type="button"
+          onClick={saveProfile}
+          disabled={isPending}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
+        >
+          <Save aria-hidden="true" className="h-4 w-4" />
+          {isPending ? "Salvando..." : "Salvar perfil"}
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Telefone
+            <input
+              value={form.phone || ""}
+              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+              className={fieldClass}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Bairro
+            <select
+              value={form.neighborhood}
+              onChange={(event) => setForm((current) => ({ ...current, neighborhood: event.target.value }))}
+              className={fieldClass}
+            >
+              {neighborhoodOptions.map((neighborhood) => (
+                <option key={neighborhood}>{neighborhood}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+            Endereco base
+            <input
+              value={form.addressLine || ""}
+              onChange={(event) => setForm((current) => ({ ...current, addressLine: event.target.value }))}
+              className={fieldClass}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Valor por hora
+            <input
+              type="number"
+              min={1}
+              value={form.hourlyRate}
+              onChange={(event) => setForm((current) => ({ ...current, hourlyRate: Number(event.target.value) }))}
+              className={fieldClass}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Valor por sessao
+            <input
+              type="number"
+              min={1}
+              value={form.sessionRate ?? ""}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, sessionRate: event.target.value ? Number(event.target.value) : null }))
+              }
+              className={fieldClass}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Raio de atendimento
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={form.serviceRadiusKm}
+              onChange={(event) => setForm((current) => ({ ...current, serviceRadiusKm: Number(event.target.value) }))}
+              className={fieldClass}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Capacidade
+            <select
+              value={form.supportLevel}
+              onChange={(event) => setForm((current) => ({ ...current, supportLevel: event.target.value as TransferSupportCode }))}
+              className={fieldClass}
+            >
+              {supportOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid gap-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-700">Servicos</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {serviceOptions.map((service) => {
+                const active = form.services.includes(service.value);
+                return (
+                  <button
+                    key={service.value}
+                    type="button"
+                    onClick={() => toggleService(service.value)}
+                    className={`h-10 rounded-lg border px-2 text-sm font-semibold transition ${
+                      active
+                        ? "border-emerald-700 bg-emerald-700 text-white"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                    }`}
+                  >
+                    {service.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-700">Agenda semanal</p>
+            <div className="mt-2 grid gap-2">
+              {weekdayOptions.map((weekday) => {
+                const slot = findSlot(weekday.value);
+                return (
+                  <div key={weekday.value} className="grid grid-cols-[54px_1fr_1fr] items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(slot)}
+                        onChange={() => toggleWeekday(weekday.value)}
+                        className="h-4 w-4 rounded border-slate-300 accent-emerald-700"
+                      />
+                      {weekday.label}
+                    </label>
+                    <input
+                      type="time"
+                      value={slot?.startTime || "08:00"}
+                      disabled={!slot}
+                      onChange={(event) => updateSlot(weekday.value, "startTime", event.target.value)}
+                      className={fieldClass}
+                    />
+                    <input
+                      type="time"
+                      value={slot?.endTime || "18:00"}
+                      disabled={!slot}
+                      onChange={(event) => updateSlot(weekday.value, "endTime", event.target.value)}
+                      className={fieldClass}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <label className="grid gap-1 text-sm font-semibold text-slate-700 lg:col-span-2">
+          Experiencia
+          <textarea
+            value={form.bio}
+            onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))}
+            className="min-h-24 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+          />
+        </label>
+
+        <label className="grid gap-1 text-sm font-semibold text-slate-700 lg:col-span-2">
+          Apoio em mobilidade
+          <textarea
+            value={form.mobilitySupport}
+            onChange={(event) => setForm((current) => ({ ...current, mobilitySupport: event.target.value }))}
+            className="min-h-24 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+          />
+        </label>
+      </div>
+
+      {message ? <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{message}</p> : null}
+      {error ? <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+    </article>
+  );
 }
 
 export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) {
@@ -124,6 +401,8 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
           );
         })}
       </div>
+
+      {dashboard.professionalSettings ? <ProfessionalProfileForm settings={dashboard.professionalSettings} /> : null}
 
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">

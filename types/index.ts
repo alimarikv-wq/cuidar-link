@@ -158,6 +158,29 @@ export type CareRequestRecord = {
   neighborhood: string;
 };
 
+export type AvailabilitySlotData = {
+  weekday: number;
+  startTime: string;
+  endTime: string;
+};
+
+export type ProfessionalSettingsData = {
+  professionalType: ProfessionalTypeCode;
+  gender: GenderCode;
+  age: number;
+  phone: string | null;
+  neighborhood: string;
+  addressLine: string | null;
+  serviceRadiusKm: number;
+  hourlyRate: number;
+  sessionRate: number | null;
+  bio: string;
+  mobilitySupport: string;
+  supportLevel: TransferSupportCode;
+  services: CareServiceCode[];
+  availability: AvailabilitySlotData[];
+};
+
 export type CareDashboardData = {
   summary: {
     accountType: string;
@@ -168,6 +191,7 @@ export type CareDashboardData = {
     verifiedDocuments: number;
   };
   requests: CareRequestRecord[];
+  professionalSettings: ProfessionalSettingsData | null;
   profile: {
     name: string;
     email: string;
