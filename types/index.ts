@@ -97,8 +97,9 @@ export type ProfessionalTypeCode = "CUIDADOR" | "TECNICO_ENFERMAGEM" | "FISIOTER
 export type GenderCode = "FEMININO" | "MASCULINO" | "OUTRO";
 export type GenderPreferenceCode = "FEMININO" | "MASCULINO" | "QUALQUER";
 export type TransferSupportCode = "MODERADO" | "ALTO" | "DUPLA";
-export type DocumentTypeCode = "RG" | "CPF" | "COREN" | "CREFITO" | "CERTIFICADO" | "REFERENCIA";
+export type DocumentTypeCode = "RG" | "CNH" | "CPF" | "COMPROVANTE_RESIDENCIA" | "COREN" | "CREFITO" | "CERTIFICADO" | "REFERENCIA";
 export type VerificationStatusCode = "PENDENTE" | "VERIFICADO" | "RECUSADO";
+export type ProfessionalVerificationStatusCode = "PENDENTE" | "EM_ANALISE" | "APROVADO" | "REPROVADO";
 export type AvailabilityFilter = "qualquer" | "agora" | "hoje" | "manha" | "tarde" | "noite" | "fim-de-semana";
 
 export type CareProfessional = {
@@ -179,16 +180,28 @@ export type ProfessionalDocumentData = {
   label: string;
   documentNumber: string | null;
   fileUrl: string | null;
+  downloadUrl: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
   expiresAt: string | null;
   createdAt: string;
   reviewNote: string | null;
   reviewedAt: string | null;
+  externalCheckStatus: string | null;
+  externalCheckSource: string | null;
+  externalCheckMessage: string | null;
 };
 
 export type AdminDocumentReviewData = ProfessionalDocumentData & {
+  professionalId: string;
   professionalName: string;
   professionalEmail: string;
   professionalTypeLabel: string;
+  professionalVerificationStatus: ProfessionalVerificationStatusCode;
+  professionalVerificationStatusLabel: string;
+  professionalRegistrationUf: string | null;
+  professionalCpfMasked: string | null;
 };
 
 export type ProfessionalSettingsData = {
@@ -196,6 +209,12 @@ export type ProfessionalSettingsData = {
   gender: GenderCode;
   age: number;
   phone: string | null;
+  cpf: string | null;
+  professionalRegistrationNumber: string | null;
+  professionalRegistrationUf: string | null;
+  verificationStatus: ProfessionalVerificationStatusCode;
+  verificationStatusLabel: string;
+  verificationNote: string | null;
   neighborhood: string;
   addressLine: string | null;
   addressNumber: string | null;
@@ -250,4 +269,12 @@ export type CareAdminOverview = {
   professionalsByType: Array<{ label: string; count: number }>;
   requestsByStatus: Array<{ label: string; count: number }>;
   documentsForReview: AdminDocumentReviewData[];
+  auditLogs: Array<{
+    id: string;
+    adminUserId: string;
+    action: string;
+    nextStatus: string | null;
+    note: string | null;
+    createdAt: string;
+  }>;
 };

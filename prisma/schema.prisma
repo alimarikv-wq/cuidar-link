@@ -61,6 +61,13 @@ enum ProfessionalType {
   FISIOTERAPEUTA
 }
 
+enum ProfessionalVerificationStatus {
+  PENDENTE
+  EM_ANALISE
+  APROVADO
+  REPROVADO
+}
+
 enum CareService {
   BANHO
   TRANSFERENCIA
@@ -82,7 +89,9 @@ enum TransferSupportLevel {
 
 enum DocumentType {
   RG
+  CNH
   CPF
+  COMPROVANTE_RESIDENCIA
   COREN
   CREFITO
   CERTIFICADO
@@ -159,40 +168,46 @@ model PatientProfile {
 }
 
 model ProfessionalProfile {
-  id                String                 @id @default(cuid())
-  userId            String                 @unique
-  professionalType  ProfessionalType
-  gender            Gender
-  age               Int
-  phone             String?
-  city              String                 @default("Porto Alegre")
-  neighborhood      String
-  addressLine       String?
-  addressNumber     String?
-  addressComplement String?
-  postalCode        String?
-  state             String?
-  latitude          Decimal                @db.Decimal(9, 6)
-  longitude         Decimal                @db.Decimal(9, 6)
-  serviceRadiusKm   Int                    @default(8)
-  hourlyRate        Decimal                @db.Decimal(10, 2)
-  sessionRate       Decimal?               @db.Decimal(10, 2)
-  photoUrl          String?
-  bio               String
-  mobilitySupport   String
-  supportLevel      TransferSupportLevel
-  services          CareService[]
-  rating            Decimal                @default(0) @db.Decimal(3, 2)
-  reviewCount       Int                    @default(0)
-  responseMinutes   Int                    @default(15)
-  isVerified        Boolean                @default(false)
-  isActive          Boolean                @default(true)
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
-  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents         ProfessionalDocument[]
-  availability      AvailabilitySlot[]
-  careRequests      CareRequest[]
+  id                             String                         @id @default(cuid())
+  userId                         String                         @unique
+  professionalType               ProfessionalType
+  gender                         Gender
+  age                            Int
+  phone                          String?
+  city                           String                         @default("Porto Alegre")
+  neighborhood                   String
+  addressLine                    String?
+  addressNumber                  String?
+  addressComplement              String?
+  postalCode                     String?
+  state                          String?
+  latitude                       Decimal                        @db.Decimal(9, 6)
+  longitude                      Decimal                        @db.Decimal(9, 6)
+  serviceRadiusKm                Int                            @default(8)
+  hourlyRate                     Decimal                        @db.Decimal(10, 2)
+  sessionRate                    Decimal?                       @db.Decimal(10, 2)
+  cpf                            String?
+  professionalRegistrationNumber String?
+  professionalRegistrationUf     String?
+  verificationStatus             ProfessionalVerificationStatus @default(PENDENTE)
+  verificationNote               String?
+  verificationReviewedAt         DateTime?
+  photoUrl                       String?
+  bio                            String
+  mobilitySupport                String
+  supportLevel                   TransferSupportLevel
+  services                       CareService[]
+  rating                         Decimal                        @default(0) @db.Decimal(3, 2)
+  reviewCount                    Int                            @default(0)
+  responseMinutes                Int                            @default(15)
+  isVerified                     Boolean                        @default(false)
+  isActive                       Boolean                        @default(true)
+  createdAt                      DateTime                       @default(now())
+  updatedAt                      DateTime                       @updatedAt
+  user                           User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents                      ProfessionalDocument[]
+  availability                   AvailabilitySlot[]
+  careRequests                   CareRequest[]
 
   @@index([professionalType])
   @@index([gender])
@@ -201,21 +216,49 @@ model ProfessionalProfile {
 }
 
 model ProfessionalDocument {
-  id             String              @id @default(cuid())
-  professionalId String
-  type           DocumentType
-  status         VerificationStatus  @default(PENDENTE)
-  label          String
-  documentNumber String?
-  fileUrl        String?
-  expiresAt      DateTime?
-  reviewNote     String?
-  reviewedAt     DateTime?
-  createdAt      DateTime            @default(now())
-  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  id                     String              @id @default(cuid())
+  professionalId         String
+  type                   DocumentType
+  status                 VerificationStatus  @default(PENDENTE)
+  label                  String
+  documentNumber         String?
+  fileUrl                String?
+  storagePath            String?
+  fileName               String?
+  mimeType               String?
+  fileSize               Int?
+  consentAccepted        Boolean             @default(false)
+  consentAcceptedAt      DateTime?
+  externalCheckStatus    String?
+  externalCheckSource    String?
+  externalCheckMessage   String?
+  externalCheckCheckedAt DateTime?
+  expiresAt              DateTime?
+  reviewNote             String?
+  reviewedAt             DateTime?
+  createdAt              DateTime            @default(now())
+  professional           ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
   @@index([professionalId])
   @@index([status])
+}
+
+model AdminAuditLog {
+  id                   String   @id @default(cuid())
+  adminUserId          String
+  targetProfessionalId String?
+  documentId           String?
+  action               String
+  previousStatus       String?
+  nextStatus           String?
+  note                 String?
+  metadata             Json?
+  createdAt            DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([targetProfessionalId])
+  @@index([documentId])
+  @@index([createdAt])
 }
 
 model AvailabilitySlot {

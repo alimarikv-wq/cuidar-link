@@ -6,6 +6,9 @@
 2. Copiar `.env.production.example` para as variaveis do provedor.
    - `DATABASE_URL`: connection pooling do Supabase.
    - `DIRECT_URL`: direct connection do Supabase.
+   - `SUPABASE_URL`: URL do projeto Supabase.
+   - `SUPABASE_SERVICE_ROLE_KEY`: service role key do Supabase. Nunca expor no frontend.
+   - `SUPABASE_DOCUMENTS_BUCKET`: use `professional-documents`.
 3. Definir `CARE_ENABLE_DEMO_FALLBACK="false"` no ambiente de producao real.
 4. Gerar um `JWT_SECRET` longo e unico.
 5. Configurar Google OAuth.
@@ -37,6 +40,7 @@ GET /api/health
 ```
 
 Resposta `200` significa app e banco acessiveis. Resposta `503` significa que o app subiu, mas o banco nao respondeu.
+O campo `documentStorage` precisa retornar `true` para liberar upload de documentos privados.
 
 ## Deploy sugerido
 
@@ -45,7 +49,7 @@ Resposta `200` significa app e banco acessiveis. Resposta `503` significa que o 
 Build command:
 
 ```txt
-npm run build
+npm run build:vercel
 ```
 
 Install command:
@@ -54,7 +58,7 @@ Install command:
 npm install
 ```
 
-Post-deploy ou etapa manual:
+Se o deploy nao usar o comando acima, rode manualmente:
 
 ```txt
 npx prisma migrate deploy

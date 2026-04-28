@@ -1,19 +1,19 @@
-import { VerificationStatus } from "@prisma/client";
+import { ProfessionalVerificationStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
-import { reviewProfessionalDocument } from "@/lib/care-data";
+import { reviewProfessionalRegistration } from "@/lib/care-data";
 import { prisma } from "@/lib/prisma";
 
 const reviewSchema = z.object({
-  status: z.nativeEnum(VerificationStatus),
-  reviewNote: z.string().max(600).optional().or(z.literal(""))
+  status: z.nativeEnum(ProfessionalVerificationStatus),
+  note: z.string().max(800).optional().or(z.literal(""))
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ error: "Entre para revisar documentos." }, { status: 401 });
+    return NextResponse.json({ error: "Entre para revisar cadastros." }, { status: 401 });
   }
 
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { role: true } });
@@ -28,10 +28,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const { id } = await params;
+
   try {
-    const document = await reviewProfessionalDocument(session.userId, id, parsed.data.status, parsed.data.reviewNote || undefined);
-    return NextResponse.json({ success: true, document });
+    const professional = await reviewProfessionalRegistration(session.userId, id, parsed.data.status, parsed.data.note || undefined);
+    return NextResponse.json({ success: true, professional });
   } catch {
-    return NextResponse.json({ error: "Documento nao encontrado." }, { status: 404 });
+    return NextResponse.json({ error: "Profissional nao encontrado." }, { status: 404 });
   }
 }

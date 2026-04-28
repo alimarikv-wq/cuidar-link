@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarCheck, Check, ClipboardList, FileBadge, FileUp, Save, ShieldCheck, UserRoundCheck, X } from "lucide-react";
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
+import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
   AvailabilitySlotData,
   CareDashboardData,
@@ -42,6 +43,8 @@ const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
 const documentOptions: Array<{ value: DocumentTypeCode; label: string }> = [
   { value: "CPF", label: "CPF" },
   { value: "RG", label: "RG" },
+  { value: "CNH", label: "CNH" },
+  { value: "COMPROVANTE_RESIDENCIA", label: "Comprovante de residencia" },
   { value: "COREN", label: "COREN" },
   { value: "CREFITO", label: "CREFITO" },
   { value: "CERTIFICADO", label: "Certificado" },
@@ -372,55 +375,75 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
   const [isPending, startTransition] = useTransition();
   const firstMissing = settings.requiredDocuments.find((document) => document.status !== "VERIFICADO");
   const [type, setType] = useState<DocumentTypeCode>(firstMissing?.type || "CPF");
-  const [documentNumber, setDocumentNumber] = useState("");
+  const [cpf, setCpf] = useState(settings.cpf ? formatCpf(settings.cpf) : "");
+  const [documentNumber, setDocumentNumber] = useState(settings.professionalRegistrationNumber || "");
+  const [registrationUf, setRegistrationUf] = useState(settings.professionalRegistrationUf || settings.state || "RS");
   const [expiresAt, setExpiresAt] = useState("");
-  const [fileUrl, setFileUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  function readDocumentFile(file: File | undefined) {
+  function readDocumentFile(nextFile: File | undefined) {
     setError("");
     setMessage("");
-    setFileUrl("");
+    setFile(null);
     setFileName("");
 
-    if (!file) return;
-    if (file.size > 2_000_000) {
+    if (!nextFile) return;
+    if (nextFile.size > 2_000_000) {
       setError("Envie um arquivo de ate 2 MB.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setFileUrl(reader.result);
-        setFileName(file.name);
-      }
-    };
-    reader.onerror = () => setError("Nao foi possivel ler este arquivo.");
-    reader.readAsDataURL(file);
+    const allowed = ["application/pdf", "image/jpeg", "image/png"];
+    if (!allowed.includes(nextFile.type)) {
+      setError("Envie PDF, JPG, JPEG ou PNG.");
+      return;
+    }
+
+    setFile(nextFile);
+    setFileName(nextFile.name);
   }
 
   function submitDocument() {
     setError("");
     setMessage("");
 
-    if (!fileUrl) {
+    if (!isValidCpf(cpf)) {
+      setError("Informe um CPF valido.");
+      return;
+    }
+
+    if ((type === "COREN" || type === "CREFITO") && (!documentNumber.trim() || registrationUf.trim().length !== 2)) {
+      setError("Informe numero e UF do registro profissional.");
+      return;
+    }
+
+    if (!file) {
       setError("Anexe uma imagem ou PDF do documento.");
       return;
     }
 
+    if (!consentAccepted) {
+      setError("Autorize o uso dos dados para validacao cadastral.");
+      return;
+    }
+
     startTransition(async () => {
+      const formData = new FormData();
+      formData.set("type", type);
+      formData.set("cpf", cpf);
+      formData.set("documentNumber", type === "CPF" ? cpf : documentNumber);
+      formData.set("registrationUf", registrationUf);
+      formData.set("expiresAt", expiresAt);
+      formData.set("consentAccepted", String(consentAccepted));
+      formData.set("file", file);
+
       const response = await fetch("/api/professional-documents", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          documentNumber,
-          fileUrl,
-          expiresAt
-        })
+        body: formData
       });
       const data = await response.json();
 
@@ -429,11 +452,11 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
         return;
       }
 
-      setMessage("Documento enviado para verificacao.");
-      setDocumentNumber("");
+      setMessage("Seus documentos foram enviados e estao em analise. Voce sera notificado quando a validacao for concluida.");
       setExpiresAt("");
-      setFileUrl("");
+      setFile(null);
       setFileName("");
+      setConsentAccepted(false);
       router.refresh();
     });
   }
@@ -451,6 +474,11 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <p className="text-sm font-semibold text-slate-700">Obrigatorios para liberar selo</p>
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-sm font-semibold text-slate-500">Status do cadastro</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950">{settings.verificationStatusLabel}</p>
+            {settings.verificationNote ? <p className="mt-2 text-sm text-slate-600">{settings.verificationNote}</p> : null}
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {settings.requiredDocuments.map((document) => (
               <span
@@ -463,6 +491,16 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
           </div>
 
           <div className="mt-4 grid gap-3">
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              CPF
+              <input
+                value={cpf}
+                onChange={(event) => setCpf(formatCpf(event.target.value))}
+                placeholder="000.000.000-00"
+                inputMode="numeric"
+                className={fieldClass}
+              />
+            </label>
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
               Tipo de documento
               <select value={type} onChange={(event) => setType(event.target.value as DocumentTypeCode)} className={fieldClass}>
@@ -482,6 +520,17 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 className={fieldClass}
               />
             </label>
+            {(type === "COREN" || type === "CREFITO") ? (
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                UF do registro
+                <input
+                  value={registrationUf}
+                  onChange={(event) => setRegistrationUf(event.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="RS"
+                  className={fieldClass}
+                />
+              </label>
+            ) : null}
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
               Validade, se houver
               <input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className={fieldClass} />
@@ -493,6 +542,17 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
               </span>
               <input type="file" accept="image/*,.pdf" onChange={(event) => readDocumentFile(event.target.files?.[0])} className="text-sm" />
               {fileName ? <span className="text-sm font-medium text-emerald-700">{fileName}</span> : null}
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                onChange={(event) => setConsentAccepted(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700"
+              />
+              <span>
+                Autorizo o uso dos meus dados e documentos exclusivamente para fins de validacao profissional e cadastral na plataforma.
+              </span>
             </label>
             <button
               type="button"
@@ -529,13 +589,14 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                {document.fileUrl ? (
-                  <a href={document.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700">
+                {document.downloadUrl ? (
+                  <a href={document.downloadUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700">
                     Abrir arquivo
                   </a>
                 ) : null}
                 {document.expiresAt ? <span className="text-slate-500">Validade {new Date(document.expiresAt).toLocaleDateString("pt-BR")}</span> : null}
               </div>
+              {document.externalCheckMessage ? <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">{document.externalCheckMessage}</p> : null}
               {document.reviewNote ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{document.reviewNote}</p> : null}
             </div>
           ))}

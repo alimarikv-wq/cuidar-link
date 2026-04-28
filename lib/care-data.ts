@@ -7,10 +7,13 @@ import {
   GenderPreference,
   Prisma,
   ProfessionalType,
+  ProfessionalVerificationStatus,
   TransferSupportLevel,
   VerificationStatus
 } from "@prisma/client";
+import { maskCpf } from "@/lib/cpf";
 import { prisma } from "@/lib/prisma";
+import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
 import { formatMoney } from "@/lib/utils";
 import {
   AvailabilityFilter,
@@ -89,7 +92,9 @@ const statusLabel: Record<CareRequestStatus, string> = {
 
 const documentTypeLabel: Record<DocumentType, string> = {
   RG: "RG",
+  CNH: "CNH",
   CPF: "CPF",
+  COMPROVANTE_RESIDENCIA: "Comprovante de residencia",
   COREN: "COREN",
   CREFITO: "CREFITO",
   CERTIFICADO: "Certificado",
@@ -97,9 +102,16 @@ const documentTypeLabel: Record<DocumentType, string> = {
 };
 
 const verificationStatusLabel: Record<VerificationStatus, string> = {
+  PENDENTE: "Enviado",
+  VERIFICADO: "Aprovado",
+  RECUSADO: "Reprovado"
+};
+
+const professionalVerificationStatusLabel: Record<ProfessionalVerificationStatus, string> = {
   PENDENTE: "Pendente",
-  VERIFICADO: "Verificado",
-  RECUSADO: "Recusado"
+  EM_ANALISE: "Em analise",
+  APROVADO: "Aprovado",
+  REPROVADO: "Reprovado"
 };
 
 export type CareSearchParams = {
@@ -164,20 +176,42 @@ type UpdateProfessionalProfileInput = {
 
 type CreateProfessionalDocumentInput = {
   type: DocumentType;
+  cpf?: string;
   label?: string;
   documentNumber?: string;
-  fileUrl?: string;
+  registrationUf?: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
   expiresAt?: string;
+  consentAccepted: boolean;
 };
 
 function coordinatesFor(neighborhood: string) {
   return neighborhoodCoordinates[neighborhood] ?? { latitude: defaultCenter.latitude, longitude: defaultCenter.longitude };
 }
 
-function requiredDocumentTypesFor(type: ProfessionalType) {
-  if (type === ProfessionalType.TECNICO_ENFERMAGEM) return [DocumentType.CPF, DocumentType.RG, DocumentType.COREN];
-  if (type === ProfessionalType.FISIOTERAPEUTA) return [DocumentType.CPF, DocumentType.RG, DocumentType.CREFITO];
-  return [DocumentType.CPF, DocumentType.RG, DocumentType.CERTIFICADO];
+function requiredDocumentRulesFor(type: ProfessionalType): Array<{ type: DocumentTypeCode; label: string; matches: DocumentType[] }> {
+  const base = [
+    { type: "CPF" as const, label: "CPF", matches: [DocumentType.CPF] },
+    { type: "RG" as const, label: "RG ou CNH", matches: [DocumentType.RG, DocumentType.CNH] },
+    {
+      type: "COMPROVANTE_RESIDENCIA" as const,
+      label: "Comprovante de residencia",
+      matches: [DocumentType.COMPROVANTE_RESIDENCIA]
+    }
+  ];
+
+  if (type === ProfessionalType.TECNICO_ENFERMAGEM) {
+    return [...base, { type: "COREN", label: "COREN", matches: [DocumentType.COREN] }];
+  }
+
+  if (type === ProfessionalType.FISIOTERAPEUTA) {
+    return [...base, { type: "CREFITO", label: "CREFITO", matches: [DocumentType.CREFITO] }];
+  }
+
+  return [...base, { type: "CERTIFICADO", label: "Certificado", matches: [DocumentType.CERTIFICADO] }];
 }
 
 function toProfessionalDocumentData(document: {
@@ -187,10 +221,17 @@ function toProfessionalDocumentData(document: {
   label: string;
   documentNumber: string | null;
   fileUrl: string | null;
+  storagePath: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
   expiresAt: Date | null;
   createdAt: Date;
   reviewNote: string | null;
   reviewedAt: Date | null;
+  externalCheckStatus: string | null;
+  externalCheckSource: string | null;
+  externalCheckMessage: string | null;
 }): ProfessionalDocumentData {
   return {
     id: document.id,
@@ -201,10 +242,17 @@ function toProfessionalDocumentData(document: {
     label: document.label,
     documentNumber: document.documentNumber,
     fileUrl: document.fileUrl,
+    downloadUrl: document.storagePath ? `/api/professional-documents/${document.id}/download` : document.fileUrl,
+    fileName: document.fileName,
+    mimeType: document.mimeType,
+    fileSize: document.fileSize,
     expiresAt: document.expiresAt ? document.expiresAt.toISOString() : null,
     createdAt: document.createdAt.toISOString(),
     reviewNote: document.reviewNote,
-    reviewedAt: document.reviewedAt ? document.reviewedAt.toISOString() : null
+    reviewedAt: document.reviewedAt ? document.reviewedAt.toISOString() : null,
+    externalCheckStatus: document.externalCheckStatus,
+    externalCheckSource: document.externalCheckSource,
+    externalCheckMessage: document.externalCheckMessage
   };
 }
 
@@ -212,8 +260,8 @@ function requiredDocumentStatus(
   professionalType: ProfessionalType,
   documents: Array<{ type: DocumentType; status: VerificationStatus }>
 ): Array<{ type: DocumentTypeCode; label: string; status: VerificationStatusCode | "FALTANDO" }> {
-  return requiredDocumentTypesFor(professionalType).map((type) => {
-    const matchingDocuments = documents.filter((document) => document.type === type);
+  return requiredDocumentRulesFor(professionalType).map((rule) => {
+    const matchingDocuments = documents.filter((document) => rule.matches.includes(document.type));
     const status: VerificationStatusCode | "FALTANDO" = matchingDocuments.some((document) => document.status === VerificationStatus.VERIFICADO)
       ? "VERIFICADO"
       : matchingDocuments.some((document) => document.status === VerificationStatus.PENDENTE)
@@ -223,8 +271,8 @@ function requiredDocumentStatus(
           : "FALTANDO";
 
     return {
-      type: type as DocumentTypeCode,
-      label: documentTypeLabel[type],
+      type: rule.type,
+      label: rule.label,
       status
     };
   });
@@ -238,9 +286,10 @@ async function refreshProfessionalVerification(professionalId: string) {
 
   if (!professional) return;
 
-  const isVerified = requiredDocumentTypesFor(professional.professionalType).every((type) =>
-    professional.documents.some((document) => document.type === type && document.status === VerificationStatus.VERIFICADO)
+  const requiredDocumentsVerified = requiredDocumentRulesFor(professional.professionalType).every((rule) =>
+    professional.documents.some((document) => rule.matches.includes(document.type) && document.status === VerificationStatus.VERIFICADO)
   );
+  const isVerified = professional.verificationStatus === ProfessionalVerificationStatus.APROVADO && requiredDocumentsVerified;
 
   await prisma.professionalProfile.update({
     where: { id: professionalId },
@@ -641,16 +690,51 @@ export async function createProfessionalDocumentForUser(userId: string, input: C
     return { ok: false as const, status: 403, error: "Perfil profissional nao encontrado." };
   }
 
-  const document = await prisma.professionalDocument.create({
-    data: {
-      professionalId: user.professionalProfile.id,
-      type: input.type,
-      label: input.label?.trim() || documentTypeLabel[input.type],
-      documentNumber: input.documentNumber?.trim() || null,
-      fileUrl: input.fileUrl || null,
-      expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-      status: VerificationStatus.PENDENTE
-    }
+  const externalCheck =
+    (input.type === DocumentType.COREN || input.type === DocumentType.CREFITO) && input.documentNumber && input.registrationUf
+      ? await verifyProfessionalRegistration({
+          council: input.type,
+          registrationNumber: input.documentNumber,
+          uf: input.registrationUf,
+          cpf: input.cpf
+        })
+      : null;
+
+  const document = await prisma.$transaction(async (tx) => {
+    const createdDocument = await tx.professionalDocument.create({
+      data: {
+        professionalId: user.professionalProfile!.id,
+        type: input.type,
+        label: input.label?.trim() || documentTypeLabel[input.type],
+        documentNumber: input.documentNumber?.trim() || null,
+        storagePath: input.storagePath,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
+        consentAccepted: input.consentAccepted,
+        consentAcceptedAt: input.consentAccepted ? new Date() : null,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        status: VerificationStatus.PENDENTE,
+        externalCheckStatus: externalCheck?.status || null,
+        externalCheckSource: externalCheck?.source || null,
+        externalCheckMessage: externalCheck?.message || null,
+        externalCheckCheckedAt: externalCheck ? new Date() : null
+      }
+    });
+
+    await tx.professionalProfile.update({
+      where: { id: user.professionalProfile!.id },
+      data: {
+        cpf: input.cpf || undefined,
+        professionalRegistrationNumber:
+          input.type === DocumentType.COREN || input.type === DocumentType.CREFITO ? input.documentNumber || undefined : undefined,
+        professionalRegistrationUf:
+          input.type === DocumentType.COREN || input.type === DocumentType.CREFITO ? input.registrationUf?.toUpperCase() || undefined : undefined,
+        verificationStatus: ProfessionalVerificationStatus.EM_ANALISE
+      }
+    });
+
+    return createdDocument;
   });
 
   await refreshProfessionalVerification(user.professionalProfile.id);
@@ -658,19 +742,85 @@ export async function createProfessionalDocumentForUser(userId: string, input: C
   return { ok: true as const, document: toProfessionalDocumentData(document) };
 }
 
-export async function reviewProfessionalDocument(documentId: string, status: VerificationStatus, reviewNote?: string) {
-  const document = await prisma.professionalDocument.update({
-    where: { id: documentId },
-    data: {
-      status,
-      reviewNote: reviewNote?.trim() || null,
-      reviewedAt: new Date()
-    }
+export async function reviewProfessionalDocument(adminUserId: string, documentId: string, status: VerificationStatus, reviewNote?: string) {
+  const existingDocument = await prisma.professionalDocument.findUnique({
+    where: { id: documentId }
+  });
+
+  if (!existingDocument) {
+    throw new Error("Documento nao encontrado.");
+  }
+
+  const document = await prisma.$transaction(async (tx) => {
+    const updatedDocument = await tx.professionalDocument.update({
+      where: { id: documentId },
+      data: {
+        status,
+        reviewNote: reviewNote?.trim() || null,
+        reviewedAt: new Date()
+      }
+    });
+
+    await tx.adminAuditLog.create({
+      data: {
+        adminUserId,
+        targetProfessionalId: updatedDocument.professionalId,
+        documentId,
+        action: "DOCUMENT_REVIEW",
+        previousStatus: existingDocument.status,
+        nextStatus: status,
+        note: reviewNote?.trim() || null
+      }
+    });
+
+    return updatedDocument;
   });
 
   await refreshProfessionalVerification(document.professionalId);
 
   return toProfessionalDocumentData(document);
+}
+
+export async function reviewProfessionalRegistration(adminUserId: string, professionalId: string, status: ProfessionalVerificationStatus, note?: string) {
+  const existingProfessional = await prisma.professionalProfile.findUnique({
+    where: { id: professionalId }
+  });
+
+  if (!existingProfessional) {
+    throw new Error("Profissional nao encontrado.");
+  }
+
+  const professional = await prisma.$transaction(async (tx) => {
+    const updatedProfessional = await tx.professionalProfile.update({
+      where: { id: professionalId },
+      data: {
+        verificationStatus: status,
+        verificationNote: note?.trim() || null,
+        verificationReviewedAt: new Date()
+      }
+    });
+
+    await tx.adminAuditLog.create({
+      data: {
+        adminUserId,
+        targetProfessionalId: professionalId,
+        action: "PROFESSIONAL_VERIFICATION_REVIEW",
+        previousStatus: existingProfessional.verificationStatus,
+        nextStatus: status,
+        note: note?.trim() || null
+      }
+    });
+
+    return updatedProfessional;
+  });
+
+  await refreshProfessionalVerification(professional.id);
+
+  return {
+    id: professional.id,
+    verificationStatus: professional.verificationStatus,
+    verificationStatusLabel: professionalVerificationStatusLabel[professional.verificationStatus]
+  };
 }
 
 export async function getCareRequestsForUser(userId: string) {
@@ -735,6 +885,12 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
           gender: user.professionalProfile.gender,
           age: user.professionalProfile.age,
           phone: user.professionalProfile.phone,
+          cpf: user.professionalProfile.cpf,
+          professionalRegistrationNumber: user.professionalProfile.professionalRegistrationNumber,
+          professionalRegistrationUf: user.professionalProfile.professionalRegistrationUf,
+          verificationStatus: user.professionalProfile.verificationStatus,
+          verificationStatusLabel: professionalVerificationStatusLabel[user.professionalProfile.verificationStatus],
+          verificationNote: user.professionalProfile.verificationNote,
           neighborhood: user.professionalProfile.neighborhood,
           addressLine: user.professionalProfile.addressLine,
           addressNumber: user.professionalProfile.addressNumber,
@@ -781,7 +937,8 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     pendingDocuments,
     professionalsByType,
     requestsByStatus,
-    documentsForReview
+    documentsForReview,
+    auditLogs
   ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { accountType: AccountType.PATIENT } }),
@@ -806,6 +963,10 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
         },
         orderBy: [{ status: "asc" }, { createdAt: "desc" }],
         take: 30
+      }),
+      prisma.adminAuditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20
       })
     ]);
 
@@ -827,9 +988,22 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     })),
     documentsForReview: documentsForReview.map((document): AdminDocumentReviewData => ({
       ...toProfessionalDocumentData(document),
+      professionalId: document.professional.id,
       professionalName: document.professional.user.name,
       professionalEmail: document.professional.user.email,
-      professionalTypeLabel: professionalTypeLabel[document.professional.professionalType]
+      professionalTypeLabel: professionalTypeLabel[document.professional.professionalType],
+      professionalVerificationStatus: document.professional.verificationStatus,
+      professionalVerificationStatusLabel: professionalVerificationStatusLabel[document.professional.verificationStatus],
+      professionalRegistrationUf: document.professional.professionalRegistrationUf,
+      professionalCpfMasked: maskCpf(document.professional.cpf) || null
+    })),
+    auditLogs: auditLogs.map((log) => ({
+      id: log.id,
+      adminUserId: log.adminUserId,
+      action: log.action,
+      nextStatus: log.nextStatus,
+      note: log.note,
+      createdAt: log.createdAt.toISOString()
     }))
   };
 }

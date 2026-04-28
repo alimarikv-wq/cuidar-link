@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ExternalLink, X } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AdminDocumentReviewData, CareAdminOverview, VerificationStatusCode } from "@/types";
+import { AdminDocumentReviewData, CareAdminOverview, ProfessionalVerificationStatusCode, VerificationStatusCode } from "@/types";
 
 const colors = ["#047857", "#6d28d9", "#0f172a", "#be123c", "#0369a1", "#a16207"];
 
@@ -40,6 +40,26 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
     });
   }
 
+  function reviewProfessional(status: ProfessionalVerificationStatusCode) {
+    setError("");
+
+    startTransition(async () => {
+      const response = await fetch(`/api/admin/professionals/${document.professionalId}/verification`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, note })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel revisar o cadastro.");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -47,6 +67,11 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
           <p className="text-sm font-semibold text-emerald-700">{document.professionalTypeLabel}</p>
           <h4 className="mt-1 text-lg font-semibold text-slate-950">{document.professionalName}</h4>
           <p className="mt-1 text-sm text-slate-500">{document.professionalEmail}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Cadastro: {document.professionalVerificationStatusLabel}
+            {document.professionalCpfMasked ? ` - CPF ${document.professionalCpfMasked}` : ""}
+            {document.professionalRegistrationUf ? ` - UF ${document.professionalRegistrationUf}` : ""}
+          </p>
         </div>
         <span className={`rounded-lg px-3 py-1 text-xs font-semibold ${documentStatusStyles[document.status]}`}>
           {document.statusLabel}
@@ -60,14 +85,28 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
           {document.documentNumber ? ` - ${document.documentNumber}` : ""}
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
-          {document.fileUrl ? (
-            <a href={document.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+          {document.downloadUrl ? (
+            <a href={document.downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-700">
               Abrir arquivo
               <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
             </a>
           ) : null}
           {document.expiresAt ? <span className="text-slate-500">Validade {new Date(document.expiresAt).toLocaleDateString("pt-BR")}</span> : null}
         </div>
+        {(document.type === "COREN" || document.type === "CREFITO") ? (
+          <div className="mt-3 flex flex-wrap gap-3 text-sm">
+            <a
+              href={document.type === "COREN" ? "https://www.portalcoren-rs.gov.br/" : "https://www.crefito5.org.br/"}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-semibold text-blue-700"
+            >
+              Consultar {document.typeLabel}
+              <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        ) : null}
+        {document.externalCheckMessage ? <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">{document.externalCheckMessage}</p> : null}
       </div>
 
       <label className="mt-4 grid gap-1 text-sm font-semibold text-slate-700">
@@ -100,12 +139,39 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
           <X aria-hidden="true" className="h-4 w-4" />
           Recusar
         </button>
+        <button
+          type="button"
+          onClick={() => reviewProfessional("APROVADO")}
+          disabled={isPending}
+          className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-70"
+        >
+          Aprovar cadastro
+        </button>
+        <button
+          type="button"
+          onClick={() => reviewProfessional("REPROVADO")}
+          disabled={isPending}
+          className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-rose-400 disabled:cursor-wait disabled:opacity-70"
+        >
+          Reprovar cadastro
+        </button>
       </div>
     </article>
   );
 }
 
 export function AdminShell({ overview }: { overview: CareAdminOverview }) {
+  const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [typeFilter, setTypeFilter] = useState("TODOS");
+  const [ufFilter, setUfFilter] = useState("TODAS");
+  const filteredDocuments = overview.documentsForReview.filter((document) => {
+    const statusMatches = statusFilter === "TODOS" || document.professionalVerificationStatus === statusFilter || document.status === statusFilter;
+    const typeMatches = typeFilter === "TODOS" || document.professionalTypeLabel === typeFilter;
+    const ufMatches = ufFilter === "TODAS" || document.professionalRegistrationUf === ufFilter;
+    return statusMatches && typeMatches && ufMatches;
+  });
+  const professionalTypes = Array.from(new Set(overview.documentsForReview.map((document) => document.professionalTypeLabel)));
+  const registrationUfs = Array.from(new Set(overview.documentsForReview.map((document) => document.professionalRegistrationUf).filter(Boolean)));
   const summaryCards = [
     { label: "Usuarios", value: String(overview.users) },
     { label: "Pacientes", value: String(overview.patients) },
@@ -163,15 +229,73 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-semibold text-emerald-700">Verificacao</p>
         <h3 className="mt-2 text-2xl font-semibold text-slate-950">Documentos para revisar</h3>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          >
+            <option value="TODOS">Todos os status</option>
+            <option value="PENDENTE">Pendente / enviado</option>
+            <option value="EM_ANALISE">Em analise</option>
+            <option value="APROVADO">Cadastro aprovado</option>
+            <option value="REPROVADO">Cadastro reprovado</option>
+            <option value="VERIFICADO">Documento aprovado</option>
+            <option value="RECUSADO">Documento reprovado</option>
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(event) => setTypeFilter(event.target.value)}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          >
+            <option value="TODOS">Todos os profissionais</option>
+            {professionalTypes.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+          <select
+            value={ufFilter}
+            onChange={(event) => setUfFilter(event.target.value)}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          >
+            <option value="TODAS">Todas as UFs</option>
+            {registrationUfs.map((uf) => (
+              <option key={uf} value={uf || ""}>
+                {uf}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
-          {overview.documentsForReview.length === 0 ? (
+          {filteredDocuments.length === 0 ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Nenhum documento enviado ainda.
+              Nenhum documento encontrado para estes filtros.
             </div>
           ) : null}
 
-          {overview.documentsForReview.map((document) => (
+          {filteredDocuments.map((document) => (
             <AdminDocumentCard key={document.id} document={document} />
+          ))}
+        </div>
+      </article>
+
+      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-semibold text-emerald-700">Auditoria</p>
+        <h3 className="mt-2 text-2xl font-semibold text-slate-950">Acoes administrativas recentes</h3>
+        <div className="mt-5 grid gap-3">
+          {overview.auditLogs.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Nenhuma acao registrada ainda.</div>
+          ) : null}
+          {overview.auditLogs.map((log) => (
+            <div key={log.id} className="rounded-lg border border-slate-200 p-4 text-sm text-slate-600">
+              <p className="font-semibold text-slate-950">
+                {log.action} {log.nextStatus ? `-> ${log.nextStatus}` : ""}
+              </p>
+              <p className="mt-1">{new Date(log.createdAt).toLocaleString("pt-BR")}</p>
+              {log.note ? <p className="mt-2 rounded-lg bg-slate-50 p-3">{log.note}</p> : null}
+            </div>
           ))}
         </div>
       </article>

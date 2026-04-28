@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isDocumentStorageConfigured } from "@/lib/document-storage";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -9,6 +10,7 @@ export async function GET() {
     appleOAuth: Boolean(
       process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY
     ),
+    documentStorage: isDocumentStorageConfigured(),
     demoFallback: process.env.CARE_ENABLE_DEMO_FALLBACK !== "false"
   };
 
