@@ -24,6 +24,7 @@ import {
   CareDashboardData,
   CareProfessional,
   CareRequestRecord,
+  DashboardFavoriteProfessional,
   DocumentTypeCode,
   VerificationStatusCode,
   ProfessionalDocumentData
@@ -571,6 +572,42 @@ function toRequestRecord(request: Prisma.CareRequestGetPayload<{ include: { prof
   };
 }
 
+function toDashboardFavoriteProfessional(
+  favorite: Prisma.ProfessionalFavoriteGetPayload<{
+    include: {
+      professional: {
+        include: {
+          user: true;
+          documents: true;
+          availability: true;
+        };
+      };
+    };
+  }>
+): DashboardFavoriteProfessional {
+  const professional = favorite.professional;
+  const priceLabel = professional.sessionRate
+    ? `${formatMoney(Number(professional.sessionRate))}/sessao`
+    : `${formatMoney(Number(professional.hourlyRate))}/h`;
+
+  return {
+    id: professional.id,
+    name: professional.user.name,
+    roleLabel: professionalTypeLabel[professional.professionalType],
+    neighborhood: professional.neighborhood,
+    city: professional.city,
+    priceLabel,
+    availableIn: professional.availability.length > 0 ? "Agenda flexivel" : "Sob consulta",
+    supportLevelLabel: supportLabel[professional.supportLevel],
+    services: professional.services.map((service) => serviceLabel[service]),
+    credentials: professional.documents.filter((document) => document.status === VerificationStatus.VERIFICADO).map((document) => document.label),
+    rating: Number(professional.rating),
+    reviewCount: professional.reviewCount,
+    isVerified: professional.isVerified,
+    createdAt: favorite.createdAt.toISOString()
+  };
+}
+
 export async function updateCareRequestStatus(requestId: string, userId: string, nextStatus: CareRequestStatus) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -918,6 +955,19 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     where: { id: userId },
     include: {
       patientProfile: true,
+      professionalFavorites: {
+        include: {
+          professional: {
+            include: {
+              user: true,
+              documents: { orderBy: { createdAt: "desc" } },
+              availability: { orderBy: [{ weekday: "asc" }, { startTime: "asc" }] }
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 12
+      },
       professionalProfile: {
         include: {
           documents: true,
@@ -938,9 +988,11 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
       requests: requests.length,
       scheduled,
       completed,
-      verifiedDocuments: user.professionalProfile?.documents.filter((document) => document.status === "VERIFICADO").length ?? 0
+      verifiedDocuments: user.professionalProfile?.documents.filter((document) => document.status === "VERIFICADO").length ?? 0,
+      favoriteProfessionals: user.professionalFavorites.length
     },
     requests,
+    favoriteProfessionals: user.professionalFavorites.map(toDashboardFavoriteProfessional),
     professionalSettings: user.professionalProfile
       ? {
           professionalType: user.professionalProfile.professionalType,

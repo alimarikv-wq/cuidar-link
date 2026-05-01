@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, Check, ClipboardList, FileBadge, FileUp, Save, ShieldCheck, UserRoundCheck, X } from "lucide-react";
+import { CalendarCheck, Check, ClipboardList, FileBadge, FileUp, Heart, MapPin, Save, ShieldCheck, Star, UserRoundCheck, X } from "lucide-react";
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
@@ -664,18 +665,113 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
   );
 }
 
+function PatientFavoritesPanel({
+  dashboard,
+  removingId,
+  error,
+  onRemove
+}: {
+  dashboard: CareDashboardData;
+  removingId: string;
+  error: string;
+  onRemove: (professionalId: string) => void;
+}) {
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Favoritos</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Profissionais salvos</h2>
+        </div>
+        <span className="rounded-lg bg-rose-50 px-3 py-1 text-sm font-semibold text-rose-700">
+          {dashboard.favoriteProfessionals.length}
+        </span>
+      </div>
+
+      {error ? <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
+
+      <div className="mt-5 grid gap-3">
+        {dashboard.favoriteProfessionals.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Nenhum profissional salvo ainda. Use o coracao na busca para montar sua lista de referencia.
+          </div>
+        ) : null}
+
+        {dashboard.favoriteProfessionals.map((professional) => (
+          <div key={professional.id} className="grid gap-4 rounded-lg border border-slate-200 p-4 lg:grid-cols-[1fr_auto]">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-emerald-700">{professional.roleLabel}</p>
+                {professional.isVerified ? (
+                  <span className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">Verificado</span>
+                ) : null}
+              </div>
+              <h3 className="mt-1 text-xl font-semibold text-slate-950">{professional.name}</h3>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
+                <span className="inline-flex items-center gap-1">
+                  <MapPin aria-hidden="true" className="h-4 w-4 text-emerald-700" />
+                  {professional.neighborhood}, {professional.city}
+                </span>
+                <span>{professional.priceLabel}</span>
+                <span>{professional.availableIn}</span>
+                <span className="inline-flex items-center gap-1">
+                  <Star aria-hidden="true" className="h-4 w-4 text-amber-500" />
+                  {professional.rating}/5 ({professional.reviewCount})
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {professional.services.slice(0, 4).map((service) => (
+                  <span key={service} className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                    {service}
+                  </span>
+                ))}
+                <span className="rounded-lg bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-800">
+                  {professional.supportLevelLabel}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-start gap-2 lg:justify-end">
+              <Link
+                href="/#busca"
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-emerald-700 bg-emerald-700 px-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+              >
+                Buscar horario
+              </Link>
+              <button
+                type="button"
+                onClick={() => onRemove(professional.id)}
+                disabled={removingId === professional.id}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
+              >
+                {removingId === professional.id ? "Removendo..." : "Remover"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState("");
   const [updatingId, setUpdatingId] = useState("");
+  const [favoriteError, setFavoriteError] = useState("");
+  const [removingFavoriteId, setRemovingFavoriteId] = useState("");
+  const isProfessional = dashboard.summary.accountType === "PROFESSIONAL";
   const summaryCards = [
     { label: "Perfil", value: dashboard.summary.accountTypeLabel, icon: UserRoundCheck },
-    { label: "Solicitacoes", value: String(dashboard.summary.requests), icon: ClipboardList },
+    { label: isProfessional ? "Solicitacoes" : "Pedidos", value: String(dashboard.summary.requests), icon: ClipboardList },
     { label: "Agendados", value: String(dashboard.summary.scheduled), icon: CalendarCheck },
-    { label: "Docs verificados", value: String(dashboard.summary.verifiedDocuments), icon: FileBadge }
+    {
+      label: isProfessional ? "Docs verificados" : "Favoritos",
+      value: String(isProfessional ? dashboard.summary.verifiedDocuments : dashboard.summary.favoriteProfessionals),
+      icon: isProfessional ? FileBadge : Heart
+    }
   ];
-  const isProfessional = dashboard.summary.accountType === "PROFESSIONAL";
 
   function updateStatus(requestId: string, nextStatus: RequestStatus) {
     setActionError("");
@@ -697,6 +793,29 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
 
       router.refresh();
       setUpdatingId("");
+    });
+  }
+
+  function removeFavorite(professionalId: string) {
+    setFavoriteError("");
+    setRemovingFavoriteId(professionalId);
+
+    startTransition(async () => {
+      const response = await fetch("/api/professional-favorites", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ professionalId })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setFavoriteError(data.error || "Nao foi possivel remover o favorito.");
+        setRemovingFavoriteId("");
+        return;
+      }
+
+      router.refresh();
+      setRemovingFavoriteId("");
     });
   }
 
@@ -728,6 +847,15 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         })}
       </div>
 
+      {!isProfessional ? (
+        <PatientFavoritesPanel
+          dashboard={dashboard}
+          removingId={removingFavoriteId}
+          error={favoriteError}
+          onRemove={removeFavorite}
+        />
+      ) : null}
+
       {dashboard.professionalSettings ? <ProfessionalProfileForm settings={dashboard.professionalSettings} /> : null}
       {dashboard.professionalSettings ? <ProfessionalDocumentsForm settings={dashboard.professionalSettings} /> : null}
 
@@ -735,7 +863,9 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-emerald-700">Atendimentos</p>
-            <h2 className="mt-1 text-2xl font-semibold text-slate-950">Solicitacoes recentes</h2>
+            <h2 className="mt-1 text-2xl font-semibold text-slate-950">
+              {isProfessional ? "Solicitacoes recebidas" : "Pedidos enviados"}
+            </h2>
           </div>
           <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{dashboard.requests.length}</span>
         </div>
@@ -745,7 +875,9 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
 
           {dashboard.requests.length === 0 ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Nenhuma solicitacao ainda. Quando um atendimento for pedido, ele aparece aqui.
+              {isProfessional
+                ? "Nenhuma solicitacao ainda. Quando um atendimento for pedido, ele aparece aqui."
+                : "Nenhum pedido enviado ainda. Quando voce solicitar atendimento, o status aparece aqui."}
             </div>
           ) : null}
 

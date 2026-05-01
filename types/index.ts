@@ -165,6 +165,23 @@ export type CareRequestRecord = {
   neighborhood: string;
 };
 
+export type DashboardFavoriteProfessional = {
+  id: string;
+  name: string;
+  roleLabel: string;
+  neighborhood: string;
+  city: string;
+  priceLabel: string;
+  availableIn: string;
+  supportLevelLabel: string;
+  services: string[];
+  credentials: string[];
+  rating: number;
+  reviewCount: number;
+  isVerified: boolean;
+  createdAt: string;
+};
+
 export type AvailabilitySlotData = {
   weekday: number;
   startTime: string;
@@ -246,8 +263,10 @@ export type CareDashboardData = {
     scheduled: number;
     completed: number;
     verifiedDocuments: number;
+    favoriteProfessionals: number;
   };
   requests: CareRequestRecord[];
+  favoriteProfessionals: DashboardFavoriteProfessional[];
   professionalSettings: ProfessionalSettingsData | null;
   profile: {
     name: string;
