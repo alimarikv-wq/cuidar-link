@@ -1,4 +1,4 @@
-import { DocumentType } from "@prisma/client";
+import { DocumentType, VerificationStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { createProfessionalDocumentForUser } from "@/lib/care-data";
@@ -13,6 +13,10 @@ function readText(form: FormData, key: string) {
 
 function isDocumentType(value: string): value is DocumentType {
   return Object.values(DocumentType).includes(value as DocumentType);
+}
+
+function equivalentDocumentTypes(type: DocumentType) {
+  return type === DocumentType.RG || type === DocumentType.CNH ? [DocumentType.RG, DocumentType.CNH] : [type];
 }
 
 export async function POST(request: NextRequest) {
@@ -62,6 +66,21 @@ export async function POST(request: NextRequest) {
   const fileError = validateDocumentFile(file);
   if (fileError) {
     return NextResponse.json({ error: fileError }, { status: 400 });
+  }
+
+  const existingDocument = await prisma.professionalDocument.findFirst({
+    where: {
+      professionalId: user.professionalProfile.id,
+      type: { in: equivalentDocumentTypes(type) },
+      status: { in: [VerificationStatus.PENDENTE, VerificationStatus.VERIFICADO] }
+    }
+  });
+
+  if (existingDocument) {
+    return NextResponse.json(
+      { error: "Este documento ja foi enviado. Escolha o proximo documento obrigatorio ou aguarde a revisao." },
+      { status: 409 }
+    );
   }
 
   const upload = await uploadPrivateProfessionalDocument({

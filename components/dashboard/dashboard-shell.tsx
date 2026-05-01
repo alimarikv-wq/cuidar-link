@@ -51,6 +51,28 @@ const documentOptions: Array<{ value: DocumentTypeCode; label: string }> = [
   { value: "REFERENCIA", label: "Referencia" }
 ];
 
+function documentRequirementMatches(requirementType: DocumentTypeCode, documentType: DocumentTypeCode) {
+  return requirementType === "RG" ? documentType === "RG" || documentType === "CNH" : requirementType === documentType;
+}
+
+function nextRequiredDocumentType(requiredDocuments: ProfessionalSettingsData["requiredDocuments"], currentType?: DocumentTypeCode) {
+  const nextDocument = requiredDocuments.find((document) => {
+    return (
+      (document.status === "FALTANDO" || document.status === "RECUSADO") &&
+      (!currentType || !documentRequirementMatches(document.type, currentType))
+    );
+  });
+
+  return nextDocument?.type;
+}
+
+function documentRequirementText(status: ProfessionalSettingsData["requiredDocuments"][number]["status"]) {
+  if (status === "FALTANDO") return "Faltando";
+  if (status === "PENDENTE") return "Enviado";
+  if (status === "VERIFICADO") return "Aprovado";
+  return "Reenviar";
+}
+
 const weekdayOptions = [
   { value: 0, label: "Dom" },
   { value: 1, label: "Seg" },
@@ -373,8 +395,10 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
 function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSettingsData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const firstMissing = settings.requiredDocuments.find((document) => document.status !== "VERIFICADO");
-  const [type, setType] = useState<DocumentTypeCode>(firstMissing?.type || "CPF");
+  const firstActionableDocument =
+    settings.requiredDocuments.find((document) => document.status === "FALTANDO" || document.status === "RECUSADO") ||
+    settings.requiredDocuments[0];
+  const [type, setType] = useState<DocumentTypeCode>(firstActionableDocument?.type || "CPF");
   const [cpf, setCpf] = useState(settings.cpf ? formatCpf(settings.cpf) : "");
   const [documentNumber, setDocumentNumber] = useState(settings.professionalRegistrationNumber || "");
   const [registrationUf, setRegistrationUf] = useState(settings.professionalRegistrationUf || settings.state || "RS");
@@ -410,6 +434,12 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
   function submitDocument() {
     setError("");
     setMessage("");
+
+    const currentRequirement = settings.requiredDocuments.find((document) => documentRequirementMatches(document.type, type));
+    if (currentRequirement && (currentRequirement.status === "PENDENTE" || currentRequirement.status === "VERIFICADO")) {
+      setError(`${currentRequirement.label} ja foi enviado. Escolha outro documento obrigatorio ou aguarde a revisao.`);
+      return;
+    }
 
     if (!isValidCpf(cpf)) {
       setError("Informe um CPF valido.");
@@ -457,6 +487,11 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
       setFile(null);
       setFileName("");
       setConsentAccepted(false);
+      setDocumentNumber("");
+      const nextType = nextRequiredDocumentType(settings.requiredDocuments, type);
+      if (nextType) {
+        setType(nextType);
+      }
       router.refresh();
     });
   }
@@ -485,9 +520,32 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 key={document.type}
                 className={`rounded-lg px-3 py-2 text-sm font-semibold ${documentStatusStyles[document.status] || documentStatusStyles.FALTANDO}`}
               >
-                {document.label}: {document.status === "FALTANDO" ? "Faltando" : document.status === "PENDENTE" ? "Pendente" : document.status === "VERIFICADO" ? "Ok" : "Recusado"}
+                {document.label}: {documentRequirementText(document.status)}
               </span>
             ))}
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {settings.requiredDocuments.map((document) => {
+              const active = documentRequirementMatches(document.type, type);
+              const locked = document.status === "PENDENTE" || document.status === "VERIFICADO";
+
+              return (
+                <button
+                  key={document.type}
+                  type="button"
+                  onClick={() => setType(document.type)}
+                  className={`grid min-h-16 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                    active
+                      ? "border-emerald-700 bg-emerald-50 text-emerald-950"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                  }`}
+                >
+                  <span className="font-semibold">{document.label}</span>
+                  <span className={locked ? "text-slate-500" : "text-emerald-700"}>{documentRequirementText(document.status)}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="mt-4 grid gap-3">

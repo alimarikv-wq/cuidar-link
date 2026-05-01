@@ -742,6 +742,53 @@ export async function createProfessionalDocumentForUser(userId: string, input: C
   return { ok: true as const, document: toProfessionalDocumentData(document) };
 }
 
+export async function updateProfessionalDocumentType(adminUserId: string, documentId: string, type: DocumentType, reviewNote?: string) {
+  const existingDocument = await prisma.professionalDocument.findUnique({
+    where: { id: documentId },
+    include: { professional: true }
+  });
+
+  if (!existingDocument) {
+    throw new Error("Documento nao encontrado.");
+  }
+
+  const documentNumberLooksLikeCpf = Boolean(
+    existingDocument.documentNumber &&
+      existingDocument.professional.cpf &&
+      existingDocument.documentNumber.replace(/\D/g, "") === existingDocument.professional.cpf.replace(/\D/g, "")
+  );
+
+  const document = await prisma.$transaction(async (tx) => {
+    const updatedDocument = await tx.professionalDocument.update({
+      where: { id: documentId },
+      data: {
+        type,
+        label: documentTypeLabel[type],
+        documentNumber: type === DocumentType.CPF || !documentNumberLooksLikeCpf ? existingDocument.documentNumber : null,
+        reviewNote: reviewNote?.trim() || existingDocument.reviewNote
+      }
+    });
+
+    await tx.adminAuditLog.create({
+      data: {
+        adminUserId,
+        targetProfessionalId: updatedDocument.professionalId,
+        documentId,
+        action: "DOCUMENT_TYPE_UPDATE",
+        previousStatus: existingDocument.type,
+        nextStatus: type,
+        note: reviewNote?.trim() || null
+      }
+    });
+
+    return updatedDocument;
+  });
+
+  await refreshProfessionalVerification(document.professionalId);
+
+  return toProfessionalDocumentData(document);
+}
+
 export async function reviewProfessionalDocument(adminUserId: string, documentId: string, status: VerificationStatus, reviewNote?: string) {
   const existingDocument = await prisma.professionalDocument.findUnique({
     where: { id: documentId }

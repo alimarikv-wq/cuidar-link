@@ -4,9 +4,26 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ExternalLink, X } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AdminDocumentReviewData, CareAdminOverview, ProfessionalVerificationStatusCode, VerificationStatusCode } from "@/types";
+import {
+  AdminDocumentReviewData,
+  CareAdminOverview,
+  DocumentTypeCode,
+  ProfessionalVerificationStatusCode,
+  VerificationStatusCode
+} from "@/types";
 
 const colors = ["#047857", "#6d28d9", "#0f172a", "#be123c", "#0369a1", "#a16207"];
+
+const documentOptions: Array<{ value: DocumentTypeCode; label: string }> = [
+  { value: "CPF", label: "CPF" },
+  { value: "RG", label: "RG" },
+  { value: "CNH", label: "CNH" },
+  { value: "COMPROVANTE_RESIDENCIA", label: "Comprovante de residencia" },
+  { value: "COREN", label: "COREN" },
+  { value: "CREFITO", label: "CREFITO" },
+  { value: "CERTIFICADO", label: "Certificado" },
+  { value: "REFERENCIA", label: "Referencia" }
+];
 
 const documentStatusStyles: Record<string, string> = {
   PENDENTE: "bg-amber-50 text-amber-900",
@@ -18,6 +35,7 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [note, setNote] = useState(document.reviewNote || "");
+  const [correctedType, setCorrectedType] = useState<DocumentTypeCode>(document.type);
   const [error, setError] = useState("");
 
   function review(status: VerificationStatusCode) {
@@ -60,6 +78,26 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
     });
   }
 
+  function saveDocumentType() {
+    setError("");
+
+    startTransition(async () => {
+      const response = await fetch(`/api/admin/documents/${document.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: correctedType, reviewNote: note })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel corrigir o tipo do documento.");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -79,11 +117,36 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
       </div>
 
       <div className="mt-4 rounded-lg bg-slate-50 p-3">
-        <p className="font-semibold text-slate-950">{document.label}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Documento: {document.typeLabel}</p>
+        <p className="mt-1 font-semibold text-slate-950">{document.label}</p>
         <p className="mt-1 text-sm text-slate-600">
           {document.typeLabel}
           {document.documentNumber ? ` - ${document.documentNumber}` : ""}
         </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Tipo correto
+            <select
+              value={correctedType}
+              onChange={(event) => setCorrectedType(event.target.value as DocumentTypeCode)}
+              className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+            >
+              {documentOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={saveDocumentType}
+            disabled={isPending || correctedType === document.type}
+            className="inline-flex h-10 items-center justify-center self-end rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Salvar tipo
+          </button>
+        </div>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
           {document.downloadUrl ? (
             <a href={document.downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-700">
@@ -163,12 +226,14 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
 export function AdminShell({ overview }: { overview: CareAdminOverview }) {
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [typeFilter, setTypeFilter] = useState("TODOS");
+  const [documentTypeFilter, setDocumentTypeFilter] = useState("TODOS");
   const [ufFilter, setUfFilter] = useState("TODAS");
   const filteredDocuments = overview.documentsForReview.filter((document) => {
     const statusMatches = statusFilter === "TODOS" || document.professionalVerificationStatus === statusFilter || document.status === statusFilter;
     const typeMatches = typeFilter === "TODOS" || document.professionalTypeLabel === typeFilter;
+    const documentTypeMatches = documentTypeFilter === "TODOS" || document.type === documentTypeFilter;
     const ufMatches = ufFilter === "TODAS" || document.professionalRegistrationUf === ufFilter;
-    return statusMatches && typeMatches && ufMatches;
+    return statusMatches && typeMatches && documentTypeMatches && ufMatches;
   });
   const professionalTypes = Array.from(new Set(overview.documentsForReview.map((document) => document.professionalTypeLabel)));
   const registrationUfs = Array.from(new Set(overview.documentsForReview.map((document) => document.professionalRegistrationUf).filter(Boolean)));
@@ -229,7 +294,7 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-semibold text-emerald-700">Verificacao</p>
         <h3 className="mt-2 text-2xl font-semibold text-slate-950">Documentos para revisar</h3>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
@@ -252,6 +317,18 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
             {professionalTypes.map((type) => (
               <option key={type} value={type}>
                 {type}
+              </option>
+            ))}
+          </select>
+          <select
+            value={documentTypeFilter}
+            onChange={(event) => setDocumentTypeFilter(event.target.value)}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          >
+            <option value="TODOS">Todos os documentos</option>
+            {documentOptions.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
               </option>
             ))}
           </select>
