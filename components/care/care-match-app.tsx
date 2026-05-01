@@ -37,12 +37,14 @@ import {
 
 type ProfessionalTypeFilter = "TODOS" | ProfessionalTypeCode;
 type LocationStatus = "idle" | "locating" | "ready" | "denied" | "unsupported" | "error";
+type AgeRangeFilter = "QUALQUER" | "20-30" | "30-40" | "40-50" | "50-60";
 
 const serviceOptions: Array<{ id: CareServiceCode; label: string; icon: typeof HeartHandshake }> = [
   { id: "BANHO", label: "Banho", icon: HeartHandshake },
   { id: "TRANSFERENCIA", label: "Transferencia", icon: Weight },
   { id: "MEDICACAO", label: "Medicacao", icon: Stethoscope },
-  { id: "FISIOTERAPIA", label: "Fisioterapia", icon: Accessibility }
+  { id: "FISIOTERAPIA", label: "Fisioterapia", icon: Accessibility },
+  { id: "OUTRO", label: "Outro", icon: ClipboardCheck }
 ];
 
 const professionalTypes: Array<{ value: ProfessionalTypeFilter; label: string }> = [
@@ -53,15 +55,37 @@ const professionalTypes: Array<{ value: ProfessionalTypeFilter; label: string }>
 ];
 
 const genderOptions: Array<{ value: GenderPreferenceCode; label: string }> = [
-  { value: "FEMININO", label: "Mulher" },
   { value: "QUALQUER", label: "Qualquer" },
+  { value: "FEMININO", label: "Mulher" },
   { value: "MASCULINO", label: "Homem" }
 ];
 
 const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
-  { value: "MODERADO", label: "Moderado" },
-  { value: "ALTO", label: "Alto" },
+  { value: "MODERADO", label: "Sem preferencia" },
+  { value: "ALTO", label: "Porte forte" },
   { value: "DUPLA", label: "Duas pessoas" }
+];
+
+const ageRangeOptions: Array<{ value: AgeRangeFilter; label: string; min?: number; max?: number }> = [
+  { value: "QUALQUER", label: "Qualquer idade" },
+  { value: "20-30", label: "20 a 30", min: 20, max: 30 },
+  { value: "30-40", label: "30 a 40", min: 30, max: 40 },
+  { value: "40-50", label: "40 a 50", min: 40, max: 50 },
+  { value: "50-60", label: "50 a 60", min: 50, max: 60 }
+];
+
+const careDurationOptions = [
+  { value: 2, label: "2 horas" },
+  { value: 6, label: "6 horas" },
+  { value: 8, label: "8 horas" },
+  { value: 12, label: "12 horas" },
+  { value: 24, label: "24 horas" }
+];
+
+const therapyDurationOptions = [
+  { value: 0.75, label: "45 minutos" },
+  { value: 1, label: "1 hora" },
+  { value: 1.5, label: "1h30" }
 ];
 
 const availabilityOptions: Array<{ value: AvailabilityFilter; label: string }> = [
@@ -91,19 +115,13 @@ const careServiceValues: CareServiceCode[] = [
   "REFEICAO",
   "SINAIS_VITAIS",
   "AVALIACAO",
-  "FORTALECIMENTO"
+  "FORTALECIMENTO",
+  "OUTRO"
 ];
 const professionalTypeValues: ProfessionalTypeCode[] = ["CUIDADOR", "TECNICO_ENFERMAGEM", "FISIOTERAPEUTA"];
 const genderPreferenceValues: GenderPreferenceCode[] = ["FEMININO", "MASCULINO", "QUALQUER"];
 const supportNeedValues: TransferSupportCode[] = ["MODERADO", "ALTO", "DUPLA"];
 const availabilityValues: AvailabilityFilter[] = ["qualquer", "agora", "hoje", "manha", "tarde", "noite", "fim-de-semana"];
-
-const appointmentTimeOptions = Array.from({ length: (22 * 60 + 45 - 6 * 60) / 15 + 1 }, (_, index) => {
-  const totalMinutes = 6 * 60 + index * 15;
-  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
-  const minutes = String(totalMinutes % 60).padStart(2, "0");
-  return `${hours}:${minutes}`;
-});
 
 function isOptionValue<T extends string>(options: T[], value: string | null): value is T {
   return Boolean(value && options.includes(value as T));
@@ -133,6 +151,25 @@ function splitScheduledFor(value: string) {
   };
 }
 
+function formatTimeInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function completeTimeInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (!digits) return "";
+
+  const hours = digits.length <= 2 ? Number(digits) : Number(digits.slice(0, 2));
+  const minutes = digits.length <= 2 ? 0 : Number(digits.slice(2).padEnd(2, "0"));
+  return `${String(Math.min(hours, 23)).padStart(2, "0")}:${String(Math.min(minutes, 59)).padStart(2, "0")}`;
+}
+
+function isValidTimeInput(value: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 function parseInitialService(value: string | null) {
   return isOptionValue(careServiceValues, value) ? value : "BANHO";
 }
@@ -142,11 +179,11 @@ function parseInitialProfessionalType(value: string | null): ProfessionalTypeFil
 }
 
 function parseInitialGenderPreference(value: string | null) {
-  return isOptionValue(genderPreferenceValues, value) ? value : "FEMININO";
+  return isOptionValue(genderPreferenceValues, value) ? value : "QUALQUER";
 }
 
 function parseInitialSupportNeed(value: string | null) {
-  return isOptionValue(supportNeedValues, value) ? value : "ALTO";
+  return isOptionValue(supportNeedValues, value) ? value : "MODERADO";
 }
 
 function parseInitialAvailability(value: string | null) {
@@ -157,6 +194,19 @@ function parseInitialRadius(value: string | null) {
   const radius = Number(value);
   if (!Number.isFinite(radius)) return 8;
   return Math.min(20, Math.max(2, Math.round(radius)));
+}
+
+function parseInitialAgeRange(value: string | null): AgeRangeFilter {
+  return ageRangeOptions.some((option) => option.value === value) ? (value as AgeRangeFilter) : "QUALQUER";
+}
+
+function ageRangeBounds(value: AgeRangeFilter) {
+  const option = ageRangeOptions.find((item) => item.value === value);
+  return { ageMin: option?.min, ageMax: option?.max };
+}
+
+function durationOptionsFor(service: CareServiceCode) {
+  return service === "FISIOTERAPIA" ? therapyDurationOptions : careDurationOptions;
 }
 
 function escapeHtml(value: string) {
@@ -184,8 +234,9 @@ export function CareMatchApp() {
   const favoriteProfessionalIdRef = useRef("");
   const [service, setService] = useState<CareServiceCode>("BANHO");
   const [professionalType, setProfessionalType] = useState<ProfessionalTypeFilter>("TODOS");
-  const [genderPreference, setGenderPreference] = useState<GenderPreferenceCode>("FEMININO");
-  const [supportNeed, setSupportNeed] = useState<TransferSupportCode>("ALTO");
+  const [genderPreference, setGenderPreference] = useState<GenderPreferenceCode>("QUALQUER");
+  const [supportNeed, setSupportNeed] = useState<TransferSupportCode>("MODERADO");
+  const [ageRange, setAgeRange] = useState<AgeRangeFilter>("QUALQUER");
   const [availability, setAvailability] = useState<AvailabilityFilter>("qualquer");
   const [radius, setRadius] = useState(8);
   const [searchReady, setSearchReady] = useState(false);
@@ -204,9 +255,9 @@ export function CareMatchApp() {
   const [requestError, setRequestError] = useState("");
   const [requestWarning, setRequestWarning] = useState("");
   const [requestPending, setRequestPending] = useState(false);
-  const [requesterName, setRequesterName] = useState("Joao Paciente");
+  const [requesterName, setRequesterName] = useState("");
   const [requesterEmail, setRequesterEmail] = useState("");
-  const [requesterPhone, setRequesterPhone] = useState("(51) 99999-0101");
+  const [requesterPhone, setRequesterPhone] = useState("");
   const [addressLine, setAddressLine] = useState("Zona Sul, Porto Alegre");
   const [addressNumber, setAddressNumber] = useState("");
   const [addressComplement, setAddressComplement] = useState("");
@@ -215,7 +266,9 @@ export function CareMatchApp() {
   const [city, setCity] = useState("Porto Alegre");
   const [stateCode, setStateCode] = useState("RS");
   const [scheduledFor, setScheduledFor] = useState(getDefaultScheduledFor);
-  const [notes, setNotes] = useState("Preciso de banho assistido e transferencia segura cadeira-cama.");
+  const [durationHours, setDurationHours] = useState(2);
+  const [customServiceDetails, setCustomServiceDetails] = useState("");
+  const [notes, setNotes] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
   const [favoritePendingId, setFavoritePendingId] = useState("");
@@ -233,6 +286,7 @@ export function CareMatchApp() {
       setProfessionalType(parseInitialProfessionalType(params.get("professionalType")));
       setGenderPreference(parseInitialGenderPreference(params.get("genderPreference")));
       setSupportNeed(parseInitialSupportNeed(params.get("supportNeed")));
+      setAgeRange(parseInitialAgeRange(params.get("ageRange")));
       setAvailability(parseInitialAvailability(params.get("availability")));
       setRadius(parseInitialRadius(params.get("radiusKm")));
       setSearchReady(true);
@@ -266,6 +320,7 @@ export function CareMatchApp() {
     if (!searchReady) return;
 
     const controller = new AbortController();
+    const { ageMin, ageMax } = ageRangeBounds(ageRange);
     const params = new URLSearchParams({
       service,
       genderPreference,
@@ -280,6 +335,8 @@ export function CareMatchApp() {
     if (professionalType !== "TODOS") {
       params.set("professionalType", professionalType);
     }
+    if (ageMin) params.set("ageMin", String(ageMin));
+    if (ageMax) params.set("ageMax", String(ageMax));
 
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
@@ -332,6 +389,7 @@ export function CareMatchApp() {
 
     return () => controller.abort();
   }, [
+    ageRange,
     availability,
     center.latitude,
     center.longitude,
@@ -349,16 +407,30 @@ export function CareMatchApp() {
     return results.find((professional) => professional.id === selectedId) ?? results[0] ?? null;
   }, [results, selectedId]);
   const scheduledParts = splitScheduledFor(scheduledFor);
-  const availableTimeOptions = appointmentTimeOptions.includes(scheduledParts.time)
-    ? appointmentTimeOptions
-    : [...appointmentTimeOptions, scheduledParts.time].sort();
+  const availableDurationOptions = durationOptionsFor(service);
+  const visibleDurationOptions = availableDurationOptions.some((option) => option.value === durationHours)
+    ? availableDurationOptions
+    : [...availableDurationOptions, { value: durationHours, label: `${durationHours} horas` }].sort((a, b) => a.value - b.value);
 
   function updateScheduledDate(date: string) {
     setScheduledFor(`${date}T${scheduledParts.time}`);
   }
 
   function updateScheduledTime(time: string) {
-    setScheduledFor(`${scheduledParts.date}T${time}`);
+    setScheduledFor(`${scheduledParts.date}T${formatTimeInput(time)}`);
+  }
+
+  function finishScheduledTime() {
+    const completed = completeTimeInput(scheduledParts.time);
+    setScheduledFor(`${scheduledParts.date}T${completed || "14:30"}`);
+  }
+
+  function selectService(nextService: CareServiceCode) {
+    setService(nextService);
+    const nextOptions = durationOptionsFor(nextService);
+    if (!nextOptions.some((option) => option.value === durationHours)) {
+      setDurationHours(nextOptions[0].value);
+    }
   }
 
   function selectProfessional(id: string) {
@@ -402,6 +474,19 @@ export function CareMatchApp() {
       }
       return next;
     });
+  }
+
+  function validateRequestForm() {
+    if (!requesterName.trim()) return "Informe o nome do paciente.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail.trim())) return "Informe um e-mail valido para receber atualizacoes.";
+    if (requesterPhone.replace(/\D/g, "").length < 10) return "Informe um telefone com DDD.";
+    if (!scheduledParts.date || !isValidTimeInput(completeTimeInput(scheduledParts.time))) return "Informe data e horario no formato HH:MM.";
+    if (!postalCode.trim()) return "Informe o CEP.";
+    if (!addressLine.trim()) return "Informe o endereco.";
+    if (!addressNumber.trim()) return "Informe o numero. Se nao houver numero, use S/N.";
+    if (!neighborhood.trim() || !city.trim() || !stateCode.trim()) return "Confirme bairro, cidade e UF.";
+    if (service === "OUTRO" && customServiceDetails.trim().length < 3) return "Descreva qual atendimento voce precisa.";
+    return "";
   }
 
   function useCurrentLocation() {
@@ -539,9 +624,22 @@ export function CareMatchApp() {
 
   async function submitRequest() {
     if (!selected || requestPending || requestSent) return;
+    const validationError = validateRequestForm();
+    if (validationError) {
+      setRequestError(validationError);
+      return;
+    }
+
     setRequestPending(true);
     setRequestError("");
     setRequestWarning("");
+    const safeScheduledFor = `${scheduledParts.date}T${completeTimeInput(scheduledParts.time)}`;
+    const requestNotes = [
+      service === "OUTRO" ? `Outro atendimento: ${customServiceDetails.trim()}` : "",
+      notes.trim()
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const response = await fetch("/api/care-requests", {
       method: "POST",
@@ -554,8 +652,8 @@ export function CareMatchApp() {
         service,
         supportNeed,
         preferredGender: genderPreference,
-        scheduledFor,
-        durationHours: 2,
+        scheduledFor: safeScheduledFor,
+        durationHours,
         addressLine,
         addressNumber,
         addressComplement,
@@ -565,7 +663,7 @@ export function CareMatchApp() {
         state: stateCode,
         latitude: center.latitude,
         longitude: center.longitude,
-        notes
+        notes: requestNotes
       })
     });
 
@@ -656,7 +754,7 @@ export function CareMatchApp() {
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => setService(option.id)}
+                      onClick={() => selectService(option.id)}
                       className={`flex h-12 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition ${
                         active
                           ? "border-emerald-700 bg-emerald-700 text-white"
@@ -669,6 +767,14 @@ export function CareMatchApp() {
                   );
                 })}
               </div>
+              {service === "OUTRO" ? (
+                <textarea
+                  value={customServiceDetails}
+                  onChange={(event) => setCustomServiceDetails(event.target.value)}
+                  placeholder="Ex.: apoio para consulta, higiene no leito, troca de curativo especifico..."
+                  className="mt-2 min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                />
+              ) : null}
             </div>
 
             <div>
@@ -692,7 +798,7 @@ export function CareMatchApp() {
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-slate-800">Capacidade para transferencia</p>
+              <p className="text-sm font-semibold text-slate-800">Porte fisico desejado</p>
               <div className="mt-2 grid gap-2">
                 {supportOptions.map((option) => (
                   <button
@@ -710,6 +816,24 @@ export function CareMatchApp() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-800" htmlFor="age-range">
+                Idade do profissional
+              </label>
+              <select
+                id="age-range"
+                value={ageRange}
+                onChange={(event) => setAgeRange(event.target.value as AgeRangeFilter)}
+                className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+              >
+                {ageRangeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid gap-4">
@@ -882,7 +1006,7 @@ export function CareMatchApp() {
                           <Heart aria-hidden="true" className={`h-4 w-4 ${favoriteIds.has(professional.id) ? "fill-current" : ""}`} />
                         </button>
                         <div className="md:text-right">
-                          <p className="text-sm text-slate-500">A partir de</p>
+                          <p className="text-sm text-slate-500">Valores</p>
                           <p className="text-2xl font-semibold text-slate-950">{professional.priceLabel}</p>
                           <p className="mt-1 text-sm text-slate-500">responde em {professional.responseTimeLabel}</p>
                         </div>
@@ -980,12 +1104,14 @@ export function CareMatchApp() {
 
                   <div className="mt-4 grid gap-3">
                     <input
+                      required
                       value={requesterName}
                       onChange={(event) => setRequesterName(event.target.value)}
                       placeholder="Nome do paciente"
                       className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
                     />
                     <input
+                      required
                       type="email"
                       value={requesterEmail}
                       onChange={(event) => setRequesterEmail(event.target.value)}
@@ -993,9 +1119,10 @@ export function CareMatchApp() {
                       className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
                     />
                     <input
+                      required
                       value={requesterPhone}
                       onChange={(event) => setRequesterPhone(event.target.value)}
-                      placeholder="Telefone"
+                      placeholder="Telefone com DDD"
                       className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -1003,6 +1130,7 @@ export function CareMatchApp() {
                         Data
                         <input
                           type="date"
+                          required
                           min={formatBrasiliaDateInput()}
                           value={scheduledParts.date}
                           onChange={(event) => updateScheduledDate(event.target.value)}
@@ -1011,19 +1139,41 @@ export function CareMatchApp() {
                       </label>
                       <label className="grid gap-1 text-sm font-semibold text-slate-700">
                         Horario de Brasilia
-                        <select
+                        <input
+                          required
+                          inputMode="numeric"
+                          placeholder="14:30"
+                          maxLength={5}
                           value={scheduledParts.time}
                           onChange={(event) => updateScheduledTime(event.target.value)}
-                          className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
-                        >
-                          {availableTimeOptions.map((time) => (
-                            <option key={time} value={time}>
-                              {time}
-                            </option>
-                          ))}
-                        </select>
+                          onBlur={finishScheduledTime}
+                          className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
+                        />
                       </label>
                     </div>
+                    <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                      Duracao do atendimento
+                      <select
+                        value={String(durationHours)}
+                        onChange={(event) => setDurationHours(Number(event.target.value))}
+                        className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
+                      >
+                        {visibleDurationOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {service === "OUTRO" ? (
+                      <textarea
+                        required
+                        value={customServiceDetails}
+                        onChange={(event) => setCustomServiceDetails(event.target.value)}
+                        placeholder="Descreva qual atendimento voce precisa"
+                        className="min-h-20 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
+                      />
+                    ) : null}
                     <CepAddressFields
                       value={{
                         postalCode,
@@ -1039,7 +1189,7 @@ export function CareMatchApp() {
                     <textarea
                       value={notes}
                       onChange={(event) => setNotes(event.target.value)}
-                      placeholder="Observacoes de seguranca"
+                      placeholder="Ex.: preciso de banho assistido e transferencia segura cadeira-cama."
                       className="min-h-20 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
                     />
                   </div>

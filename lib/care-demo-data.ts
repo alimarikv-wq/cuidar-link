@@ -7,6 +7,8 @@ type DemoSearchParams = {
   genderPreference: GenderPreference;
   supportNeed: TransferSupportLevel;
   radiusKm: number;
+  ageMin?: number;
+  ageMax?: number;
 };
 
 const supportWeight: Record<TransferSupportLevel, number> = {
@@ -32,11 +34,11 @@ const demoProfessionals: CareProfessional[] = [
     photoUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=420&q=80",
     rating: 4.96,
     reviewCount: 128,
-    priceLabel: "R$ 58,00/h",
+    priceLabel: "Sob consulta",
     availableIn: "Hoje",
     responseTimeLabel: "8 min",
     supportLevel: "ALTO",
-    supportLevelLabel: "Apoio fisico alto",
+    supportLevelLabel: "Porte fisico forte",
     mobilitySupport: "Transferencia cadeira-cama, banho assistido e uso de guincho simples.",
     services: ["BANHO", "TRANSFERENCIA", "MEDICACAO", "CURATIVOS"],
     serviceLabels: ["Banho", "Transferencia", "Medicacao", "Curativos"],
@@ -61,11 +63,11 @@ const demoProfessionals: CareProfessional[] = [
     photoUrl: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&w=420&q=80",
     rating: 4.88,
     reviewCount: 94,
-    priceLabel: "R$ 46,00/h",
+    priceLabel: "Sob consulta",
     availableIn: "Hoje",
     responseTimeLabel: "5 min",
     supportLevel: "ALTO",
-    supportLevelLabel: "Apoio fisico alto",
+    supportLevelLabel: "Porte fisico forte",
     mobilitySupport: "Apoio fisico forte, banho no leito, troca e organizacao do ambiente.",
     services: ["BANHO", "TRANSFERENCIA", "COMPANHIA", "REFEICAO"],
     serviceLabels: ["Banho", "Transferencia", "Companhia", "Refeicao"],
@@ -90,7 +92,7 @@ const demoProfessionals: CareProfessional[] = [
     photoUrl: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=420&q=80",
     rating: 4.91,
     reviewCount: 76,
-    priceLabel: "R$ 120,00/sessao",
+    priceLabel: "Sob consulta",
     availableIn: "Hoje",
     responseTimeLabel: "12 min",
     supportLevel: "DUPLA",
@@ -119,11 +121,11 @@ const demoProfessionals: CareProfessional[] = [
     photoUrl: "https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=420&q=80",
     rating: 4.79,
     reviewCount: 63,
-    priceLabel: "R$ 42,00/h",
+    priceLabel: "Sob consulta",
     availableIn: "Hoje",
     responseTimeLabel: "10 min",
     supportLevel: "ALTO",
-    supportLevelLabel: "Apoio fisico alto",
+    supportLevelLabel: "Porte fisico forte",
     mobilitySupport: "Banho assistido, preparo de rotina e apoio fisico para paciente pesado.",
     services: ["BANHO", "COMPANHIA", "REFEICAO", "TRANSFERENCIA"],
     serviceLabels: ["Banho", "Companhia", "Refeicao", "Transferencia"],
@@ -140,10 +142,12 @@ export function shouldUseDemoFallback() {
 
 export function getDemoCareProfessionals(params: DemoSearchParams) {
   return demoProfessionals
-    .filter((professional) => professional.services.includes(params.service))
+    .filter((professional) => params.service === "OUTRO" || professional.services.includes(params.service))
     .filter((professional) => !params.professionalType || professional.professionalType === params.professionalType)
     .filter((professional) => params.genderPreference === "QUALQUER" || professional.gender === params.genderPreference)
     .filter((professional) => supportWeight[professional.supportLevel] >= supportWeight[params.supportNeed])
+    .filter((professional) => !params.ageMin || professional.age >= params.ageMin)
+    .filter((professional) => !params.ageMax || professional.age <= params.ageMax)
     .filter((professional) => professional.distanceKm <= params.radiusKm)
     .sort((a, b) => b.matchScore - a.matchScore || a.distanceKm - b.distanceKm);
 }

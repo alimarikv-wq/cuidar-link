@@ -42,12 +42,13 @@ const serviceLabel: Record<CareService, string> = {
   REFEICAO: "Refeicao",
   SINAIS_VITAIS: "Sinais vitais",
   AVALIACAO: "Avaliacao",
-  FORTALECIMENTO: "Fortalecimento"
+  FORTALECIMENTO: "Fortalecimento",
+  OUTRO: "Outro atendimento"
 };
 
 const supportLabel: Record<TransferSupportLevel, string> = {
-  MODERADO: "Apoio moderado",
-  ALTO: "Apoio fisico alto",
+  MODERADO: "Sem preferencia de porte fisico",
+  ALTO: "Porte fisico forte",
   DUPLA: "Duas pessoas"
 };
 

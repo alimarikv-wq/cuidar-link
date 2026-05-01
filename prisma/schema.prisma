@@ -79,6 +79,7 @@ enum CareService {
   SINAIS_VITAIS
   AVALIACAO
   FORTALECIMENTO
+  OUTRO
 }
 
 enum TransferSupportLevel {

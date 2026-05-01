@@ -91,7 +91,8 @@ export type CareServiceCode =
   | "REFEICAO"
   | "SINAIS_VITAIS"
   | "AVALIACAO"
-  | "FORTALECIMENTO";
+  | "FORTALECIMENTO"
+  | "OUTRO";
 
 export type ProfessionalTypeCode = "CUIDADOR" | "TECNICO_ENFERMAGEM" | "FISIOTERAPEUTA";
 export type GenderCode = "FEMININO" | "MASCULINO" | "OUTRO";
@@ -149,6 +150,7 @@ export type CareRequestRecord = {
   status: string;
   statusLabel: string;
   serviceLabel: string;
+  durationHours: number;
   scheduledFor: string | null;
   createdAt: string;
   requesterName: string;

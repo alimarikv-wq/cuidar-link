@@ -17,6 +17,10 @@ export async function GET(request: NextRequest) {
   const requestedLongitude = Number(searchParams.get("longitude") || defaultCenter.longitude);
   const hasBrowserLocation =
     searchParams.get("locationSource") === "browser" && Number.isFinite(requestedLatitude) && Number.isFinite(requestedLongitude);
+  const ageMinParam = searchParams.get("ageMin");
+  const ageMaxParam = searchParams.get("ageMax");
+  const ageMin = ageMinParam ? Number(ageMinParam) : undefined;
+  const ageMax = ageMaxParam ? Number(ageMaxParam) : undefined;
   const center = hasBrowserLocation
     ? {
         ...defaultCenter,
@@ -32,6 +36,8 @@ export async function GET(request: NextRequest) {
     supportNeed: parseSupportLevel(searchParams.get("supportNeed")),
     availability: parseAvailability(searchParams.get("availability")),
     radiusKm: Number(searchParams.get("radiusKm") || "8"),
+    ageMin: typeof ageMin === "number" && Number.isFinite(ageMin) ? ageMin : undefined,
+    ageMax: typeof ageMax === "number" && Number.isFinite(ageMax) ? ageMax : undefined,
     latitude: center.latitude,
     longitude: center.longitude
   };

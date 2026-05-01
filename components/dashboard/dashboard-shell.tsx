@@ -49,14 +49,15 @@ const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
   { value: "REFEICAO", label: "Refeicao" },
   { value: "SINAIS_VITAIS", label: "Sinais vitais" },
   { value: "AVALIACAO", label: "Avaliacao" },
-  { value: "FORTALECIMENTO", label: "Fortalecimento" }
+  { value: "FORTALECIMENTO", label: "Fortalecimento" },
+  { value: "OUTRO", label: "Outro" }
 ];
 
 const publicSearchServiceCodes = new Set<CareServiceCode>(["BANHO", "TRANSFERENCIA", "MEDICACAO", "FISIOTERAPIA"]);
 
 const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
-  { value: "MODERADO", label: "Apoio moderado" },
-  { value: "ALTO", label: "Apoio fisico alto" },
+  { value: "MODERADO", label: "Sem preferencia de porte fisico" },
+  { value: "ALTO", label: "Porte fisico forte" },
   { value: "DUPLA", label: "Duas pessoas" }
 ];
 
@@ -142,6 +143,15 @@ function favoriteSearchHref(professional: DashboardFavoriteProfessional) {
   });
 
   return `/?${params.toString()}#busca`;
+}
+
+function formatDurationHours(durationHours: number) {
+  if (durationHours < 1) return `${Math.round(durationHours * 60)} min`;
+  if (Number.isInteger(durationHours)) return durationHours === 1 ? "1 hora" : `${durationHours} horas`;
+
+  const hours = Math.floor(durationHours);
+  const minutes = Math.round((durationHours - hours) * 60);
+  return `${hours}h${String(minutes).padStart(2, "0")}`;
 }
 
 function getRequestActions(status: string, accountType: string): StatusAction[] {
@@ -1094,6 +1104,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 </p>
                 {request.addressComplement ? <p className="mt-1 text-sm text-slate-500">{request.addressComplement}</p> : null}
                 {request.requesterPhone ? <p className="mt-1 text-sm text-slate-500">Telefone: {request.requesterPhone}</p> : null}
+                <p className="mt-1 text-sm text-slate-500">Duracao: {formatDurationHours(request.durationHours)}</p>
                 {request.notes ? <p className="mt-2 text-sm leading-6 text-slate-600">{request.notes}</p> : null}
               </div>
               <div className="grid gap-3 text-sm text-slate-500 md:min-w-44 md:text-right">

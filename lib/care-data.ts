@@ -25,7 +25,6 @@ import {
 import { parseBrasiliaDateTime } from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
-import { formatMoney } from "@/lib/utils";
 import {
   AvailabilityFilter,
   AvailabilitySlotData,
@@ -78,7 +77,8 @@ const serviceLabel: Record<CareService, string> = {
   REFEICAO: "Refeicao",
   SINAIS_VITAIS: "Sinais vitais",
   AVALIACAO: "Avaliacao",
-  FORTALECIMENTO: "Fortalecimento"
+  FORTALECIMENTO: "Fortalecimento",
+  OUTRO: "Outro atendimento"
 };
 
 const genderLabel: Record<Gender, string> = {
@@ -88,8 +88,8 @@ const genderLabel: Record<Gender, string> = {
 };
 
 const supportLabel: Record<TransferSupportLevel, string> = {
-  MODERADO: "Apoio moderado",
-  ALTO: "Apoio fisico alto",
+  MODERADO: "Sem preferencia de porte fisico",
+  ALTO: "Porte fisico forte",
   DUPLA: "Duas pessoas"
 };
 
@@ -133,6 +133,8 @@ export type CareSearchParams = {
   supportNeed: TransferSupportLevel;
   availability: AvailabilityFilter;
   radiusKm: number;
+  ageMin?: number;
+  ageMax?: number;
   latitude?: number;
   longitude?: number;
 };
@@ -324,13 +326,13 @@ export function parseProfessionalType(value: string | null) {
 export function parseGenderPreference(value: string | null): GenderPreference {
   return Object.values(GenderPreference).includes(value as GenderPreference)
     ? (value as GenderPreference)
-    : GenderPreference.FEMININO;
+    : GenderPreference.QUALQUER;
 }
 
 export function parseSupportLevel(value: string | null): TransferSupportLevel {
   return Object.values(TransferSupportLevel).includes(value as TransferSupportLevel)
     ? (value as TransferSupportLevel)
-    : TransferSupportLevel.ALTO;
+    : TransferSupportLevel.MODERADO;
 }
 
 export function parseAvailability(value: string | null): AvailabilityFilter {
@@ -414,7 +416,8 @@ function calculateScore(
   hasAvailability: boolean
 ) {
   let score = 52;
-  if (professional.services.includes(params.service)) score += 18;
+  if (params.service === CareService.OUTRO) score += 8;
+  if (params.service !== CareService.OUTRO && professional.services.includes(params.service)) score += 18;
   if (params.genderPreference === GenderPreference.QUALQUER || professional.gender === params.genderPreference) score += 10;
   if (canSupport(professional.supportLevel, params.supportNeed)) score += 12;
   if (hasAvailability) score += 8;
@@ -427,7 +430,7 @@ function calculateScore(
 function toCareProfessional(professional: ProfessionalWithRelations, params: CareSearchParams, distance: number): CareProfessional {
   const hasAvailability = professional.availability.some((slot) => slotMatchesAvailability(slot, params.availability));
   const verifiedDocs = professional.documents.filter((document) => document.status === "VERIFICADO");
-  const price = professional.sessionRate ? `${formatMoney(Number(professional.sessionRate))}/sessao` : `${formatMoney(Number(professional.hourlyRate))}/h`;
+  const price = "Sob consulta";
 
   return {
     id: professional.id,
@@ -467,8 +470,12 @@ export async function searchCareProfessionals(params: CareSearchParams) {
   const candidates = await prisma.professionalProfile.findMany({
     where: {
       isActive: true,
-      services: { has: params.service },
+      services: params.service === CareService.OUTRO ? undefined : { has: params.service },
       professionalType: params.professionalType,
+      age: {
+        gte: params.ageMin,
+        lte: params.ageMax
+      },
       gender:
         params.genderPreference === GenderPreference.QUALQUER
           ? undefined
@@ -571,6 +578,7 @@ function toRequestRecord(request: Prisma.CareRequestGetPayload<{ include: { prof
     status: request.status,
     statusLabel: statusLabel[request.status],
     serviceLabel: serviceLabel[request.service],
+    durationHours: Number(request.durationHours),
     scheduledFor: request.scheduledFor ? request.scheduledFor.toISOString() : null,
     createdAt: request.createdAt.toISOString(),
     requesterName: request.requesterName,
@@ -602,9 +610,7 @@ function toDashboardFavoriteProfessional(
   }>
 ): DashboardFavoriteProfessional {
   const professional = favorite.professional;
-  const priceLabel = professional.sessionRate
-    ? `${formatMoney(Number(professional.sessionRate))}/sessao`
-    : `${formatMoney(Number(professional.hourlyRate))}/h`;
+  const priceLabel = "Sob consulta";
 
   return {
     id: professional.id,

@@ -12,7 +12,8 @@ const serviceLabel: Record<CareService, string> = {
   REFEICAO: "Refeicao",
   SINAIS_VITAIS: "Sinais vitais",
   AVALIACAO: "Avaliacao",
-  FORTALECIMENTO: "Fortalecimento"
+  FORTALECIMENTO: "Fortalecimento",
+  OUTRO: "Outro atendimento"
 };
 
 const statusLabel: Record<CareRequestStatus, string> = {
