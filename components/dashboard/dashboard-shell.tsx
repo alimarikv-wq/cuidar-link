@@ -26,6 +26,7 @@ import {
   AvailabilitySlotData,
   CareDashboardData,
   CareServiceCode,
+  DashboardFavoriteProfessional,
   DocumentTypeCode,
   ProfessionalSettingsData,
   TransferSupportCode
@@ -50,6 +51,8 @@ const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
   { value: "AVALIACAO", label: "Avaliacao" },
   { value: "FORTALECIMENTO", label: "Fortalecimento" }
 ];
+
+const publicSearchServiceCodes = new Set<CareServiceCode>(["BANHO", "TRANSFERENCIA", "MEDICACAO", "FISIOTERAPIA"]);
 
 const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
   { value: "MODERADO", label: "Apoio moderado" },
@@ -124,6 +127,22 @@ const buttonStyles: Record<StatusAction["variant"], string> = {
   secondary: "border-slate-300 bg-white text-slate-800 hover:border-slate-500",
   danger: "border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100"
 };
+
+function favoriteSearchHref(professional: DashboardFavoriteProfessional) {
+  const service = professional.serviceCodes.find((item) => publicSearchServiceCodes.has(item)) || "BANHO";
+  const genderPreference = professional.gender === "OUTRO" ? "QUALQUER" : professional.gender;
+  const params = new URLSearchParams({
+    professionalId: professional.id,
+    professionalType: professional.professionalType,
+    service,
+    genderPreference,
+    supportNeed: professional.supportLevel,
+    availability: "qualquer",
+    radiusKm: "20"
+  });
+
+  return `/?${params.toString()}#busca`;
+}
 
 function getRequestActions(status: string, accountType: string): StatusAction[] {
   if (accountType === "PROFESSIONAL") {
@@ -845,7 +864,7 @@ function PatientFavoritesPanel({
 
             <div className="flex flex-wrap items-start gap-2 lg:justify-end">
               <Link
-                href="/#busca"
+                href={favoriteSearchHref(professional)}
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-emerald-700 bg-emerald-700 px-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
               >
                 Buscar horario

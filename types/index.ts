@@ -168,12 +168,16 @@ export type CareRequestRecord = {
 export type DashboardFavoriteProfessional = {
   id: string;
   name: string;
+  professionalType: ProfessionalTypeCode;
   roleLabel: string;
+  gender: GenderCode;
   neighborhood: string;
   city: string;
   priceLabel: string;
   availableIn: string;
+  supportLevel: TransferSupportCode;
   supportLevelLabel: string;
+  serviceCodes: CareServiceCode[];
   services: string[];
   credentials: string[];
   rating: number;

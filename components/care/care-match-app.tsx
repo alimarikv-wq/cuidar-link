@@ -81,13 +81,82 @@ const emptyCenter = {
   longitude: -51.256708
 };
 
-function getDefaultScheduledFor() {
-  const scheduled = new Date();
-  scheduled.setDate(scheduled.getDate() + 1);
-  scheduled.setHours(14, 30, 0, 0);
+const careServiceValues: CareServiceCode[] = [
+  "BANHO",
+  "TRANSFERENCIA",
+  "MEDICACAO",
+  "CURATIVOS",
+  "FISIOTERAPIA",
+  "COMPANHIA",
+  "REFEICAO",
+  "SINAIS_VITAIS",
+  "AVALIACAO",
+  "FORTALECIMENTO"
+];
+const professionalTypeValues: ProfessionalTypeCode[] = ["CUIDADOR", "TECNICO_ENFERMAGEM", "FISIOTERAPEUTA"];
+const genderPreferenceValues: GenderPreferenceCode[] = ["FEMININO", "MASCULINO", "QUALQUER"];
+const supportNeedValues: TransferSupportCode[] = ["MODERADO", "ALTO", "DUPLA"];
+const availabilityValues: AvailabilityFilter[] = ["qualquer", "agora", "hoje", "manha", "tarde", "noite", "fim-de-semana"];
 
-  const localDate = new Date(scheduled.getTime() - scheduled.getTimezoneOffset() * 60_000);
-  return localDate.toISOString().slice(0, 16);
+const appointmentTimeOptions = Array.from({ length: (22 * 60 + 45 - 6 * 60) / 15 + 1 }, (_, index) => {
+  const totalMinutes = 6 * 60 + index * 15;
+  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const minutes = String(totalMinutes % 60).padStart(2, "0");
+  return `${hours}:${minutes}`;
+});
+
+function isOptionValue<T extends string>(options: T[], value: string | null): value is T {
+  return Boolean(value && options.includes(value as T));
+}
+
+function formatBrasiliaDateInput(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function getDefaultScheduledFor() {
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  return `${formatBrasiliaDateInput(tomorrow)}T14:30`;
+}
+
+function splitScheduledFor(value: string) {
+  const [date, timeValue] = value.split("T");
+  return {
+    date: date || formatBrasiliaDateInput(),
+    time: (timeValue || "14:30").slice(0, 5) || "14:30"
+  };
+}
+
+function parseInitialService(value: string | null) {
+  return isOptionValue(careServiceValues, value) ? value : "BANHO";
+}
+
+function parseInitialProfessionalType(value: string | null): ProfessionalTypeFilter {
+  return value === "TODOS" || isOptionValue(professionalTypeValues, value) ? value : "TODOS";
+}
+
+function parseInitialGenderPreference(value: string | null) {
+  return isOptionValue(genderPreferenceValues, value) ? value : "FEMININO";
+}
+
+function parseInitialSupportNeed(value: string | null) {
+  return isOptionValue(supportNeedValues, value) ? value : "ALTO";
+}
+
+function parseInitialAvailability(value: string | null) {
+  return isOptionValue(availabilityValues, value) ? value : "qualquer";
+}
+
+function parseInitialRadius(value: string | null) {
+  const radius = Number(value);
+  if (!Number.isFinite(radius)) return 8;
+  return Math.min(20, Math.max(2, Math.round(radius)));
 }
 
 function escapeHtml(value: string) {
@@ -112,12 +181,14 @@ export function CareMatchApp() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRefs = useRef<Marker[]>([]);
+  const favoriteProfessionalIdRef = useRef("");
   const [service, setService] = useState<CareServiceCode>("BANHO");
   const [professionalType, setProfessionalType] = useState<ProfessionalTypeFilter>("TODOS");
   const [genderPreference, setGenderPreference] = useState<GenderPreferenceCode>("FEMININO");
   const [supportNeed, setSupportNeed] = useState<TransferSupportCode>("ALTO");
   const [availability, setAvailability] = useState<AvailabilityFilter>("qualquer");
   const [radius, setRadius] = useState(8);
+  const [searchReady, setSearchReady] = useState(false);
   const [searchVersion, setSearchVersion] = useState(0);
   const [results, setResults] = useState<CareProfessional[]>([]);
   const [center, setCenter] = useState(emptyCenter);
@@ -153,6 +224,28 @@ export function CareMatchApp() {
   useEffect(() => {
     let disposed = false;
 
+    queueMicrotask(() => {
+      if (disposed) return;
+
+      const params = new URLSearchParams(window.location.search);
+      favoriteProfessionalIdRef.current = params.get("professionalId") || "";
+      setService(parseInitialService(params.get("service")));
+      setProfessionalType(parseInitialProfessionalType(params.get("professionalType")));
+      setGenderPreference(parseInitialGenderPreference(params.get("genderPreference")));
+      setSupportNeed(parseInitialSupportNeed(params.get("supportNeed")));
+      setAvailability(parseInitialAvailability(params.get("availability")));
+      setRadius(parseInitialRadius(params.get("radiusKm")));
+      setSearchReady(true);
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+
     fetch("/api/professional-favorites")
       .then(async (response) => {
         const data = (await response.json()) as { favoriteIds?: string[] };
@@ -170,6 +263,8 @@ export function CareMatchApp() {
   }, []);
 
   useEffect(() => {
+    if (!searchReady) return;
+
     const controller = new AbortController();
     const params = new URLSearchParams({
       service,
@@ -198,10 +293,32 @@ export function CareMatchApp() {
         if (!response.ok) {
           throw new Error(data.error || "Nao foi possivel buscar profissionais.");
         }
+        const requestedProfessionalId = favoriteProfessionalIdRef.current;
+        const requestedProfessionalFound = Boolean(
+          requestedProfessionalId && data.results.some((professional) => professional.id === requestedProfessionalId)
+        );
+        const deepLinkWarning =
+          requestedProfessionalId && !requestedProfessionalFound
+            ? "Nao encontrei esse favorito com os filtros atuais. Mostrei profissionais compativeis para voce ajustar a busca."
+            : "";
+
         setResults(data.results);
         setCenter(data.center);
-        setDataWarning(data.warning || "");
-        setSelectedId((current) => (data.results.some((professional) => professional.id === current) ? current : data.results[0]?.id || ""));
+        setDataWarning(data.warning || deepLinkWarning);
+        setSelectedId((current) => {
+          if (requestedProfessionalFound) return requestedProfessionalId;
+          return data.results.some((professional) => professional.id === current) ? current : data.results[0]?.id || "";
+        });
+
+        if (requestedProfessionalId) {
+          favoriteProfessionalIdRef.current = "";
+          if (requestedProfessionalFound) {
+            setDetailOpen(true);
+            setRequestSent(false);
+            setRequestError("");
+            setRequestWarning("");
+          }
+        }
       })
       .catch((fetchError: Error) => {
         if (controller.signal.aborted) return;
@@ -214,11 +331,35 @@ export function CareMatchApp() {
       });
 
     return () => controller.abort();
-  }, [availability, center.latitude, center.longitude, genderPreference, locationStatus, professionalType, radius, searchVersion, service, supportNeed]);
+  }, [
+    availability,
+    center.latitude,
+    center.longitude,
+    genderPreference,
+    locationStatus,
+    professionalType,
+    radius,
+    searchReady,
+    searchVersion,
+    service,
+    supportNeed
+  ]);
 
   const selected = useMemo(() => {
     return results.find((professional) => professional.id === selectedId) ?? results[0] ?? null;
   }, [results, selectedId]);
+  const scheduledParts = splitScheduledFor(scheduledFor);
+  const availableTimeOptions = appointmentTimeOptions.includes(scheduledParts.time)
+    ? appointmentTimeOptions
+    : [...appointmentTimeOptions, scheduledParts.time].sort();
+
+  function updateScheduledDate(date: string) {
+    setScheduledFor(`${date}T${scheduledParts.time}`);
+  }
+
+  function updateScheduledTime(time: string) {
+    setScheduledFor(`${scheduledParts.date}T${time}`);
+  }
 
   function selectProfessional(id: string) {
     setSelectedId(id);
@@ -452,7 +593,7 @@ export function CareMatchApp() {
 
   return (
     <div className="surface space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <section id="busca" className="scroll-mt-24 grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="request-title">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -857,12 +998,32 @@ export function CareMatchApp() {
                       placeholder="Telefone"
                       className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
                     />
-                    <input
-                      type="datetime-local"
-                      value={scheduledFor}
-                      onChange={(event) => setScheduledFor(event.target.value)}
-                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                    />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                        Data
+                        <input
+                          type="date"
+                          min={formatBrasiliaDateInput()}
+                          value={scheduledParts.date}
+                          onChange={(event) => updateScheduledDate(event.target.value)}
+                          className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
+                        />
+                      </label>
+                      <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                        Horario de Brasilia
+                        <select
+                          value={scheduledParts.time}
+                          onChange={(event) => updateScheduledTime(event.target.value)}
+                          className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
+                        >
+                          {availableTimeOptions.map((time) => (
+                            <option key={time} value={time}>
+                              {time}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
                     <CepAddressFields
                       value={{
                         postalCode,
