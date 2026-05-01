@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, X } from "lucide-react";
+import { Check, ExternalLink, MailCheck, X } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AdminDocumentReviewData,
@@ -228,6 +228,9 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
   const [typeFilter, setTypeFilter] = useState("TODOS");
   const [documentTypeFilter, setDocumentTypeFilter] = useState("TODOS");
   const [ufFilter, setUfFilter] = useState("TODAS");
+  const [emailTestPending, startEmailTestTransition] = useTransition();
+  const [emailTestMessage, setEmailTestMessage] = useState("");
+  const [emailTestError, setEmailTestError] = useState("");
   const filteredDocuments = overview.documentsForReview.filter((document) => {
     const statusMatches = statusFilter === "TODOS" || document.professionalVerificationStatus === statusFilter || document.status === statusFilter;
     const typeMatches = typeFilter === "TODOS" || document.professionalTypeLabel === typeFilter;
@@ -246,6 +249,23 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
     { label: "Docs pendentes", value: String(overview.pendingDocuments) }
   ];
 
+  function sendEmailTest() {
+    setEmailTestMessage("");
+    setEmailTestError("");
+
+    startEmailTestTransition(async () => {
+      const response = await fetch("/api/admin/email-test", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setEmailTestError(data.error || "Nao foi possivel enviar o e-mail de teste.");
+        return;
+      }
+
+      setEmailTestMessage(data.message || "E-mail de teste enviado.");
+    });
+  }
+
   return (
     <section className="surface space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
@@ -256,6 +276,31 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
           </article>
         ))}
       </div>
+
+      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Notificacoes</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Teste de e-mail</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Envia uma mensagem real pelo Resend para validar remetente, chave e destinatarios administrativos.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={sendEmailTest}
+            disabled={emailTestPending}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
+          >
+            <MailCheck aria-hidden="true" className="h-4 w-4" />
+            {emailTestPending ? "Enviando..." : "Enviar e-mail de teste"}
+          </button>
+        </div>
+        {emailTestMessage ? (
+          <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{emailTestMessage}</p>
+        ) : null}
+        {emailTestError ? <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{emailTestError}</p> : null}
+      </article>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">

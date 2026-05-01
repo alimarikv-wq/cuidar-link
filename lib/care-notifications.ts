@@ -183,6 +183,33 @@ async function sendEmail(input: EmailPayload) {
   return { ok: true as const, skipped: false as const };
 }
 
+export async function sendEmailConfigurationTest(primaryRecipient: string) {
+  const recipients = Array.from(new Set([primaryRecipient, ...parseEmails(process.env.CARE_ADMIN_EMAILS)].filter(Boolean)));
+
+  if (recipients.length === 0) {
+    return { ok: false as const, skipped: true as const, error: "Nenhum destinatario configurado para teste." };
+  }
+
+  return sendEmail({
+    to: recipients,
+    subject: "Teste CuidarLink - notificacoes por e-mail",
+    text: [
+      "CuidarLink: este e-mail confirma que o envio de notificacoes esta funcionando.",
+      "",
+      `Painel: ${appUrl()}/admin`
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
+        <h1 style="font-size:20px;margin:0 0 12px">CuidarLink</h1>
+        <p>Este e-mail confirma que o envio de notificacoes esta funcionando.</p>
+        <p style="margin:16px 0 0">
+          <a href="${appUrl()}/admin" style="color:#047857;font-weight:700">Abrir painel admin</a>
+        </p>
+      </div>
+    `
+  });
+}
+
 export async function sendNewCareRequestNotifications(request: CareRequestNotificationData) {
   const professionalEmail = request.professional.user.email;
   const adminEmails = parseEmails(process.env.CARE_ADMIN_EMAILS);
