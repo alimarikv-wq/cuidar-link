@@ -815,7 +815,7 @@ export function CareMatchApp() {
           <ShieldCheck aria-hidden="true" className="h-6 w-6 text-violet-700" />
           <h3 className="mt-3 text-lg font-semibold text-slate-950">Credenciais checadas</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            COREN, CREFITO, referencias, documentos e historico de atendimento ficam ligados ao perfil profissional.
+            Documentos, certificados, registros profissionais quando aplicavel e historico ficam ligados ao perfil profissional.
           </p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

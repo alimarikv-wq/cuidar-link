@@ -24,6 +24,7 @@ Marketplace para conectar pacientes PCD a cuidadores, tecnicos de enfermagem e f
 - Validacao de documentos profissionais com storage privado, CPF, COREN/CREFITO e auditoria admin
 - Dashboard para acompanhar solicitacoes e perfil
 - Admin com metricas operacionais
+- Notificacoes por e-mail para novas solicitacoes e mudancas de status
 - Health check em `/api/health`
 
 ## Como rodar localmente
@@ -79,6 +80,9 @@ Para Supabase em producao, use:
 - `SUPABASE_URL`: URL do projeto Supabase
 - `SUPABASE_SERVICE_ROLE_KEY`: chave secreta do Supabase, somente no servidor/Vercel
 - `SUPABASE_DOCUMENTS_BUCKET`: bucket privado para documentos, por padrao `professional-documents`
+- `RESEND_API_KEY`: chave da Resend para notificacoes por e-mail
+- `RESEND_FROM_EMAIL`: remetente verificado, por exemplo `CuidarLink <notificacoes@seudominio.com>`
+- `CARE_ADMIN_EMAILS`: e-mails administrativos separados por virgula, opcional
 
 Callbacks locais:
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isEmailNotificationsConfigured } from "@/lib/care-notifications";
 import { isDocumentStorageConfigured } from "@/lib/document-storage";
 import { prisma } from "@/lib/prisma";
 
@@ -11,6 +12,7 @@ export async function GET() {
       process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY
     ),
     documentStorage: isDocumentStorageConfigured(),
+    emailNotifications: isEmailNotificationsConfigured(),
     demoFallback: process.env.CARE_ENABLE_DEMO_FALLBACK !== "false"
   };
 

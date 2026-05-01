@@ -12,6 +12,7 @@ import {
   VerificationStatus
 } from "@prisma/client";
 import { maskCpf } from "@/lib/cpf";
+import { sendCareRequestStatusNotification, sendNewCareRequestNotifications } from "@/lib/care-notifications";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
 import { formatMoney } from "@/lib/utils";
@@ -507,7 +508,7 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
     }
   }
 
-  return prisma.careRequest.create({
+  const request = await prisma.careRequest.create({
     data: {
       patientProfileId,
       professionalId: input.professionalId,
@@ -537,6 +538,14 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       }
     }
   });
+
+  try {
+    await sendNewCareRequestNotifications(request);
+  } catch (error) {
+    console.error("Nao foi possivel enviar notificacao do novo atendimento.", error);
+  }
+
+  return request;
 }
 
 function toRequestRecord(request: Prisma.CareRequestGetPayload<{ include: { professional: { include: { user: true } } } }>): CareRequestRecord {
@@ -621,6 +630,12 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
       }
     }
   });
+
+  try {
+    await sendCareRequestStatusNotification(updatedRequest);
+  } catch (error) {
+    console.error("Nao foi possivel enviar notificacao de status do atendimento.", error);
+  }
 
   return { ok: true as const, request: toRequestRecord(updatedRequest) };
 }

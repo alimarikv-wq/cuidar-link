@@ -9,6 +9,9 @@
    - `SUPABASE_URL`: URL do projeto Supabase.
    - `SUPABASE_SERVICE_ROLE_KEY`: service role key do Supabase. Nunca expor no frontend.
    - `SUPABASE_DOCUMENTS_BUCKET`: use `professional-documents`.
+   - `RESEND_API_KEY`: chave da Resend para notificacoes.
+   - `RESEND_FROM_EMAIL`: remetente verificado.
+   - `CARE_ADMIN_EMAILS`: e-mails administrativos separados por virgula, opcional.
 3. Definir `CARE_ENABLE_DEMO_FALLBACK="false"` no ambiente de producao real.
 4. Gerar um `JWT_SECRET` longo e unico.
 5. Configurar Google OAuth.
@@ -41,6 +44,7 @@ GET /api/health
 
 Resposta `200` significa app e banco acessiveis. Resposta `503` significa que o app subiu, mas o banco nao respondeu.
 O campo `documentStorage` precisa retornar `true` para liberar upload de documentos privados.
+O campo `emailNotifications` precisa retornar `true` para envio automatico de e-mails.
 
 ## Deploy sugerido
 
