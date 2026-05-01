@@ -639,7 +639,11 @@ export function CareMatchApp() {
               </div>
 
               <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-[#eef4ef]">
-                <div ref={mapContainerRef} className="h-72 w-full" aria-label="Mapa com sua localizacao e profissionais proximos" />
+                <div
+                  ref={mapContainerRef}
+                  className="relative z-0 h-72 w-full"
+                  aria-label="Mapa com sua localizacao e profissionais proximos"
+                />
               </div>
               {mapError ? <p className="mt-2 text-sm text-rose-700">{mapError}</p> : null}
             </div>
@@ -766,7 +770,7 @@ export function CareMatchApp() {
           <aside
             className={
               detailOpen && selected
-                ? "fixed inset-0 z-50 grid place-items-center overflow-hidden bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4"
+                ? "fixed inset-0 z-[2000] grid place-items-center overflow-hidden bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4"
                 : "hidden"
             }
             role="dialog"

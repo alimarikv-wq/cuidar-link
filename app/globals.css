@@ -85,4 +85,5 @@ a {
 
 .leaflet-container {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  z-index: 0;
 }
