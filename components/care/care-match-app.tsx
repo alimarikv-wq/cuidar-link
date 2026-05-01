@@ -1295,9 +1295,12 @@ export function CareMatchApp() {
                       role="status"
                       aria-live="polite"
                     >
-                      {requestWarning || `Pedido gravado no banco para ${selected.name}.`}
+                      {requestWarning || `Pedido enviado para ${selected.name}.`}
                       <span className="block pt-1 font-medium">
-                        A proxima etapa e confirmar horario, endereco e combinados de seguranca.
+                        Aguarde a confirmacao do profissional pelo painel e pelo e-mail informado.
+                      </span>
+                      <span className="block pt-1 font-medium">
+                        Nesta versao, pagamento e detalhes finais sao combinados diretamente com o profissional.
                       </span>
                     </div>
                   ) : null}
