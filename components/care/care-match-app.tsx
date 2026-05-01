@@ -8,6 +8,7 @@ import {
   CalendarClock,
   Check,
   ClipboardCheck,
+  Heart,
   HeartHandshake,
   LocateFixed,
   MapPin,
@@ -19,7 +20,8 @@ import {
   Star,
   Stethoscope,
   UserRound,
-  Weight
+  Weight,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
@@ -132,6 +134,7 @@ export function CareMatchApp() {
   const [requestWarning, setRequestWarning] = useState("");
   const [requestPending, setRequestPending] = useState(false);
   const [requesterName, setRequesterName] = useState("Joao Paciente");
+  const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterPhone, setRequesterPhone] = useState("(51) 99999-0101");
   const [addressLine, setAddressLine] = useState("Zona Sul, Porto Alegre");
   const [addressNumber, setAddressNumber] = useState("");
@@ -142,6 +145,29 @@ export function CareMatchApp() {
   const [stateCode, setStateCode] = useState("RS");
   const [scheduledFor, setScheduledFor] = useState(getDefaultScheduledFor);
   const [notes, setNotes] = useState("Preciso de banho assistido e transferencia segura cadeira-cama.");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
+  const [favoritePendingId, setFavoritePendingId] = useState("");
+  const [favoriteError, setFavoriteError] = useState("");
+
+  useEffect(() => {
+    let disposed = false;
+
+    fetch("/api/professional-favorites")
+      .then(async (response) => {
+        const data = (await response.json()) as { favoriteIds?: string[] };
+        if (!disposed && response.ok) {
+          setFavoriteIds(new Set(data.favoriteIds || []));
+        }
+      })
+      .catch(() => {
+        if (!disposed) setFavoriteIds(new Set());
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -196,8 +222,44 @@ export function CareMatchApp() {
 
   function selectProfessional(id: string) {
     setSelectedId(id);
+    setDetailOpen(true);
     setRequestSent(false);
     setRequestError("");
+  }
+
+  function closeDetails() {
+    setDetailOpen(false);
+    setRequestError("");
+  }
+
+  async function toggleFavorite(professionalId: string) {
+    const isFavorite = favoriteIds.has(professionalId);
+    setFavoriteError("");
+    setFavoritePendingId(professionalId);
+
+    const response = await fetch("/api/professional-favorites", {
+      method: isFavorite ? "DELETE" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ professionalId })
+    });
+
+    setFavoritePendingId("");
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: "" }));
+      setFavoriteError(data.error || "Nao foi possivel atualizar favoritos.");
+      return;
+    }
+
+    setFavoriteIds((current) => {
+      const next = new Set(current);
+      if (isFavorite) {
+        next.delete(professionalId);
+      } else {
+        next.add(professionalId);
+      }
+      return next;
+    });
   }
 
   function useCurrentLocation() {
@@ -346,6 +408,7 @@ export function CareMatchApp() {
       body: JSON.stringify({
         professionalId: selected.id,
         requesterName,
+        requesterEmail,
         requesterPhone,
         service,
         supportNeed,
@@ -559,7 +622,7 @@ export function CareMatchApp() {
           </div>
         </aside>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-4">
           <div className="space-y-4">
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -585,6 +648,10 @@ export function CareMatchApp() {
 
             {dataWarning ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">{dataWarning}</div>
+            ) : null}
+
+            {favoriteError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{favoriteError}</div>
             ) : null}
 
             {!loading && !error && results.length === 0 ? (
@@ -654,10 +721,26 @@ export function CareMatchApp() {
                     </div>
 
                     <div className="flex flex-col justify-between gap-3 md:items-end">
-                      <div className="md:text-right">
-                        <p className="text-sm text-slate-500">A partir de</p>
-                        <p className="text-2xl font-semibold text-slate-950">{professional.priceLabel}</p>
-                        <p className="mt-1 text-sm text-slate-500">responde em {professional.responseTimeLabel}</p>
+                      <div className="flex w-full items-start justify-between gap-3 md:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => toggleFavorite(professional.id)}
+                          disabled={favoritePendingId === professional.id}
+                          aria-pressed={favoriteIds.has(professional.id)}
+                          aria-label={favoriteIds.has(professional.id) ? "Remover dos favoritos" : "Salvar nos favoritos"}
+                          className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border transition ${
+                            favoriteIds.has(professional.id)
+                              ? "border-rose-200 bg-rose-50 text-rose-700"
+                              : "border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-600"
+                          }`}
+                        >
+                          <Heart aria-hidden="true" className={`h-4 w-4 ${favoriteIds.has(professional.id) ? "fill-current" : ""}`} />
+                        </button>
+                        <div className="md:text-right">
+                          <p className="text-sm text-slate-500">A partir de</p>
+                          <p className="text-2xl font-semibold text-slate-950">{professional.priceLabel}</p>
+                          <p className="mt-1 text-sm text-slate-500">responde em {professional.responseTimeLabel}</p>
+                        </div>
                       </div>
                       <div className="flex gap-2 md:flex-col">
                         <Button
@@ -666,7 +749,7 @@ export function CareMatchApp() {
                           className="h-10 gap-2 bg-slate-950 hover:bg-slate-800"
                         >
                           <UserRound aria-hidden="true" className="h-4 w-4" />
-                          Selecionar
+                          Ver detalhes
                         </Button>
                         <Button type="button" variant="secondary" className="h-10 gap-2">
                           <MessageCircle aria-hidden="true" className="h-4 w-4" />
@@ -680,9 +763,22 @@ export function CareMatchApp() {
             </div>
           </div>
 
-          <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-24 xl:self-start">
+          <aside
+            className={detailOpen && selected ? "fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" : "hidden"}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Solicitar atendimento"
+          >
             {selected ? (
-              <div>
+              <div className="relative mx-auto max-w-3xl rounded-lg bg-white p-4 shadow-2xl sm:p-5">
+                <button
+                  type="button"
+                  onClick={closeDetails}
+                  className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-lg bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950"
+                  aria-label="Fechar detalhes"
+                >
+                  <X aria-hidden="true" className="h-5 w-5" />
+                </button>
                 <div className="relative h-44 overflow-hidden rounded-lg bg-slate-100">
                   {selected.photoUrl ? (
                     <Image src={selected.photoUrl} alt={selected.name} fill sizes="360px" className="object-cover" />
@@ -737,6 +833,13 @@ export function CareMatchApp() {
                     value={requesterName}
                     onChange={(event) => setRequesterName(event.target.value)}
                     placeholder="Nome do paciente"
+                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
+                  />
+                  <input
+                    type="email"
+                    value={requesterEmail}
+                    onChange={(event) => setRequesterEmail(event.target.value)}
+                    placeholder="E-mail para receber atualizacoes"
                     className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
                   />
                   <input
