@@ -1281,22 +1281,24 @@ export function CareMatchApp() {
                     </label>
                   </div>
 
-                  {requestSent ? (
-                    <div
-                      className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"
-                      aria-live="polite"
-                    >
-                      {requestWarning || `Pedido gravado no banco para ${selected.name}.`}
-                      <span className="block pt-1">A proxima etapa e confirmar horario, endereco e combinados de seguranca.</span>
-                    </div>
-                  ) : null}
-
                 </div>
 
                 <div className="grid gap-2 border-t border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5">
                   {requestError ? (
                     <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 sm:col-span-2" role="alert">
                       {requestError}
+                    </div>
+                  ) : null}
+                  {requestSent ? (
+                    <div
+                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-950 sm:col-span-2"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {requestWarning || `Pedido gravado no banco para ${selected.name}.`}
+                      <span className="block pt-1 font-medium">
+                        A proxima etapa e confirmar horario, endereco e combinados de seguranca.
+                      </span>
                     </div>
                   ) : null}
                   <Button
