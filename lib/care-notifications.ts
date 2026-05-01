@@ -1,4 +1,5 @@
 import { CareRequestStatus, CareService, TransferSupportLevel } from "@prisma/client";
+import { formatBrasiliaDateTime } from "@/lib/date-time";
 
 type EmailPayload = {
   to: string | string[];
@@ -82,11 +83,7 @@ function escapeHtml(value: string | null | undefined) {
 function formatDate(value: Date | null) {
   if (!value) return "A combinar";
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Sao_Paulo"
-  }).format(value);
+  return formatBrasiliaDateTime(value);
 }
 
 function formatAddress(request: CareRequestNotificationData) {

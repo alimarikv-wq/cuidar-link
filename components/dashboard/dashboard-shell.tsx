@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
+import { formatBrasiliaDateTime } from "@/lib/date-time";
 import {
   AvailabilitySlotData,
   CareDashboardData,
@@ -745,7 +746,7 @@ function NotificationsPanel({
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{notification.body}</p>
                 <p className="mt-2 text-xs font-semibold text-slate-400">
-                  {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(notification.createdAt))}
+                  {formatBrasiliaDateTime(notification.createdAt)}
                 </p>
               </div>
               <div className="flex flex-wrap items-start gap-2 md:justify-end">
@@ -1078,7 +1079,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
               </div>
               <div className="grid gap-3 text-sm text-slate-500 md:min-w-44 md:text-right">
                 <span>
-                  {request.scheduledFor ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(request.scheduledFor)) : "A combinar"}
+                  {request.scheduledFor ? formatBrasiliaDateTime(request.scheduledFor) : "A combinar"}
                 </span>
                 {getRequestActions(request.status, dashboard.summary.accountType).length > 0 ? (
                   <div className="flex flex-wrap gap-2 md:justify-end">

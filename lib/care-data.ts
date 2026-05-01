@@ -22,6 +22,7 @@ import {
   notifyProfessionalDocumentReview,
   notifyProfessionalVerificationReview
 } from "@/lib/care-in-app-notifications";
+import { parseBrasiliaDateTime } from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
 import { formatMoney } from "@/lib/utils";
@@ -528,7 +529,7 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       service: input.service,
       supportNeed: input.supportNeed,
       preferredGender: input.preferredGender,
-      scheduledFor: input.scheduledFor ? new Date(input.scheduledFor) : null,
+      scheduledFor: input.scheduledFor ? parseBrasiliaDateTime(input.scheduledFor) : null,
       durationHours: input.durationHours ?? 2,
       addressLine: input.addressLine,
       addressNumber: input.addressNumber,
