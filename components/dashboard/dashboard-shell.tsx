@@ -3,7 +3,22 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, Check, ClipboardList, FileBadge, FileUp, Heart, MapPin, Save, ShieldCheck, Star, UserRoundCheck, X } from "lucide-react";
+import {
+  Bell,
+  CalendarCheck,
+  Check,
+  CheckCheck,
+  ClipboardList,
+  FileBadge,
+  FileUp,
+  Heart,
+  MapPin,
+  Save,
+  ShieldCheck,
+  Star,
+  UserRoundCheck,
+  X
+} from "lucide-react";
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
@@ -498,7 +513,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
   }
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <article id="documentos" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700">Verificacao</p>
@@ -665,6 +680,102 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
   );
 }
 
+function NotificationsPanel({
+  dashboard,
+  pendingId,
+  isPending,
+  error,
+  onRead,
+  onReadAll
+}: {
+  dashboard: CareDashboardData;
+  pendingId: string;
+  isPending: boolean;
+  error: string;
+  onRead: (notificationId: string) => void;
+  onReadAll: () => void;
+}) {
+  return (
+    <article id="notificacoes" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Notificacoes</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Atualizacoes importantes</h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+            {dashboard.summary.unreadNotifications} nao lidas
+          </span>
+          <button
+            type="button"
+            onClick={onReadAll}
+            disabled={isPending || dashboard.summary.unreadNotifications === 0}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <CheckCheck aria-hidden="true" className="h-4 w-4" />
+            Marcar lidas
+          </button>
+        </div>
+      </div>
+
+      {error ? <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
+
+      <div className="mt-5 grid gap-3">
+        {dashboard.notifications.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Nenhuma notificacao ainda. Quando houver novidades de atendimento ou verificacao, elas aparecem aqui.
+          </div>
+        ) : null}
+
+        {dashboard.notifications.map((notification) => {
+          const unread = !notification.readAt;
+
+          return (
+            <div
+              key={notification.id}
+              className={`grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_auto] ${
+                unread ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Bell aria-hidden="true" className={`h-4 w-4 ${unread ? "text-emerald-700" : "text-slate-400"}`} />
+                  <h3 className="font-semibold text-slate-950">{notification.title}</h3>
+                  {unread ? <span className="rounded-lg bg-emerald-700 px-2 py-1 text-xs font-semibold text-white">Nova</span> : null}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{notification.body}</p>
+                <p className="mt-2 text-xs font-semibold text-slate-400">
+                  {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(notification.createdAt))}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-start gap-2 md:justify-end">
+                {notification.actionUrl ? (
+                  <Link
+                    href={notification.actionUrl}
+                    className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500"
+                  >
+                    Abrir
+                  </Link>
+                ) : null}
+                {unread ? (
+                  <button
+                    type="button"
+                    onClick={() => onRead(notification.id)}
+                    disabled={pendingId === notification.id}
+                    className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
+                  >
+                    {pendingId === notification.id ? "Salvando..." : "Marcar lida"}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
 function PatientFavoritesPanel({
   dashboard,
   removingId,
@@ -757,15 +868,23 @@ function PatientFavoritesPanel({
 export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isNotificationPending, startNotificationTransition] = useTransition();
   const [actionError, setActionError] = useState("");
   const [updatingId, setUpdatingId] = useState("");
   const [favoriteError, setFavoriteError] = useState("");
   const [removingFavoriteId, setRemovingFavoriteId] = useState("");
+  const [notificationError, setNotificationError] = useState("");
+  const [readingNotificationId, setReadingNotificationId] = useState("");
   const isProfessional = dashboard.summary.accountType === "PROFESSIONAL";
   const summaryCards = [
     { label: "Perfil", value: dashboard.summary.accountTypeLabel, icon: UserRoundCheck },
     { label: isProfessional ? "Solicitacoes" : "Pedidos", value: String(dashboard.summary.requests), icon: ClipboardList },
     { label: "Agendados", value: String(dashboard.summary.scheduled), icon: CalendarCheck },
+    {
+      label: "Notificacoes",
+      value: String(dashboard.summary.unreadNotifications),
+      icon: Bell
+    },
     {
       label: isProfessional ? "Docs verificados" : "Favoritos",
       value: String(isProfessional ? dashboard.summary.verifiedDocuments : dashboard.summary.favoriteProfessionals),
@@ -819,6 +938,52 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
     });
   }
 
+  function markNotificationRead(notificationId: string) {
+    setNotificationError("");
+    setReadingNotificationId(notificationId);
+
+    startNotificationTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNotificationError(data.error || "Nao foi possivel atualizar a notificacao.");
+        setReadingNotificationId("");
+        return;
+      }
+
+      router.refresh();
+      setReadingNotificationId("");
+    });
+  }
+
+  function markAllNotificationsRead() {
+    setNotificationError("");
+    setReadingNotificationId("all");
+
+    startNotificationTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ readAll: true })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNotificationError(data.error || "Nao foi possivel atualizar as notificacoes.");
+        setReadingNotificationId("");
+        return;
+      }
+
+      router.refresh();
+      setReadingNotificationId("");
+    });
+  }
+
   return (
     <section className="surface space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -832,7 +997,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
@@ -847,6 +1012,15 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         })}
       </div>
 
+      <NotificationsPanel
+        dashboard={dashboard}
+        pendingId={readingNotificationId}
+        isPending={isNotificationPending}
+        error={notificationError}
+        onRead={markNotificationRead}
+        onReadAll={markAllNotificationsRead}
+      />
+
       {!isProfessional ? (
         <PatientFavoritesPanel
           dashboard={dashboard}
@@ -859,7 +1033,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       {dashboard.professionalSettings ? <ProfessionalProfileForm settings={dashboard.professionalSettings} /> : null}
       {dashboard.professionalSettings ? <ProfessionalDocumentsForm settings={dashboard.professionalSettings} /> : null}
 
-      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <article id="atendimentos" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-emerald-700">Atendimentos</p>

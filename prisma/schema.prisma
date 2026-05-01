@@ -126,6 +126,7 @@ model User {
   updatedAt             DateTime               @updatedAt
   favorites             Favorite[]
   professionalFavorites ProfessionalFavorite[]
+  careNotifications     CareNotification[]
   alerts                Alert[]
   patientProfile        PatientProfile?
   professionalProfile   ProfessionalProfile?
@@ -313,10 +314,28 @@ model CareRequest {
   updatedAt         DateTime             @updatedAt
   patientProfile    PatientProfile?      @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
   professional      ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  notifications     CareNotification[]
 
   @@index([professionalId, status])
   @@index([patientProfileId])
   @@index([scheduledFor])
+}
+
+model CareNotification {
+  id            String       @id @default(cuid())
+  userId        String
+  careRequestId String?
+  type          String
+  title         String
+  body          String
+  actionUrl     String?
+  readAt        DateTime?
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  careRequest   CareRequest? @relation(fields: [careRequestId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([careRequestId])
 }
 
 model AwardOffer {

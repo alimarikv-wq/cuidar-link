@@ -13,6 +13,15 @@ import {
 } from "@prisma/client";
 import { maskCpf } from "@/lib/cpf";
 import { sendCareRequestStatusNotification, sendNewCareRequestNotifications } from "@/lib/care-notifications";
+import {
+  getCareNotificationsForUser,
+  getUnreadCareNotificationCount,
+  notifyCareRequestCanceledForProfessional,
+  notifyCareRequestStatusForPatient,
+  notifyNewCareRequest,
+  notifyProfessionalDocumentReview,
+  notifyProfessionalVerificationReview
+} from "@/lib/care-in-app-notifications";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
 import { formatMoney } from "@/lib/utils";
@@ -541,6 +550,12 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
   });
 
   try {
+    await notifyNewCareRequest(request);
+  } catch (error) {
+    console.error("Nao foi possivel criar notificacao interna do novo atendimento.", error);
+  }
+
+  try {
     await sendNewCareRequestNotifications(request);
   } catch (error) {
     console.error("Nao foi possivel enviar notificacao do novo atendimento.", error);
@@ -664,9 +679,20 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
     include: {
       professional: {
         include: { user: true }
-      }
+      },
+      patientProfile: true
     }
   });
+
+  try {
+    if (isRequestPatient && nextStatus === CareRequestStatus.CANCELADO) {
+      await notifyCareRequestCanceledForProfessional(updatedRequest);
+    } else {
+      await notifyCareRequestStatusForPatient(updatedRequest);
+    }
+  } catch (error) {
+    console.error("Nao foi possivel criar notificacao interna de status do atendimento.", error);
+  }
 
   try {
     await sendCareRequestStatusNotification(updatedRequest);
@@ -843,7 +869,8 @@ export async function updateProfessionalDocumentType(adminUserId: string, docume
 
 export async function reviewProfessionalDocument(adminUserId: string, documentId: string, status: VerificationStatus, reviewNote?: string) {
   const existingDocument = await prisma.professionalDocument.findUnique({
-    where: { id: documentId }
+    where: { id: documentId },
+    include: { professional: true }
   });
 
   if (!existingDocument) {
@@ -876,6 +903,14 @@ export async function reviewProfessionalDocument(adminUserId: string, documentId
   });
 
   await refreshProfessionalVerification(document.professionalId);
+
+  if (existingDocument.status !== status) {
+    try {
+      await notifyProfessionalDocumentReview(existingDocument.professional.userId, document.label, status);
+    } catch (error) {
+      console.error("Nao foi possivel criar notificacao interna de documento.", error);
+    }
+  }
 
   return toProfessionalDocumentData(document);
 }
@@ -914,6 +949,14 @@ export async function reviewProfessionalRegistration(adminUserId: string, profes
   });
 
   await refreshProfessionalVerification(professional.id);
+
+  if (existingProfessional.verificationStatus !== status) {
+    try {
+      await notifyProfessionalVerificationReview(professional.userId, status);
+    } catch (error) {
+      console.error("Nao foi possivel criar notificacao interna de cadastro profissional.", error);
+    }
+  }
 
   return {
     id: professional.id,
@@ -978,6 +1021,10 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
   });
 
   const requests = await getCareRequestsForUser(userId);
+  const [notifications, unreadNotifications] = await Promise.all([
+    getCareNotificationsForUser(userId),
+    getUnreadCareNotificationCount(userId)
+  ]);
   const scheduled = requests.filter((request) => ["ACEITO", "AGENDADO"].includes(request.status)).length;
   const completed = requests.filter((request) => request.status === "CONCLUIDO").length;
 
@@ -989,9 +1036,11 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
       scheduled,
       completed,
       verifiedDocuments: user.professionalProfile?.documents.filter((document) => document.status === "VERIFICADO").length ?? 0,
-      favoriteProfessionals: user.professionalFavorites.length
+      favoriteProfessionals: user.professionalFavorites.length,
+      unreadNotifications
     },
     requests,
+    notifications,
     favoriteProfessionals: user.professionalFavorites.map(toDashboardFavoriteProfessional),
     professionalSettings: user.professionalProfile
       ? {

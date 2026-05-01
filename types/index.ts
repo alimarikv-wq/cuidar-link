@@ -182,6 +182,16 @@ export type DashboardFavoriteProfessional = {
   createdAt: string;
 };
 
+export type CareNotificationData = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  actionUrl: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
 export type AvailabilitySlotData = {
   weekday: number;
   startTime: string;
@@ -264,9 +274,11 @@ export type CareDashboardData = {
     completed: number;
     verifiedDocuments: number;
     favoriteProfessionals: number;
+    unreadNotifications: number;
   };
   requests: CareRequestRecord[];
   favoriteProfessionals: DashboardFavoriteProfessional[];
+  notifications: CareNotificationData[];
   professionalSettings: ProfessionalSettingsData | null;
   profile: {
     name: string;

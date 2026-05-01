@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { HeartHandshake, LogIn, PanelRightOpen, UserPlus } from "lucide-react";
+import { Bell, HeartHandshake, LogIn, PanelRightOpen, UserPlus } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
+import { getUnreadCareNotificationCount } from "@/lib/care-in-app-notifications";
 import { buttonStyles } from "@/components/ui/button";
 import { LogoutButton } from "@/components/ui/logout-button";
 
 export async function Header() {
   const user = await getCurrentUser();
+  const unreadNotifications = user ? await getUnreadCareNotificationCount(user.id) : 0;
 
   return (
     <header className="surface sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
@@ -29,6 +31,18 @@ export async function Header() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
+              <Link
+                href="/dashboard#notificacoes"
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                aria-label={`Notificacoes${unreadNotifications > 0 ? `: ${unreadNotifications} nao lidas` : ""}`}
+              >
+                <Bell aria-hidden="true" className="h-4 w-4" />
+                {unreadNotifications > 0 ? (
+                  <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-xs font-semibold text-white">
+                    {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                  </span>
+                ) : null}
+              </Link>
               <Link href="/dashboard" className={`${buttonStyles()} gap-2`}>
                 <PanelRightOpen aria-hidden="true" className="h-4 w-4" />
                 Meu painel
