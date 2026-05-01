@@ -225,6 +225,7 @@ export function CareMatchApp() {
     setDetailOpen(true);
     setRequestSent(false);
     setRequestError("");
+    setRequestWarning("");
   }
 
   function closeDetails() {
@@ -396,11 +397,10 @@ export function CareMatchApp() {
   }, []);
 
   async function submitRequest() {
-    if (!selected) return;
+    if (!selected || requestPending || requestSent) return;
     setRequestPending(true);
     setRequestError("");
     setRequestWarning("");
-    setRequestSent(false);
 
     const response = await fetch("/api/care-requests", {
       method: "POST",
@@ -428,7 +428,7 @@ export function CareMatchApp() {
       })
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ error: "" }));
     setRequestPending(false);
 
     if (!response.ok) {
@@ -764,13 +764,17 @@ export function CareMatchApp() {
           </div>
 
           <aside
-            className={detailOpen && selected ? "fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" : "hidden"}
+            className={
+              detailOpen && selected
+                ? "fixed inset-0 z-50 grid place-items-center overflow-hidden bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4"
+                : "hidden"
+            }
             role="dialog"
             aria-modal="true"
             aria-label="Solicitar atendimento"
           >
             {selected ? (
-              <div className="relative mx-auto max-w-3xl rounded-lg bg-white p-4 shadow-2xl sm:p-5">
+              <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
                 <button
                   type="button"
                   onClick={closeDetails}
@@ -779,123 +783,132 @@ export function CareMatchApp() {
                 >
                   <X aria-hidden="true" className="h-5 w-5" />
                 </button>
-                <div className="relative h-44 overflow-hidden rounded-lg bg-slate-100">
-                  {selected.photoUrl ? (
-                    <Image src={selected.photoUrl} alt={selected.name} fill sizes="360px" className="object-cover" />
-                  ) : (
-                    <div className="grid h-full w-full place-items-center text-slate-400">
-                      <UserRound aria-hidden="true" className="h-10 w-10" />
+                <div className="overflow-y-auto p-4 pb-5 sm:p-5">
+                  <div className="relative h-32 overflow-hidden rounded-lg bg-slate-100 sm:h-40">
+                    {selected.photoUrl ? (
+                      <Image src={selected.photoUrl} alt={selected.name} fill sizes="360px" className="object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-slate-400">
+                        <UserRound aria-hidden="true" className="h-10 w-10" />
+                      </div>
+                    )}
+                    {selected.isVerified ? (
+                      <div className="absolute left-3 top-3 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-800">
+                        Verificada
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-emerald-700">{selected.roleLabel}</p>
+                    <h2 className="mt-1 text-2xl font-semibold text-slate-950">{selected.name}</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">{selected.bio}</p>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 border-y border-slate-200 py-4">
+                    <div>
+                      <p className="text-sm text-slate-500">Distancia</p>
+                      <p className="font-semibold text-slate-950">{selected.distanceKm.toFixed(1)} km</p>
                     </div>
-                  )}
-                  {selected.isVerified ? (
-                    <div className="absolute left-3 top-3 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-800">
-                      Verificada
+                    <div>
+                      <p className="text-sm text-slate-500">Chegada</p>
+                      <p className="font-semibold text-slate-950">{selected.availableIn}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Avaliacao</p>
+                      <p className="font-semibold text-slate-950">{selected.rating}/5</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Cuidado</p>
+                      <p className="font-semibold text-slate-950">{selected.genderLabel}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {selected.credentials.map((credential) => (
+                      <div key={credential} className="flex items-center gap-2 text-sm text-slate-700">
+                        <ShieldCheck aria-hidden="true" className="h-4 w-4 text-emerald-700" />
+                        {credential}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    <input
+                      value={requesterName}
+                      onChange={(event) => setRequesterName(event.target.value)}
+                      placeholder="Nome do paciente"
+                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
+                    />
+                    <input
+                      type="email"
+                      value={requesterEmail}
+                      onChange={(event) => setRequesterEmail(event.target.value)}
+                      placeholder="E-mail para receber atualizacoes"
+                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
+                    />
+                    <input
+                      value={requesterPhone}
+                      onChange={(event) => setRequesterPhone(event.target.value)}
+                      placeholder="Telefone"
+                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={scheduledFor}
+                      onChange={(event) => setScheduledFor(event.target.value)}
+                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
+                    />
+                    <CepAddressFields
+                      value={{
+                        postalCode,
+                        addressLine,
+                        addressNumber,
+                        addressComplement,
+                        neighborhood,
+                        city,
+                        state: stateCode
+                      }}
+                      onChange={updateRequestAddress}
+                    />
+                    <textarea
+                      value={notes}
+                      onChange={(event) => setNotes(event.target.value)}
+                      placeholder="Observacoes de seguranca"
+                      className="min-h-20 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  {requestSent ? (
+                    <div
+                      className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"
+                      aria-live="polite"
+                    >
+                      {requestWarning || `Pedido gravado no banco para ${selected.name}.`}
+                      <span className="block pt-1">A proxima etapa e confirmar horario, endereco e combinados de seguranca.</span>
                     </div>
                   ) : null}
+
+                  {requestError ? <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{requestError}</div> : null}
                 </div>
 
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-emerald-700">{selected.roleLabel}</p>
-                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">{selected.name}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{selected.bio}</p>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3 border-y border-slate-200 py-4">
-                  <div>
-                    <p className="text-sm text-slate-500">Distancia</p>
-                    <p className="font-semibold text-slate-950">{selected.distanceKm.toFixed(1)} km</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Chegada</p>
-                    <p className="font-semibold text-slate-950">{selected.availableIn}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Avaliacao</p>
-                    <p className="font-semibold text-slate-950">{selected.rating}/5</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Cuidado</p>
-                    <p className="font-semibold text-slate-950">{selected.genderLabel}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {selected.credentials.map((credential) => (
-                    <div key={credential} className="flex items-center gap-2 text-sm text-slate-700">
-                      <ShieldCheck aria-hidden="true" className="h-4 w-4 text-emerald-700" />
-                      {credential}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 grid gap-3">
-                  <input
-                    value={requesterName}
-                    onChange={(event) => setRequesterName(event.target.value)}
-                    placeholder="Nome do paciente"
-                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                  />
-                  <input
-                    type="email"
-                    value={requesterEmail}
-                    onChange={(event) => setRequesterEmail(event.target.value)}
-                    placeholder="E-mail para receber atualizacoes"
-                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                  />
-                  <input
-                    value={requesterPhone}
-                    onChange={(event) => setRequesterPhone(event.target.value)}
-                    placeholder="Telefone"
-                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                  />
-                  <input
-                    type="datetime-local"
-                    value={scheduledFor}
-                    onChange={(event) => setScheduledFor(event.target.value)}
-                    className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                  />
-                  <CepAddressFields
-                    value={{
-                      postalCode,
-                      addressLine,
-                      addressNumber,
-                      addressComplement,
-                      neighborhood,
-                      city,
-                      state: stateCode
-                    }}
-                    onChange={updateRequestAddress}
-                  />
-                  <textarea
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                    placeholder="Observacoes de seguranca"
-                    className="min-h-20 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
-                  />
-                </div>
-
-                {requestSent ? (
-                  <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
-                    {requestWarning || `Pedido gravado no banco para ${selected.name}.`}
-                    <span className="block pt-1">A proxima etapa e confirmar horario, endereco e combinados de seguranca.</span>
-                  </div>
-                ) : null}
-
-                {requestError ? <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{requestError}</div> : null}
-
-                <div className="mt-4 grid gap-2">
+                <div className="grid gap-2 border-t border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5">
                   <Button
                     type="button"
                     onClick={submitRequest}
-                    disabled={requestPending}
-                    className="h-12 gap-2 bg-emerald-700 hover:bg-emerald-800"
+                    disabled={requestPending || requestSent}
+                    className={
+                      requestSent
+                        ? "h-12 gap-2 bg-emerald-50 text-emerald-800 shadow-none ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:opacity-100"
+                        : "h-12 gap-2 bg-emerald-700 hover:bg-emerald-800"
+                    }
                   >
                     <CalendarClock aria-hidden="true" className="h-4 w-4" />
-                    {requestPending ? "Enviando..." : "Solicitar atendimento"}
+                    {requestSent ? "Pedido enviado" : requestPending ? "Enviando..." : "Solicitar atendimento"}
                   </Button>
-                  <Button type="button" variant="secondary" className="h-12 gap-2">
-                    <Phone aria-hidden="true" className="h-4 w-4" />
-                    Ligar para triagem
+                  <Button type="button" variant="secondary" onClick={requestSent ? closeDetails : undefined} className="h-12 gap-2">
+                    {requestSent ? <X aria-hidden="true" className="h-4 w-4" /> : <Phone aria-hidden="true" className="h-4 w-4" />}
+                    {requestSent ? "Fechar" : "Ligar para triagem"}
                   </Button>
                 </div>
               </div>
