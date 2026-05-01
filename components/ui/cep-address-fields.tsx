@@ -21,10 +21,22 @@ type CepAddressFieldsProps = {
   value: CepAddressValue;
   onChange: (value: CepAddressValue) => void;
   className?: string;
+  requiredFields?: Partial<Record<keyof CepAddressValue, boolean>>;
+  invalidFields?: Partial<Record<keyof CepAddressValue, boolean>>;
 };
 
 const fieldClass =
-  "h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+  "h-10 w-full min-w-0 rounded-lg border bg-white px-3 text-sm text-slate-950 outline-none transition";
+
+function requiredMark(required?: boolean) {
+  return required ? <span className="text-rose-600" aria-label="obrigatorio">*</span> : null;
+}
+
+function inputClass(invalid?: boolean) {
+  return invalid
+    ? `${fieldClass} border-rose-400 bg-rose-50/40 focus:border-rose-600 focus:ring-2 focus:ring-rose-100`
+    : `${fieldClass} border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100`;
+}
 
 function onlyDigits(value: string) {
   return value.replace(/\D/g, "").slice(0, 8);
@@ -36,7 +48,7 @@ function formatCep(value: string) {
   return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
 
-export function CepAddressFields({ value, onChange, className = "" }: CepAddressFieldsProps) {
+export function CepAddressFields({ value, onChange, className = "", requiredFields = {}, invalidFields = {} }: CepAddressFieldsProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [message, setMessage] = useState("");
   const cepDigits = onlyDigits(value.postalCode);
@@ -88,13 +100,14 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
     <div className={`grid min-w-0 gap-3 ${className}`}>
       <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          CEP
+          <span>CEP {requiredMark(requiredFields.postalCode)}</span>
           <input
             value={value.postalCode}
             onChange={(event) => update("postalCode", event.target.value)}
             placeholder="00000-000"
             inputMode="numeric"
-            className={fieldClass}
+            aria-invalid={invalidFields.postalCode ? "true" : undefined}
+            className={inputClass(invalidFields.postalCode)}
           />
         </label>
         <button
@@ -110,61 +123,67 @@ export function CepAddressFields({ value, onChange, className = "" }: CepAddress
 
       <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          Endereco
+          <span>Endereco {requiredMark(requiredFields.addressLine)}</span>
           <input
             value={value.addressLine}
             onChange={(event) => update("addressLine", event.target.value)}
             placeholder="Rua, avenida ou referencia"
-            className={fieldClass}
+            aria-invalid={invalidFields.addressLine ? "true" : undefined}
+            className={inputClass(invalidFields.addressLine)}
           />
         </label>
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          Numero
+          <span>Numero {requiredMark(requiredFields.addressNumber)}</span>
           <input
             value={value.addressNumber}
             onChange={(event) => update("addressNumber", event.target.value)}
             placeholder="123"
-            className={fieldClass}
+            aria-invalid={invalidFields.addressNumber ? "true" : undefined}
+            className={inputClass(invalidFields.addressNumber)}
           />
         </label>
       </div>
 
       <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-        Complemento
+        <span>Complemento {requiredMark(requiredFields.addressComplement)}</span>
         <input
           value={value.addressComplement}
           onChange={(event) => update("addressComplement", event.target.value)}
           placeholder="Apto, bloco, andar ou ponto de referencia"
-          className={fieldClass}
+          aria-invalid={invalidFields.addressComplement ? "true" : undefined}
+          className={inputClass(invalidFields.addressComplement)}
         />
       </label>
 
       <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_80px]">
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          Bairro
+          <span>Bairro {requiredMark(requiredFields.neighborhood)}</span>
           <input
             value={value.neighborhood}
             onChange={(event) => update("neighborhood", event.target.value)}
             placeholder="Bairro"
-            className={fieldClass}
+            aria-invalid={invalidFields.neighborhood ? "true" : undefined}
+            className={inputClass(invalidFields.neighborhood)}
           />
         </label>
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          Cidade
+          <span>Cidade {requiredMark(requiredFields.city)}</span>
           <input
             value={value.city}
             onChange={(event) => update("city", event.target.value)}
             placeholder="Cidade"
-            className={fieldClass}
+            aria-invalid={invalidFields.city ? "true" : undefined}
+            className={inputClass(invalidFields.city)}
           />
         </label>
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          UF
+          <span>UF {requiredMark(requiredFields.state)}</span>
           <input
             value={value.state}
             onChange={(event) => update("state", event.target.value.toUpperCase().slice(0, 2))}
             placeholder="RS"
-            className={fieldClass}
+            aria-invalid={invalidFields.state ? "true" : undefined}
+            className={inputClass(invalidFields.state)}
           />
         </label>
       </div>

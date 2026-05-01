@@ -227,6 +227,30 @@ function formatAccuracy(value: number | null) {
   return value >= 1000 ? `aprox. ${(value / 1000).toFixed(1)} km` : `aprox. ${Math.round(value)} m`;
 }
 
+const requestFieldBase = "w-full rounded-lg border bg-white px-3 text-sm outline-none transition";
+
+function requiredMark() {
+  return <span className="text-rose-600" aria-label="obrigatorio">*</span>;
+}
+
+function requestInputClass(invalid?: boolean) {
+  return invalid
+    ? `${requestFieldBase} h-10 border-rose-400 bg-rose-50/40 focus:border-rose-600 focus:ring-2 focus:ring-rose-100`
+    : `${requestFieldBase} h-10 border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100`;
+}
+
+function requestTextareaClass(invalid?: boolean) {
+  return invalid
+    ? `${requestFieldBase} min-h-20 border-rose-400 bg-rose-50/40 py-2 focus:border-rose-600 focus:ring-2 focus:ring-rose-100`
+    : `${requestFieldBase} min-h-20 border-slate-300 py-2 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100`;
+}
+
+function formatValidationMessage(items: string[]) {
+  if (items.length === 0) return "";
+  if (items.length === 1) return `Falta preencher: ${items[0]}.`;
+  return `Faltam preencher: ${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}.`;
+}
+
 export function CareMatchApp() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -255,6 +279,7 @@ export function CareMatchApp() {
   const [requestError, setRequestError] = useState("");
   const [requestWarning, setRequestWarning] = useState("");
   const [requestPending, setRequestPending] = useState(false);
+  const [requestAttempted, setRequestAttempted] = useState(false);
   const [requesterName, setRequesterName] = useState("");
   const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterPhone, setRequesterPhone] = useState("");
@@ -371,6 +396,7 @@ export function CareMatchApp() {
           favoriteProfessionalIdRef.current = "";
           if (requestedProfessionalFound) {
             setDetailOpen(true);
+            setRequestAttempted(false);
             setRequestSent(false);
             setRequestError("");
             setRequestWarning("");
@@ -411,6 +437,21 @@ export function CareMatchApp() {
   const visibleDurationOptions = availableDurationOptions.some((option) => option.value === durationHours)
     ? availableDurationOptions
     : [...availableDurationOptions, { value: durationHours, label: `${durationHours} horas` }].sort((a, b) => a.value - b.value);
+  const completedScheduledTime = completeTimeInput(scheduledParts.time);
+  const requestFieldErrors = {
+    requesterName: requestAttempted && !requesterName.trim(),
+    requesterEmail: requestAttempted && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail.trim()),
+    requesterPhone: requestAttempted && requesterPhone.replace(/\D/g, "").length < 10,
+    scheduledDate: requestAttempted && !scheduledParts.date,
+    scheduledTime: requestAttempted && !isValidTimeInput(completedScheduledTime),
+    postalCode: requestAttempted && !postalCode.trim(),
+    addressLine: requestAttempted && !addressLine.trim(),
+    addressNumber: requestAttempted && !addressNumber.trim(),
+    neighborhood: requestAttempted && !neighborhood.trim(),
+    city: requestAttempted && !city.trim(),
+    state: requestAttempted && !stateCode.trim(),
+    customServiceDetails: requestAttempted && service === "OUTRO" && customServiceDetails.trim().length < 3
+  };
 
   function updateScheduledDate(date: string) {
     setScheduledFor(`${date}T${scheduledParts.time}`);
@@ -436,6 +477,7 @@ export function CareMatchApp() {
   function selectProfessional(id: string) {
     setSelectedId(id);
     setDetailOpen(true);
+    setRequestAttempted(false);
     setRequestSent(false);
     setRequestError("");
     setRequestWarning("");
@@ -443,6 +485,7 @@ export function CareMatchApp() {
 
   function closeDetails() {
     setDetailOpen(false);
+    setRequestAttempted(false);
     setRequestError("");
   }
 
@@ -477,16 +520,22 @@ export function CareMatchApp() {
   }
 
   function validateRequestForm() {
-    if (!requesterName.trim()) return "Informe o nome do paciente.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail.trim())) return "Informe um e-mail valido para receber atualizacoes.";
-    if (requesterPhone.replace(/\D/g, "").length < 10) return "Informe um telefone com DDD.";
-    if (!scheduledParts.date || !isValidTimeInput(completeTimeInput(scheduledParts.time))) return "Informe data e horario no formato HH:MM.";
-    if (!postalCode.trim()) return "Informe o CEP.";
-    if (!addressLine.trim()) return "Informe o endereco.";
-    if (!addressNumber.trim()) return "Informe o numero. Se nao houver numero, use S/N.";
-    if (!neighborhood.trim() || !city.trim() || !stateCode.trim()) return "Confirme bairro, cidade e UF.";
-    if (service === "OUTRO" && customServiceDetails.trim().length < 3) return "Descreva qual atendimento voce precisa.";
-    return "";
+    const missingFields = [
+      !requesterName.trim() ? "nome do paciente" : "",
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail.trim()) ? "e-mail valido" : "",
+      requesterPhone.replace(/\D/g, "").length < 10 ? "telefone com DDD" : "",
+      !scheduledParts.date ? "data" : "",
+      !isValidTimeInput(completedScheduledTime) ? "horario" : "",
+      !postalCode.trim() ? "CEP" : "",
+      !addressLine.trim() ? "endereco" : "",
+      !addressNumber.trim() ? "numero" : "",
+      !neighborhood.trim() ? "bairro" : "",
+      !city.trim() ? "cidade" : "",
+      !stateCode.trim() ? "UF" : "",
+      service === "OUTRO" && customServiceDetails.trim().length < 3 ? "descricao do outro atendimento" : ""
+    ].filter(Boolean);
+
+    return formatValidationMessage(missingFields);
   }
 
   function useCurrentLocation() {
@@ -624,6 +673,7 @@ export function CareMatchApp() {
 
   async function submitRequest() {
     if (!selected || requestPending || requestSent) return;
+    setRequestAttempted(true);
     const validationError = validateRequestForm();
     if (validationError) {
       setRequestError(validationError);
@@ -633,7 +683,7 @@ export function CareMatchApp() {
     setRequestPending(true);
     setRequestError("");
     setRequestWarning("");
-    const safeScheduledFor = `${scheduledParts.date}T${completeTimeInput(scheduledParts.time)}`;
+    const safeScheduledFor = `${scheduledParts.date}T${completedScheduledTime}`;
     const requestNotes = [
       service === "OUTRO" ? `Outro atendimento: ${customServiceDetails.trim()}` : "",
       notes.trim()
@@ -1103,42 +1153,55 @@ export function CareMatchApp() {
                   </div>
 
                   <div className="mt-4 grid gap-3">
-                    <input
-                      required
-                      value={requesterName}
-                      onChange={(event) => setRequesterName(event.target.value)}
-                      placeholder="Nome do paciente"
-                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                    />
-                    <input
-                      required
-                      type="email"
-                      value={requesterEmail}
-                      onChange={(event) => setRequesterEmail(event.target.value)}
-                      placeholder="E-mail para receber atualizacoes"
-                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                    />
-                    <input
-                      required
-                      value={requesterPhone}
-                      onChange={(event) => setRequesterPhone(event.target.value)}
-                      placeholder="Telefone com DDD"
-                      className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-emerald-600"
-                    />
+                    <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                      <span>Nome do paciente {requiredMark()}</span>
+                      <input
+                        required
+                        value={requesterName}
+                        onChange={(event) => setRequesterName(event.target.value)}
+                        placeholder="Nome do paciente"
+                        aria-invalid={requestFieldErrors.requesterName ? "true" : undefined}
+                        className={requestInputClass(requestFieldErrors.requesterName)}
+                      />
+                    </label>
+                    <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                      <span>E-mail para atualizacoes {requiredMark()}</span>
+                      <input
+                        required
+                        type="email"
+                        value={requesterEmail}
+                        onChange={(event) => setRequesterEmail(event.target.value)}
+                        placeholder="email@exemplo.com"
+                        aria-invalid={requestFieldErrors.requesterEmail ? "true" : undefined}
+                        className={requestInputClass(requestFieldErrors.requesterEmail)}
+                      />
+                    </label>
+                    <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                      <span>Telefone com DDD {requiredMark()}</span>
+                      <input
+                        required
+                        value={requesterPhone}
+                        onChange={(event) => setRequesterPhone(event.target.value)}
+                        placeholder="(51) 99999-0101"
+                        aria-invalid={requestFieldErrors.requesterPhone ? "true" : undefined}
+                        className={requestInputClass(requestFieldErrors.requesterPhone)}
+                      />
+                    </label>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-1 text-sm font-semibold text-slate-700">
-                        Data
+                        <span>Data {requiredMark()}</span>
                         <input
                           type="date"
                           required
                           min={formatBrasiliaDateInput()}
                           value={scheduledParts.date}
                           onChange={(event) => updateScheduledDate(event.target.value)}
-                          className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
+                          aria-invalid={requestFieldErrors.scheduledDate ? "true" : undefined}
+                          className={requestInputClass(requestFieldErrors.scheduledDate)}
                         />
                       </label>
                       <label className="grid gap-1 text-sm font-semibold text-slate-700">
-                        Horario de Brasilia
+                        <span>Horario de Brasilia {requiredMark()}</span>
                         <input
                           required
                           inputMode="numeric"
@@ -1147,7 +1210,8 @@ export function CareMatchApp() {
                           value={scheduledParts.time}
                           onChange={(event) => updateScheduledTime(event.target.value)}
                           onBlur={finishScheduledTime}
-                          className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
+                          aria-invalid={requestFieldErrors.scheduledTime ? "true" : undefined}
+                          className={requestInputClass(requestFieldErrors.scheduledTime)}
                         />
                       </label>
                     </div>
@@ -1156,7 +1220,7 @@ export function CareMatchApp() {
                       <select
                         value={String(durationHours)}
                         onChange={(event) => setDurationHours(Number(event.target.value))}
-                        className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 outline-none focus:border-emerald-600"
+                        className={requestInputClass(false)}
                       >
                         {visibleDurationOptions.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -1166,13 +1230,17 @@ export function CareMatchApp() {
                       </select>
                     </label>
                     {service === "OUTRO" ? (
-                      <textarea
-                        required
-                        value={customServiceDetails}
-                        onChange={(event) => setCustomServiceDetails(event.target.value)}
-                        placeholder="Descreva qual atendimento voce precisa"
-                        className="min-h-20 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
-                      />
+                      <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                        <span>Descricao do atendimento {requiredMark()}</span>
+                        <textarea
+                          required
+                          value={customServiceDetails}
+                          onChange={(event) => setCustomServiceDetails(event.target.value)}
+                          placeholder="Descreva qual atendimento voce precisa"
+                          aria-invalid={requestFieldErrors.customServiceDetails ? "true" : undefined}
+                          className={requestTextareaClass(requestFieldErrors.customServiceDetails)}
+                        />
+                      </label>
                     ) : null}
                     <CepAddressFields
                       value={{
@@ -1185,13 +1253,32 @@ export function CareMatchApp() {
                         state: stateCode
                       }}
                       onChange={updateRequestAddress}
+                      requiredFields={{
+                        postalCode: true,
+                        addressLine: true,
+                        addressNumber: true,
+                        neighborhood: true,
+                        city: true,
+                        state: true
+                      }}
+                      invalidFields={{
+                        postalCode: requestFieldErrors.postalCode,
+                        addressLine: requestFieldErrors.addressLine,
+                        addressNumber: requestFieldErrors.addressNumber,
+                        neighborhood: requestFieldErrors.neighborhood,
+                        city: requestFieldErrors.city,
+                        state: requestFieldErrors.state
+                      }}
                     />
-                    <textarea
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                      placeholder="Ex.: preciso de banho assistido e transferencia segura cadeira-cama."
-                      className="min-h-20 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
-                    />
+                    <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                      Observacoes de seguranca
+                      <textarea
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        placeholder="Ex.: preciso de banho assistido e transferencia segura cadeira-cama."
+                        className={requestTextareaClass(false)}
+                      />
+                    </label>
                   </div>
 
                   {requestSent ? (
@@ -1204,10 +1291,14 @@ export function CareMatchApp() {
                     </div>
                   ) : null}
 
-                  {requestError ? <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{requestError}</div> : null}
                 </div>
 
                 <div className="grid gap-2 border-t border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5">
+                  {requestError ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 sm:col-span-2" role="alert">
+                      {requestError}
+                    </div>
+                  ) : null}
                   <Button
                     type="button"
                     onClick={submitRequest}
