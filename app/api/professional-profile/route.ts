@@ -5,26 +5,58 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { updateProfessionalProfileForUser } from "@/lib/care-data";
 
 const timeSchema = z.string().regex(/^\d{2}:\d{2}$/);
+const optionalText = (schema: z.ZodString = z.string()) =>
+  z.preprocess((value) => (value === null ? "" : value), schema.optional().or(z.literal("")));
+
+function profileValidationMessage(error: z.ZodError) {
+  const issue = error.issues[0];
+  const field = issue?.path.join(".");
+  const fieldLabels: Record<string, string> = {
+    phone: "telefone",
+    neighborhood: "bairro",
+    addressLine: "endereco",
+    addressNumber: "numero",
+    postalCode: "CEP",
+    city: "cidade",
+    state: "UF",
+    serviceRadiusKm: "raio de atendimento",
+    hourlyRate: "valor por hora",
+    sessionRate: "valor por sessao",
+    bio: "experiencia",
+    mobilitySupport: "apoio em mobilidade",
+    supportLevel: "capacidade",
+    travelNotes: "observacoes de viagem",
+    services: "servicos",
+    availability: "agenda semanal"
+  };
+
+  if (!issue) return "Revise os dados do perfil.";
+  if (issue.message && issue.message !== "Invalid input") return issue.message;
+
+  const label = field ? fieldLabels[field] || fieldLabels[field.split(".")[0]] : "";
+  return label ? `Revise o campo ${label}.` : "Revise os dados do perfil.";
+}
+
 const updateSchema = z.object({
-  phone: z.string().optional().or(z.literal("")),
+  phone: optionalText(),
   neighborhood: z.string().min(2),
-  addressLine: z.string().optional().or(z.literal("")),
-  addressNumber: z.string().optional().or(z.literal("")),
-  addressComplement: z.string().optional().or(z.literal("")),
-  postalCode: z.string().optional().or(z.literal("")),
-  city: z.string().min(2).optional().or(z.literal("")),
-  state: z.string().min(2).max(2).optional().or(z.literal("")),
-  serviceRadiusKm: z.coerce.number().int().min(1).max(50),
-  hourlyRate: z.coerce.number().min(1).max(1000),
-  sessionRate: z.coerce.number().min(1).max(5000).nullable().optional(),
-  bio: z.string().min(10).max(600),
-  mobilitySupport: z.string().min(10).max(600),
+  addressLine: optionalText(),
+  addressNumber: optionalText(),
+  addressComplement: optionalText(),
+  postalCode: optionalText(),
+  city: optionalText(z.string().min(2, "Informe a cidade ou deixe em branco.")),
+  state: optionalText(z.string().min(2, "Informe a UF com 2 letras.").max(2, "Informe a UF com 2 letras.")),
+  serviceRadiusKm: z.coerce.number().int().min(1, "Informe um raio de atendimento entre 1 e 50 km.").max(50, "Informe um raio de atendimento entre 1 e 50 km."),
+  hourlyRate: z.coerce.number().min(1, "Informe o valor por hora.").max(1000, "O valor por hora esta acima do limite aceito."),
+  sessionRate: z.coerce.number().min(1, "Informe o valor por sessao ou deixe em branco.").max(5000, "O valor por sessao esta acima do limite aceito.").nullable().optional(),
+  bio: z.string().min(3, "Informe sua experiencia profissional.").max(600, "A experiencia deve ter no maximo 600 caracteres."),
+  mobilitySupport: z.string().min(10, "Descreva como voce apoia mobilidade e transferencia.").max(600, "O apoio em mobilidade deve ter no maximo 600 caracteres."),
   supportLevel: z.nativeEnum(TransferSupportLevel),
   acceptsTravel: z.boolean().default(false),
   hasPassport: z.boolean().default(false),
   hasUsVisa: z.boolean().default(false),
-  travelNotes: z.string().max(500).optional().or(z.literal("")),
-  services: z.array(z.nativeEnum(CareService)).min(1),
+  travelNotes: optionalText(z.string().max(500, "As observacoes de viagem devem ter no maximo 500 caracteres.")),
+  services: z.array(z.nativeEnum(CareService)).min(1, "Selecione pelo menos um servico."),
   availability: z
     .array(
       z.object({
@@ -45,7 +77,7 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Revise os dados do perfil." }, { status: 400 });
+    return NextResponse.json({ error: profileValidationMessage(parsed.error) }, { status: 400 });
   }
 
   const invalidSlot = parsed.data.availability.find((slot) => slot.startTime >= slot.endTime);

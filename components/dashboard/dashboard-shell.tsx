@@ -373,10 +373,22 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
     setError("");
 
     startTransition(async () => {
+      const payload = {
+        ...form,
+        phone: form.phone || "",
+        addressLine: form.addressLine || "",
+        addressNumber: form.addressNumber || "",
+        addressComplement: form.addressComplement || "",
+        postalCode: form.postalCode || "",
+        city: form.city || "",
+        state: form.state || "",
+        travelNotes: form.travelNotes || ""
+      };
+
       const response = await fetch("/api/professional-profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payload)
       });
       const data = await response.json();
 
@@ -515,7 +527,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
                     acceptsTravel: event.target.checked,
                     hasPassport: event.target.checked ? current.hasPassport : false,
                     hasUsVisa: event.target.checked ? current.hasUsVisa : false,
-                    travelNotes: event.target.checked ? current.travelNotes : ""
+                    travelNotes: event.target.checked ? current.travelNotes || "" : ""
                   }))
                 }
                 className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700"
