@@ -24,7 +24,12 @@ const createSchema = z.object({
   state: z.string().min(2).max(2).optional().or(z.literal("")),
   latitude: z.coerce.number().optional(),
   longitude: z.coerce.number().optional(),
-  notes: z.string().max(1000).optional().or(z.literal(""))
+  notes: z.string().max(1000).optional().or(z.literal("")),
+  travelRequested: z.boolean().optional(),
+  travelDestination: z.string().max(160).optional().or(z.literal("")),
+  isInternationalTravel: z.boolean().optional(),
+  needsUsVisa: z.boolean().optional(),
+  travelNotes: z.string().max(500).optional().or(z.literal(""))
 });
 
 export async function GET(request: NextRequest) {
@@ -58,7 +63,9 @@ export async function POST(request: NextRequest) {
         postalCode: parsed.data.postalCode || undefined,
         state: parsed.data.state || undefined,
         scheduledFor: parsed.data.scheduledFor || undefined,
-        notes: parsed.data.notes || undefined
+        notes: parsed.data.notes || undefined,
+        travelDestination: parsed.data.travelDestination || undefined,
+        travelNotes: parsed.data.travelNotes || undefined
       },
       session?.userId
     );

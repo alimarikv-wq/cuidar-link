@@ -14,6 +14,7 @@ import {
   MapPin,
   MessageCircle,
   Phone,
+  Plane,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -265,6 +266,7 @@ export function CareMatchApp() {
   const [supportNeed, setSupportNeed] = useState<TransferSupportCode>("MODERADO");
   const [ageRange, setAgeRange] = useState<AgeRangeFilter>("QUALQUER");
   const [availability, setAvailability] = useState<AvailabilityFilter>("qualquer");
+  const [travelRequested, setTravelRequested] = useState(false);
   const [radius, setRadius] = useState(8);
   const [searchReady, setSearchReady] = useState(false);
   const [searchVersion, setSearchVersion] = useState(0);
@@ -301,6 +303,10 @@ export function CareMatchApp() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState("");
   const [customServiceDetails, setCustomServiceDetails] = useState("");
+  const [travelDestination, setTravelDestination] = useState("");
+  const [isInternationalTravel, setIsInternationalTravel] = useState(false);
+  const [needsUsVisa, setNeedsUsVisa] = useState(false);
+  const [travelNotes, setTravelNotes] = useState("");
   const [notes, setNotes] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
@@ -321,6 +327,7 @@ export function CareMatchApp() {
       setSupportNeed(parseInitialSupportNeed(params.get("supportNeed")));
       setAgeRange(parseInitialAgeRange(params.get("ageRange")));
       setAvailability(parseInitialAvailability(params.get("availability")));
+      setTravelRequested(params.get("travelRequested") === "true");
       setRadius(parseInitialRadius(params.get("radiusKm")));
       setSearchReady(true);
     });
@@ -359,6 +366,7 @@ export function CareMatchApp() {
       genderPreference,
       supportNeed,
       availability,
+      travelRequested: String(travelRequested),
       radiusKm: String(radius),
       latitude: String(center.latitude),
       longitude: String(center.longitude),
@@ -434,7 +442,8 @@ export function CareMatchApp() {
     searchReady,
     searchVersion,
     service,
-    supportNeed
+    supportNeed,
+    travelRequested
   ]);
 
   const selected = useMemo(() => {
@@ -461,7 +470,8 @@ export function CareMatchApp() {
     city: requestAttempted && !city.trim(),
     state: requestAttempted && !stateCode.trim(),
     customDurationDetails: requestAttempted && durationMode === "custom" && customDurationDetails.trim().length < 3,
-    customServiceDetails: requestAttempted && service === "OUTRO" && customServiceDetails.trim().length < 3
+    customServiceDetails: requestAttempted && service === "OUTRO" && customServiceDetails.trim().length < 3,
+    travelDestination: requestAttempted && travelRequested && travelDestination.trim().length < 2
   };
 
   useEffect(() => {
@@ -584,7 +594,10 @@ export function CareMatchApp() {
       !city.trim() ? "cidade" : "",
       !stateCode.trim() ? "UF" : "",
       durationMode === "custom" && customDurationDetails.trim().length < 3 ? "detalhe da duracao personalizada" : "",
-      service === "OUTRO" && customServiceDetails.trim().length < 3 ? "descricao do outro atendimento" : ""
+      service === "OUTRO" && customServiceDetails.trim().length < 3 ? "descricao do outro atendimento" : "",
+      travelRequested && travelDestination.trim().length < 2 ? "destino da viagem" : "",
+      travelRequested && isInternationalTravel && selected && !selected.hasPassport ? "profissional com passaporte informado" : "",
+      travelRequested && needsUsVisa && selected && !selected.hasUsVisa ? "profissional com visto americano informado" : ""
     ].filter(Boolean);
 
     return formatValidationMessage(missingFields);
@@ -740,6 +753,16 @@ export function CareMatchApp() {
       durationMode === "custom"
         ? `Duracao personalizada: reservar ${formatDurationLabel(durationHours)} na agenda. ${customDurationDetails.trim()}`
         : "",
+      travelRequested
+        ? [
+            `Acompanhamento em viagem: ${travelDestination.trim()}`,
+            isInternationalTravel ? "Viagem internacional" : "Viagem nacional/local",
+            needsUsVisa ? "Destino exige visto americano" : "",
+            travelNotes.trim() ? `Detalhes da viagem: ${travelNotes.trim()}` : ""
+          ]
+            .filter(Boolean)
+            .join(" | ")
+        : "",
       service === "OUTRO" ? `Outro atendimento: ${customServiceDetails.trim()}` : "",
       notes.trim()
     ]
@@ -768,6 +791,11 @@ export function CareMatchApp() {
         state: stateCode,
         latitude: center.latitude,
         longitude: center.longitude,
+        travelRequested,
+        travelDestination,
+        isInternationalTravel,
+        needsUsVisa,
+        travelNotes,
         notes: requestNotes
       })
     });
@@ -880,6 +908,23 @@ export function CareMatchApp() {
                   className="mt-2 min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                 />
               ) : null}
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={travelRequested}
+                  onChange={(event) => setTravelRequested(event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700"
+                />
+                <span>
+                  Preciso de acompanhante para viagem
+                  <span className="block pt-1 text-sm font-normal leading-5 text-slate-600">
+                    Mostra somente profissionais que marcaram disponibilidade para acompanhar viagens.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div>
@@ -1083,6 +1128,12 @@ export function CareMatchApp() {
                           <CalendarClock aria-hidden="true" className="h-4 w-4 text-violet-700" />
                           {professional.availableIn}
                         </span>
+                        {professional.acceptsTravel ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Plane aria-hidden="true" className="h-4 w-4 text-sky-700" />
+                            Aceita viagem
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-3 text-sm leading-6 text-slate-700">{professional.mobilitySupport}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1091,6 +1142,11 @@ export function CareMatchApp() {
                             {credential}
                           </span>
                         ))}
+                        {professional.acceptsTravel ? (
+                          <span className="rounded-lg border border-sky-100 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800">
+                            Viagens
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 
@@ -1205,6 +1261,23 @@ export function CareMatchApp() {
                         {credential}
                       </div>
                     ))}
+                    {selected.acceptsTravel ? (
+                      <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm text-sky-950">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <Plane aria-hidden="true" className="h-4 w-4" />
+                          Disponivel para viagens
+                        </div>
+                        <p className="mt-1 text-sky-900">
+                          {[
+                            selected.hasPassport ? "Passaporte informado" : "",
+                            selected.hasUsVisa ? "Visto EUA informado" : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" | ") || "Viagens sob alinhamento previo"}
+                        </p>
+                        {selected.travelNotes ? <p className="mt-1 text-sky-900">{selected.travelNotes}</p> : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="mt-4 grid gap-3">
@@ -1345,6 +1418,70 @@ export function CareMatchApp() {
                         />
                       </label>
                     ) : null}
+                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={travelRequested}
+                          onChange={(event) => setTravelRequested(event.target.checked)}
+                          disabled={!selected.acceptsTravel}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700 disabled:opacity-50"
+                        />
+                        <span>
+                          Este pedido envolve acompanhamento em viagem
+                          <span className="block pt-1 text-sm font-normal leading-5 text-slate-600">
+                            {selected.acceptsTravel
+                              ? "Informe destino e detalhes principais para o profissional avaliar."
+                              : "Esse profissional nao marcou disponibilidade para viagens."}
+                          </span>
+                        </span>
+                      </label>
+
+                      {travelRequested ? (
+                        <div className="grid gap-3">
+                          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                            <span>Destino da viagem {requiredMark()}</span>
+                            <input
+                              value={travelDestination}
+                              onChange={(event) => setTravelDestination(event.target.value)}
+                              placeholder="Ex.: Gramado, Sao Paulo, Miami..."
+                              aria-invalid={requestFieldErrors.travelDestination ? "true" : undefined}
+                              className={requestInputClass(requestFieldErrors.travelDestination)}
+                            />
+                          </label>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={isInternationalTravel}
+                                onChange={(event) => {
+                                  setIsInternationalTravel(event.target.checked);
+                                  if (!event.target.checked) setNeedsUsVisa(false);
+                                }}
+                                className="h-4 w-4 rounded border-slate-300 accent-emerald-700"
+                              />
+                              Viagem internacional
+                            </label>
+                            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={needsUsVisa}
+                                onChange={(event) => setNeedsUsVisa(event.target.checked)}
+                                disabled={!isInternationalTravel}
+                                className="h-4 w-4 rounded border-slate-300 accent-emerald-700 disabled:opacity-50"
+                              />
+                              Precisa de visto EUA
+                            </label>
+                          </div>
+                          <textarea
+                            value={travelNotes}
+                            onChange={(event) => setTravelNotes(event.target.value)}
+                            placeholder="Ex.: quantidade de dias, pernoite, hotel, deslocamento, rotina durante a viagem..."
+                            className={requestTextareaClass(false)}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                     <CepAddressFields
                       value={{
                         postalCode,

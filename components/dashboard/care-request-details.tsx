@@ -14,6 +14,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  Plane,
   ShieldCheck,
   UserRound,
   X
@@ -217,6 +218,21 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
             </div>
           </article>
 
+          {request.travelRequested ? (
+            <article className="rounded-lg border border-sky-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Plane aria-hidden="true" className="h-5 w-5 text-sky-700" />
+                <h2 className="text-xl font-semibold text-slate-950">Viagem ou acompanhamento fora de casa</h2>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <InfoRow label="Destino" value={request.travelDestination} />
+                <InfoRow label="Tipo" value={request.isInternationalTravel ? "Viagem internacional" : "Viagem nacional ou local"} />
+                <InfoRow label="Visto EUA" value={request.needsUsVisa ? "Necessario" : "Nao informado como necessario"} />
+                <InfoRow label="Observacoes" value={request.travelNotes || "Nenhuma observacao especifica."} />
+              </div>
+            </article>
+          ) : null}
+
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <Home aria-hidden="true" className="h-5 w-5 text-emerald-700" />
@@ -317,7 +333,20 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                 value={<span className="inline-flex items-center gap-1"><MapPin aria-hidden="true" className="h-4 w-4 text-emerald-700" />{request.professional.neighborhood}, {request.professional.city}</span>}
               />
               <InfoRow label="Apoio fisico" value={request.professional.supportLevelLabel} />
+              {request.professional.acceptsTravel ? (
+                <InfoRow
+                  label="Viagens"
+                  value={[
+                    "Aceita acompanhamento",
+                    request.professional.hasPassport ? "passaporte informado" : "",
+                    request.professional.hasUsVisa ? "visto EUA informado" : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" - ")}
+                />
+              ) : null}
               <InfoRow label="Experiencia" value={request.professional.bio} />
+              {request.professional.travelNotes ? <InfoRow label="Observacoes sobre viagem" value={request.professional.travelNotes} /> : null}
             </div>
           </article>
         </aside>

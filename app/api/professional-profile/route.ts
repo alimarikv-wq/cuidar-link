@@ -20,6 +20,10 @@ const updateSchema = z.object({
   bio: z.string().min(10).max(600),
   mobilitySupport: z.string().min(10).max(600),
   supportLevel: z.nativeEnum(TransferSupportLevel),
+  acceptsTravel: z.boolean().default(false),
+  hasPassport: z.boolean().default(false),
+  hasUsVisa: z.boolean().default(false),
+  travelNotes: z.string().max(500).optional().or(z.literal("")),
   services: z.array(z.nativeEnum(CareService)).min(1),
   availability: z
     .array(
@@ -58,7 +62,8 @@ export async function PATCH(request: NextRequest) {
     postalCode: parsed.data.postalCode || undefined,
     city: parsed.data.city || undefined,
     state: parsed.data.state || undefined,
-    sessionRate: parsed.data.sessionRate ?? null
+    sessionRate: parsed.data.sessionRate ?? null,
+    travelNotes: parsed.data.travelNotes || undefined
   });
 
   if (!result.ok) {

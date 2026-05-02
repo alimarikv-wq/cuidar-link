@@ -198,6 +198,10 @@ model ProfessionalProfile {
   verificationNote               String?
   verificationReviewedAt         DateTime?
   photoUrl                       String?
+  acceptsTravel                  Boolean                        @default(false)
+  hasPassport                    Boolean                        @default(false)
+  hasUsVisa                      Boolean                        @default(false)
+  travelNotes                    String?
   bio                            String
   mobilitySupport                String
   supportLevel                   TransferSupportLevel
@@ -312,6 +316,11 @@ model CareRequest {
   latitude          Decimal?             @db.Decimal(9, 6)
   longitude         Decimal?             @db.Decimal(9, 6)
   notes             String?
+  travelRequested   Boolean              @default(false)
+  travelDestination String?
+  isInternationalTravel Boolean          @default(false)
+  needsUsVisa       Boolean              @default(false)
+  travelNotes       String?
   status            CareRequestStatus    @default(ENVIADO)
   patientArchivedAt DateTime?
   professionalArchivedAt DateTime?

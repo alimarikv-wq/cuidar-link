@@ -141,6 +141,7 @@ export type CareSearchParams = {
   supportNeed: TransferSupportLevel;
   availability: AvailabilityFilter;
   radiusKm: number;
+  travelRequested?: boolean;
   ageMin?: number;
   ageMax?: number;
   latitude?: number;
@@ -167,6 +168,11 @@ export type CreateCareRequestInput = {
   latitude?: number;
   longitude?: number;
   notes?: string;
+  travelRequested?: boolean;
+  travelDestination?: string;
+  isInternationalTravel?: boolean;
+  needsUsVisa?: boolean;
+  travelNotes?: string;
 };
 
 type ProfessionalWithRelations = Prisma.ProfessionalProfileGetPayload<{
@@ -192,6 +198,10 @@ type UpdateProfessionalProfileInput = {
   bio: string;
   mobilitySupport: string;
   supportLevel: TransferSupportLevel;
+  acceptsTravel: boolean;
+  hasPassport: boolean;
+  hasUsVisa: boolean;
+  travelNotes?: string | null;
   services: CareService[];
   availability: AvailabilitySlotData[];
 };
@@ -597,6 +607,7 @@ function calculateScore(
   if (canSupport(professional.supportLevel, params.supportNeed)) score += 12;
   if (hasAvailability) score += 8;
   if (professional.isVerified) score += 4;
+  if (params.travelRequested && professional.acceptsTravel) score += 6;
   score += Math.max(0, 10 - distance);
   score += Number(professional.rating) - 4.5;
   return Math.round(Math.min(score, 99));
@@ -629,6 +640,10 @@ function toCareProfessional(professional: ProfessionalWithRelations, params: Car
     supportLevel: professional.supportLevel,
     supportLevelLabel: supportLabel[professional.supportLevel],
     mobilitySupport: professional.mobilitySupport,
+    acceptsTravel: professional.acceptsTravel,
+    hasPassport: professional.hasPassport,
+    hasUsVisa: professional.hasUsVisa,
+    travelNotes: professional.travelNotes,
     services: professional.services,
     serviceLabels: professional.services.map((service) => serviceLabel[service]),
     credentials: verifiedDocs.map((document) => document.label),
@@ -656,7 +671,8 @@ export async function searchCareProfessionals(params: CareSearchParams) {
           ? undefined
           : params.genderPreference === GenderPreference.FEMININO
             ? Gender.FEMININO
-            : Gender.MASCULINO
+            : Gender.MASCULINO,
+      acceptsTravel: params.travelRequested ? true : undefined
     },
     include: {
       user: true,
@@ -676,6 +692,7 @@ export async function searchCareProfessionals(params: CareSearchParams) {
         distance <= params.radiusKm &&
         distance <= professional.serviceRadiusKm &&
         canSupport(professional.supportLevel, params.supportNeed) &&
+        (!params.travelRequested || professional.acceptsTravel) &&
         hasAvailability
       );
     })
@@ -708,6 +725,29 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
     return { ok: false as const, status: 409, error: scheduleValidation.error };
   }
 
+  if (input.travelRequested) {
+    if (!input.travelDestination?.trim()) {
+      return { ok: false as const, status: 400, error: "Informe o destino da viagem." };
+    }
+
+    const professionalTravel = await prisma.professionalProfile.findUnique({
+      where: { id: input.professionalId },
+      select: { acceptsTravel: true, hasPassport: true, hasUsVisa: true }
+    });
+
+    if (!professionalTravel?.acceptsTravel) {
+      return { ok: false as const, status: 409, error: "Esse profissional nao marcou disponibilidade para viagens." };
+    }
+
+    if (input.isInternationalTravel && !professionalTravel.hasPassport) {
+      return { ok: false as const, status: 409, error: "Esse profissional nao informou passaporte para viagem internacional." };
+    }
+
+    if (input.needsUsVisa && !professionalTravel.hasUsVisa) {
+      return { ok: false as const, status: 409, error: "Esse profissional nao informou visto americano." };
+    }
+  }
+
   const request = await prisma.careRequest.create({
     data: {
       patientProfileId,
@@ -730,6 +770,11 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       latitude: input.latitude,
       longitude: input.longitude,
       notes: input.notes,
+      travelRequested: Boolean(input.travelRequested),
+      travelDestination: input.travelRequested ? input.travelDestination : null,
+      isInternationalTravel: Boolean(input.isInternationalTravel),
+      needsUsVisa: Boolean(input.needsUsVisa),
+      travelNotes: input.travelRequested ? input.travelNotes : null,
       status: CareRequestStatus.ENVIADO
     },
     include: {
@@ -776,6 +821,11 @@ function toRequestRecord(
     city: request.city,
     state: request.state,
     notes: request.notes,
+    travelRequested: request.travelRequested,
+    travelDestination: request.travelDestination,
+    isInternationalTravel: request.isInternationalTravel,
+    needsUsVisa: request.needsUsVisa,
+    travelNotes: request.travelNotes,
     professionalName: request.professional.user.name,
     professionalRole: professionalTypeLabel[request.professional.professionalType],
     neighborhood: request.neighborhood
@@ -819,7 +869,11 @@ function toRequestDetailsData(
       supportLevelLabel: supportLabel[request.professional.supportLevel],
       mobilitySupport: request.professional.mobilitySupport,
       bio: request.professional.bio,
-      isVerified: request.professional.isVerified
+      isVerified: request.professional.isVerified,
+      acceptsTravel: request.professional.acceptsTravel,
+      hasPassport: request.professional.hasPassport,
+      hasUsVisa: request.professional.hasUsVisa,
+      travelNotes: request.professional.travelNotes
     },
     patient: {
       name: request.requesterName || request.patientProfile?.user.name || "Paciente",
@@ -1063,6 +1117,10 @@ export async function updateProfessionalProfileForUser(userId: string, input: Up
         bio: input.bio,
         mobilitySupport: input.mobilitySupport,
         supportLevel: input.supportLevel,
+        acceptsTravel: input.acceptsTravel,
+        hasPassport: input.acceptsTravel ? input.hasPassport : false,
+        hasUsVisa: input.acceptsTravel ? input.hasUsVisa : false,
+        travelNotes: input.acceptsTravel ? input.travelNotes || null : null,
         services: input.services
       }
     }),
@@ -1450,6 +1508,10 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
           bio: user.professionalProfile.bio,
           mobilitySupport: user.professionalProfile.mobilitySupport,
           supportLevel: user.professionalProfile.supportLevel,
+          acceptsTravel: user.professionalProfile.acceptsTravel,
+          hasPassport: user.professionalProfile.hasPassport,
+          hasUsVisa: user.professionalProfile.hasUsVisa,
+          travelNotes: user.professionalProfile.travelNotes,
           services: user.professionalProfile.services,
           availability: user.professionalProfile.availability.map((slot) => ({
             weekday: slot.weekday,

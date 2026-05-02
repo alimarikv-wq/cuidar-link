@@ -13,8 +13,10 @@ import {
   ClipboardList,
   FileBadge,
   FileUp,
+  Globe2,
   Heart,
   MapPin,
+  Plane,
   Save,
   ShieldCheck,
   Star,
@@ -500,6 +502,64 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
                 );
               })}
             </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+              <input
+                type="checkbox"
+                checked={form.acceptsTravel}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    acceptsTravel: event.target.checked,
+                    hasPassport: event.target.checked ? current.hasPassport : false,
+                    hasUsVisa: event.target.checked ? current.hasUsVisa : false,
+                    travelNotes: event.target.checked ? current.travelNotes : ""
+                  }))
+                }
+                className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700"
+              />
+              <span>
+                Aceito acompanhar viagens
+                <span className="block pt-1 text-sm font-normal leading-5 text-slate-600">
+                  Use para pacientes que precisam de apoio em deslocamentos, eventos, consultas fora da cidade ou viagens.
+                </span>
+              </span>
+            </label>
+
+            {form.acceptsTravel ? (
+              <div className="mt-3 grid gap-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.hasPassport}
+                      onChange={(event) => setForm((current) => ({ ...current, hasPassport: event.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-300 accent-emerald-700"
+                    />
+                    <Globe2 aria-hidden="true" className="h-4 w-4 text-sky-700" />
+                    Tenho passaporte
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.hasUsVisa}
+                      onChange={(event) => setForm((current) => ({ ...current, hasUsVisa: event.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-300 accent-emerald-700"
+                    />
+                    <Plane aria-hidden="true" className="h-4 w-4 text-sky-700" />
+                    Tenho visto EUA
+                  </label>
+                </div>
+                <textarea
+                  value={form.travelNotes || ""}
+                  onChange={(event) => setForm((current) => ({ ...current, travelNotes: event.target.value }))}
+                  placeholder="Ex.: aceito viagens nacionais, finais de semana, eventos ou consultas fora da cidade."
+                  className="min-h-20 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                />
+              </div>
+            ) : null}
           </div>
 
           <div>
@@ -1417,6 +1477,17 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 {request.addressComplement ? <p className="mt-1 text-sm text-slate-500">{request.addressComplement}</p> : null}
                 {request.requesterPhone ? <p className="mt-1 text-sm text-slate-500">Telefone: {request.requesterPhone}</p> : null}
                 <p className="mt-1 text-sm text-slate-500">Duracao: {formatDurationHours(request.durationHours)}</p>
+                {request.travelRequested ? (
+                  <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm leading-6 text-sky-950">
+                    <p className="inline-flex items-center gap-2 font-semibold">
+                      <Plane aria-hidden="true" className="h-4 w-4" />
+                      Acompanhamento em viagem
+                    </p>
+                    <p>Destino: {request.travelDestination || "Nao informado"}</p>
+                    <p>{request.isInternationalTravel ? "Viagem internacional" : "Viagem nacional ou local"}{request.needsUsVisa ? " - visto EUA necessario" : ""}</p>
+                    {request.travelNotes ? <p>{request.travelNotes}</p> : null}
+                  </div>
+                ) : null}
                 {request.notes ? <p className="mt-2 text-sm leading-6 text-slate-600">{request.notes}</p> : null}
               </div>
               <div className="grid gap-3 text-sm text-slate-500 md:min-w-44 md:text-right">

@@ -125,6 +125,10 @@ export type CareProfessional = {
   supportLevel: TransferSupportCode;
   supportLevelLabel: string;
   mobilitySupport: string;
+  acceptsTravel: boolean;
+  hasPassport: boolean;
+  hasUsVisa: boolean;
+  travelNotes: string | null;
   services: CareServiceCode[];
   serviceLabels: string[];
   credentials: string[];
@@ -163,6 +167,11 @@ export type CareRequestRecord = {
   city: string;
   state: string | null;
   notes: string | null;
+  travelRequested: boolean;
+  travelDestination: string | null;
+  isInternationalTravel: boolean;
+  needsUsVisa: boolean;
+  travelNotes: string | null;
   professionalName: string;
   professionalRole: string;
   neighborhood: string;
@@ -186,6 +195,10 @@ export type CareRequestDetailsData = CareRequestRecord & {
     mobilitySupport: string;
     bio: string;
     isVerified: boolean;
+    acceptsTravel: boolean;
+    hasPassport: boolean;
+    hasUsVisa: boolean;
+    travelNotes: string | null;
   };
   patient: {
     name: string;
@@ -293,6 +306,10 @@ export type ProfessionalSettingsData = {
   bio: string;
   mobilitySupport: string;
   supportLevel: TransferSupportCode;
+  acceptsTravel: boolean;
+  hasPassport: boolean;
+  hasUsVisa: boolean;
+  travelNotes: string | null;
   services: CareServiceCode[];
   availability: AvailabilitySlotData[];
   documents: ProfessionalDocumentData[];
