@@ -1145,7 +1145,7 @@ export async function getCareRequestCollectionsForUser(userId: string) {
   const isProfessional = user.accountType === AccountType.PROFESSIONAL && user.professionalProfile;
   const ownerWhere = isProfessional ? { professionalId: user.professionalProfile!.id } : { patientProfileId: user.patientProfile?.id || "" };
   const archiveField = isProfessional ? "professionalArchivedAt" : "patientArchivedAt";
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const historySince = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const includeProfessional = {
     professional: {
       include: { user: true }
@@ -1168,11 +1168,11 @@ export async function getCareRequestCollectionsForUser(userId: string) {
         ...ownerWhere,
         [archiveField]: null,
         status: { in: [CareRequestStatus.CONCLUIDO, CareRequestStatus.CANCELADO] },
-        createdAt: { gte: thirtyDaysAgo }
+        createdAt: { gte: historySince }
       },
       include: includeProfessional,
       orderBy: { createdAt: "desc" },
-      take: 30
+      take: 200
     }),
     prisma.careRequest.findMany({
       where: {
@@ -1181,7 +1181,7 @@ export async function getCareRequestCollectionsForUser(userId: string) {
       },
       include: includeProfessional,
       orderBy: [{ [archiveField]: "desc" }, { createdAt: "desc" }],
-      take: 30
+      take: 200
     })
   ]);
 

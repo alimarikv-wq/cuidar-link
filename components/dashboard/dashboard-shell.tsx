@@ -28,6 +28,7 @@ import { formatBrasiliaDateTime } from "@/lib/date-time";
 import {
   AvailabilitySlotData,
   CareDashboardData,
+  CareRequestRecord,
   CareServiceCode,
   DashboardFavoriteProfessional,
   DocumentTypeCode,
@@ -42,6 +43,7 @@ type StatusAction = {
   variant: "primary" | "secondary" | "danger";
 };
 type RequestView = "active" | "recent" | "archived";
+type HistoryRange = "30" | "90" | "custom";
 
 const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
   { value: "BANHO", label: "Banho" },
@@ -156,6 +158,38 @@ function formatDurationHours(durationHours: number) {
   const hours = Math.floor(durationHours);
   const minutes = Math.round((durationHours - hours) * 60);
   return `${hours}h${String(minutes).padStart(2, "0")}`;
+}
+
+function parseDateInput(value: string, endOfDay = false) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+}
+
+function rangeStart(days: number) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - days + 1);
+  return date;
+}
+
+function filterRequestsByHistoryRange(
+  requests: CareRequestRecord[],
+  range: HistoryRange,
+  startDate = "",
+  endDate = ""
+) {
+  const start = range === "30" ? rangeStart(30) : range === "90" ? rangeStart(90) : parseDateInput(startDate);
+  const end = range === "custom" ? parseDateInput(endDate, true) : null;
+
+  return requests.filter((request) => {
+    const requestDate = new Date(request.scheduledFor || request.createdAt);
+    if (Number.isNaN(requestDate.getTime())) return false;
+    if (start && requestDate < start) return false;
+    if (end && requestDate > end) return false;
+    return true;
+  });
 }
 
 function getRequestActions(status: string, accountType: string): StatusAction[] {
@@ -1022,19 +1056,30 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
   const [notificationError, setNotificationError] = useState("");
   const [readingNotificationId, setReadingNotificationId] = useState("");
   const [requestView, setRequestView] = useState<RequestView>("active");
+  const [historyRange, setHistoryRange] = useState<HistoryRange>("30");
+  const [historyStartDate, setHistoryStartDate] = useState("");
+  const [historyEndDate, setHistoryEndDate] = useState("");
   const isProfessional = dashboard.summary.accountType === "PROFESSIONAL";
+  const visibleHistoryRequests = filterRequestsByHistoryRange(
+    requestView === "archived" ? dashboard.archivedRequests : dashboard.recentRequests,
+    historyRange,
+    historyStartDate,
+    historyEndDate
+  );
   const visibleRequests =
-    requestView === "active" ? dashboard.requests : requestView === "recent" ? dashboard.recentRequests : dashboard.archivedRequests;
+    requestView === "active" ? dashboard.requests : visibleHistoryRequests;
+  const recentThirtyDaysCount = filterRequestsByHistoryRange(dashboard.recentRequests, "30").length;
+  const recentNinetyDaysCount = filterRequestsByHistoryRange(dashboard.recentRequests, "90").length;
   const requestViewTitle =
-    requestView === "active" ? (isProfessional ? "Solicitacoes recebidas" : "Pedidos em andamento") : requestView === "recent" ? "Historico recente" : "Atendimentos arquivados";
+    requestView === "active" ? (isProfessional ? "Solicitacoes recebidas" : "Pedidos em andamento") : requestView === "recent" ? "Historico de atendimentos" : "Atendimentos arquivados";
   const requestViewEmpty =
     requestView === "active"
       ? isProfessional
         ? "Nenhuma solicitacao ativa agora. Quando um atendimento for pedido, ele aparece aqui."
         : "Nenhum pedido em andamento agora. Quando voce solicitar atendimento, o status aparece aqui."
       : requestView === "recent"
-        ? "Nenhum atendimento concluido ou cancelado nos ultimos 30 dias."
-        : "Nenhum atendimento arquivado ainda.";
+        ? "Nenhum atendimento concluido ou cancelado nesse periodo."
+        : "Nenhum atendimento arquivado nesse periodo.";
   const summaryCards = [
     { label: "Perfil", value: dashboard.summary.accountTypeLabel, icon: UserRoundCheck },
     { label: isProfessional ? "Solicitacoes" : "Pedidos", value: String(dashboard.summary.requests), icon: ClipboardList },
@@ -1277,7 +1322,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         <div className="mt-4 flex flex-wrap gap-2">
           {[
             { key: "active" as const, label: `Ativos (${dashboard.requests.length})` },
-            { key: "recent" as const, label: `Ultimos 30 dias (${dashboard.recentRequests.length})` },
+            { key: "recent" as const, label: `Historico (${recentThirtyDaysCount}/${recentNinetyDaysCount})` },
             { key: "archived" as const, label: `Arquivados (${dashboard.archivedRequests.length})` }
           ].map((item) => (
             <button
@@ -1294,6 +1339,54 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
             </button>
           ))}
         </div>
+
+        {requestView !== "active" ? (
+          <div className="mt-3 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: "30" as const, label: "Ultimos 30 dias" },
+                { key: "90" as const, label: "Ultimos 3 meses" },
+                { key: "custom" as const, label: "Escolher periodo" }
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setHistoryRange(item.key)}
+                  className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition ${
+                    historyRange === item.key
+                      ? "border-slate-950 bg-slate-950 text-white"
+                      : "border-slate-300 bg-white text-slate-800 hover:border-slate-500"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {historyRange === "custom" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1 text-sm font-medium text-slate-700">
+                  Inicio
+                  <input
+                    type="date"
+                    value={historyStartDate}
+                    onChange={(event) => setHistoryStartDate(event.target.value)}
+                    className={fieldClass}
+                  />
+                </label>
+                <label className="grid gap-1 text-sm font-medium text-slate-700">
+                  Fim
+                  <input
+                    type="date"
+                    value={historyEndDate}
+                    onChange={(event) => setHistoryEndDate(event.target.value)}
+                    className={fieldClass}
+                  />
+                </label>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-5 grid gap-3">
           {actionError ? <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{actionError}</div> : null}
