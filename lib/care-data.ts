@@ -23,7 +23,7 @@ import {
   notifyProfessionalDocumentReview,
   notifyProfessionalVerificationReview
 } from "@/lib/care-in-app-notifications";
-import { parseBrasiliaDateTime } from "@/lib/date-time";
+import { BRAZIL_TIME_ZONE, parseBrasiliaDateTime } from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
 import {
@@ -383,6 +383,173 @@ function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+function slotEndToMinutes(value: string) {
+  return value === "23:59" ? 24 * 60 : timeToMinutes(value);
+}
+
+function minutesToTime(value: number) {
+  const normalized = Math.max(0, Math.min(23 * 60 + 59, value));
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function getBrasiliaDateKey(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BRAZIL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function getBrasiliaMinutes(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BRAZIL_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const hours = Number(byType.hour === "24" ? "0" : byType.hour);
+  return hours * 60 + Number(byType.minute || 0);
+}
+
+function getWeekdayFromBrasiliaDateKey(dateKey: string) {
+  return new Date(`${dateKey}T12:00:00-03:00`).getUTCDay();
+}
+
+function dateFromBrasiliaDateAndMinutes(dateKey: string, minutes: number) {
+  return new Date(`${dateKey}T${minutesToTime(minutes)}:00-03:00`);
+}
+
+function requestEnd(start: Date, durationHours: number | Prisma.Decimal) {
+  return new Date(start.getTime() + Number(durationHours) * 60 * 60 * 1000);
+}
+
+function rangesOverlap(startA: Date, endA: Date, startB: Date, endB: Date) {
+  return startA < endB && endA > startB;
+}
+
+async function getActiveRequestsForProfessionalDay(professionalId: string, dateKey: string) {
+  const dayStart = new Date(`${dateKey}T00:00:00-03:00`);
+  const nextDayStart = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+  return prisma.careRequest.findMany({
+    where: {
+      professionalId,
+      scheduledFor: {
+        gte: dayStart,
+        lt: nextDayStart
+      },
+      status: { in: [CareRequestStatus.ENVIADO, CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO] }
+    },
+    select: {
+      id: true,
+      scheduledFor: true,
+      durationHours: true
+    },
+    orderBy: { scheduledFor: "asc" }
+  });
+}
+
+function isCoveredByAvailability(
+  availability: Array<{ weekday: number; startTime: string; endTime: string }>,
+  start: Date,
+  durationHours: number
+) {
+  const dateKey = getBrasiliaDateKey(start);
+  const weekday = getWeekdayFromBrasiliaDateKey(dateKey);
+  const startMinutes = getBrasiliaMinutes(start);
+  const endMinutes = startMinutes + durationHours * 60;
+
+  return availability.some((slot) => {
+    return slot.weekday === weekday && startMinutes >= timeToMinutes(slot.startTime) && endMinutes <= slotEndToMinutes(slot.endTime);
+  });
+}
+
+export async function getAvailableCareRequestSlots(professionalId: string, dateKey: string, durationHours = 2) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || durationHours < 0.5 || durationHours > 24) {
+    return [];
+  }
+
+  const professional = await prisma.professionalProfile.findUnique({
+    where: { id: professionalId },
+    include: {
+      availability: { orderBy: [{ weekday: "asc" }, { startTime: "asc" }] }
+    }
+  });
+
+  if (!professional || !professional.isActive) return [];
+
+  const weekday = getWeekdayFromBrasiliaDateKey(dateKey);
+  const daySlots = professional.availability.filter((slot) => slot.weekday === weekday);
+  if (daySlots.length === 0) return [];
+
+  const busyRequests = await getActiveRequestsForProfessionalDay(professionalId, dateKey);
+  const busyRanges = busyRequests
+    .filter((request) => request.scheduledFor)
+    .map((request) => ({
+      start: request.scheduledFor!,
+      end: requestEnd(request.scheduledFor!, request.durationHours)
+    }));
+  const now = new Date();
+  const durationMinutes = Math.round(durationHours * 60);
+
+  const availableTimes: string[] = [];
+  for (const slot of daySlots) {
+    const slotStart = timeToMinutes(slot.startTime);
+    const slotEnd = slotEndToMinutes(slot.endTime);
+
+    for (let minutes = slotStart; minutes + durationMinutes <= slotEnd; minutes += 30) {
+      const candidateStart = dateFromBrasiliaDateAndMinutes(dateKey, minutes);
+      if (candidateStart <= now) continue;
+
+      const candidateEnd = requestEnd(candidateStart, durationHours);
+      const overlaps = busyRanges.some((range) => rangesOverlap(candidateStart, candidateEnd, range.start, range.end));
+      if (!overlaps) availableTimes.push(minutesToTime(minutes));
+    }
+  }
+
+  return [...new Set(availableTimes)];
+}
+
+async function validateCareRequestSchedule(professionalId: string, scheduledFor: Date | null, durationHours: number) {
+  if (!scheduledFor) return { ok: false as const, error: "Informe data e horario do atendimento." };
+  if (scheduledFor <= new Date()) return { ok: false as const, error: "Escolha um horario futuro." };
+
+  const professional = await prisma.professionalProfile.findUnique({
+    where: { id: professionalId },
+    include: { availability: true }
+  });
+
+  if (!professional || !professional.isActive) return { ok: false as const, error: "Profissional indisponivel no momento." };
+
+  if (!isCoveredByAvailability(professional.availability, scheduledFor, durationHours)) {
+    return {
+      ok: false as const,
+      error: "Esse horario nao esta dentro da agenda cadastrada pelo profissional. Escolha outro horario disponivel."
+    };
+  }
+
+  const dateKey = getBrasiliaDateKey(scheduledFor);
+  const requestStart = scheduledFor;
+  const requestEndDate = requestEnd(requestStart, durationHours);
+  const busyRequests = await getActiveRequestsForProfessionalDay(professionalId, dateKey);
+  const hasConflict = busyRequests.some((request) => {
+    if (!request.scheduledFor) return false;
+    return rangesOverlap(requestStart, requestEndDate, request.scheduledFor, requestEnd(request.scheduledFor, request.durationHours));
+  });
+
+  if (hasConflict) {
+    return { ok: false as const, error: "Esse horario acabou de ficar ocupado. Escolha outro horario disponivel." };
+  }
+
+  return { ok: true as const };
+}
+
 function slotMatchesAvailability(slot: { weekday: number; startTime: string; endTime: string }, filter: AvailabilityFilter) {
   if (filter === "qualquer") return true;
 
@@ -390,7 +557,7 @@ function slotMatchesAvailability(slot: { weekday: number; startTime: string; end
   const weekday = now.getDay();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const start = timeToMinutes(slot.startTime);
-  const end = timeToMinutes(slot.endTime);
+  const end = slotEndToMinutes(slot.endTime);
 
   if (filter === "fim-de-semana") return slot.weekday === 0 || slot.weekday === 6;
   if (filter === "hoje") return slot.weekday === weekday;
@@ -520,6 +687,8 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
   let patientProfileId: string | undefined;
   let requesterName = input.requesterName;
   let requesterEmail = input.requesterEmail;
+  const durationHours = input.durationHours ?? 2;
+  const scheduledFor = input.scheduledFor ? parseBrasiliaDateTime(input.scheduledFor) : null;
 
   if (userId) {
     const user = await prisma.user.findUnique({
@@ -534,6 +703,11 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
     }
   }
 
+  const scheduleValidation = await validateCareRequestSchedule(input.professionalId, scheduledFor, durationHours);
+  if (!scheduleValidation.ok) {
+    return { ok: false as const, status: 409, error: scheduleValidation.error };
+  }
+
   const request = await prisma.careRequest.create({
     data: {
       patientProfileId,
@@ -544,8 +718,8 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       service: input.service,
       supportNeed: input.supportNeed,
       preferredGender: input.preferredGender,
-      scheduledFor: input.scheduledFor ? parseBrasiliaDateTime(input.scheduledFor) : null,
-      durationHours: input.durationHours ?? 2,
+      scheduledFor,
+      durationHours,
       addressLine: input.addressLine,
       addressNumber: input.addressNumber,
       addressComplement: input.addressComplement,
@@ -577,7 +751,7 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
     console.error("Nao foi possivel enviar notificacao do novo atendimento.", error);
   }
 
-  return request;
+  return { ok: true as const, request };
 }
 
 function toRequestRecord(

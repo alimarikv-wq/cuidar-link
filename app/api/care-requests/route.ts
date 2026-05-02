@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
 
   try {
-    const requestRecord = await createCareRequest(
+    const result = await createCareRequest(
       {
         ...parsed.data,
         requesterEmail: parsed.data.requesterEmail || undefined,
@@ -62,6 +62,12 @@ export async function POST(request: NextRequest) {
       },
       session?.userId
     );
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    const requestRecord = result.request;
 
     return NextResponse.json({
       success: true,

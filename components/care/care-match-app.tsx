@@ -38,6 +38,7 @@ import {
 type ProfessionalTypeFilter = "TODOS" | ProfessionalTypeCode;
 type LocationStatus = "idle" | "locating" | "ready" | "denied" | "unsupported" | "error";
 type AgeRangeFilter = "QUALQUER" | "20-30" | "30-40" | "40-50" | "50-60";
+type DurationMode = "preset" | "custom";
 
 const serviceOptions: Array<{ id: CareServiceCode; label: string; icon: typeof HeartHandshake }> = [
   { id: "BANHO", label: "Banho", icon: HeartHandshake },
@@ -151,12 +152,6 @@ function splitScheduledFor(value: string) {
   };
 }
 
-function formatTimeInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-}
-
 function completeTimeInput(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 4);
   if (!digits) return "";
@@ -207,6 +202,14 @@ function ageRangeBounds(value: AgeRangeFilter) {
 
 function durationOptionsFor(service: CareServiceCode) {
   return service === "FISIOTERAPIA" ? therapyDurationOptions : careDurationOptions;
+}
+
+function formatDurationLabel(durationHours: number) {
+  if (durationHours < 1) return `${Math.round(durationHours * 60)} minutos`;
+  if (Number.isInteger(durationHours)) return durationHours === 1 ? "1 hora" : `${durationHours} horas`;
+  const hours = Math.floor(durationHours);
+  const minutes = Math.round((durationHours - hours) * 60);
+  return `${hours}h${String(minutes).padStart(2, "0")}`;
 }
 
 function escapeHtml(value: string) {
@@ -292,6 +295,11 @@ export function CareMatchApp() {
   const [stateCode, setStateCode] = useState("RS");
   const [scheduledFor, setScheduledFor] = useState(getDefaultScheduledFor);
   const [durationHours, setDurationHours] = useState(2);
+  const [durationMode, setDurationMode] = useState<DurationMode>("preset");
+  const [customDurationDetails, setCustomDurationDetails] = useState("");
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
   const [customServiceDetails, setCustomServiceDetails] = useState("");
   const [notes, setNotes] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
@@ -443,27 +451,67 @@ export function CareMatchApp() {
     requesterEmail: requestAttempted && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail.trim()),
     requesterPhone: requestAttempted && requesterPhone.replace(/\D/g, "").length < 10,
     scheduledDate: requestAttempted && !scheduledParts.date,
-    scheduledTime: requestAttempted && !isValidTimeInput(completedScheduledTime),
+    scheduledTime:
+      requestAttempted &&
+      (!isValidTimeInput(completedScheduledTime) || (!availabilityLoading && availableTimes.length > 0 && !availableTimes.includes(completedScheduledTime))),
     postalCode: requestAttempted && !postalCode.trim(),
     addressLine: requestAttempted && !addressLine.trim(),
     addressNumber: requestAttempted && !addressNumber.trim(),
     neighborhood: requestAttempted && !neighborhood.trim(),
     city: requestAttempted && !city.trim(),
     state: requestAttempted && !stateCode.trim(),
+    customDurationDetails: requestAttempted && durationMode === "custom" && customDurationDetails.trim().length < 3,
     customServiceDetails: requestAttempted && service === "OUTRO" && customServiceDetails.trim().length < 3
   };
 
+  useEffect(() => {
+    if (!detailOpen || !selected || !scheduledParts.date) {
+      queueMicrotask(() => {
+        setAvailableTimes([]);
+        setAvailabilityError("");
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      setAvailabilityLoading(true);
+      setAvailabilityError("");
+    });
+
+    fetch(`/api/professionals/${selected.id}/availability?date=${scheduledParts.date}&durationHours=${durationHours}`, {
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        const data = (await response.json()) as { slots?: string[]; error?: string };
+        if (!response.ok) throw new Error(data.error || "Nao foi possivel carregar horarios.");
+
+        const slots = data.slots || [];
+        setAvailableTimes(slots);
+        if (slots.length === 0) {
+          setAvailabilityError("Esse profissional nao tem horario livre nessa data para a duracao escolhida.");
+          return;
+        }
+
+        setScheduledFor((current) => {
+          const currentTime = completeTimeInput(splitScheduledFor(current).time);
+          return slots.includes(currentTime) ? current : `${scheduledParts.date}T${slots[0]}`;
+        });
+      })
+      .catch((error: Error) => {
+        if (controller.signal.aborted) return;
+        setAvailableTimes([]);
+        setAvailabilityError(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setAvailabilityLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [detailOpen, durationHours, scheduledParts.date, selected]);
+
   function updateScheduledDate(date: string) {
     setScheduledFor(`${date}T${scheduledParts.time}`);
-  }
-
-  function updateScheduledTime(time: string) {
-    setScheduledFor(`${scheduledParts.date}T${formatTimeInput(time)}`);
-  }
-
-  function finishScheduledTime() {
-    const completed = completeTimeInput(scheduledParts.time);
-    setScheduledFor(`${scheduledParts.date}T${completed || "14:30"}`);
   }
 
   function selectService(nextService: CareServiceCode) {
@@ -526,12 +574,16 @@ export function CareMatchApp() {
       requesterPhone.replace(/\D/g, "").length < 10 ? "telefone com DDD" : "",
       !scheduledParts.date ? "data" : "",
       !isValidTimeInput(completedScheduledTime) ? "horario" : "",
+      availabilityLoading ? "aguardar horarios disponiveis" : "",
+      !availabilityLoading && availableTimes.length === 0 ? "horario disponivel na agenda do profissional" : "",
+      !availabilityLoading && availableTimes.length > 0 && !availableTimes.includes(completedScheduledTime) ? "horario disponivel na agenda do profissional" : "",
       !postalCode.trim() ? "CEP" : "",
       !addressLine.trim() ? "endereco" : "",
       !addressNumber.trim() ? "numero" : "",
       !neighborhood.trim() ? "bairro" : "",
       !city.trim() ? "cidade" : "",
       !stateCode.trim() ? "UF" : "",
+      durationMode === "custom" && customDurationDetails.trim().length < 3 ? "detalhe da duracao personalizada" : "",
       service === "OUTRO" && customServiceDetails.trim().length < 3 ? "descricao do outro atendimento" : ""
     ].filter(Boolean);
 
@@ -685,6 +737,9 @@ export function CareMatchApp() {
     setRequestWarning("");
     const safeScheduledFor = `${scheduledParts.date}T${completedScheduledTime}`;
     const requestNotes = [
+      durationMode === "custom"
+        ? `Duracao personalizada: reservar ${formatDurationLabel(durationHours)} na agenda. ${customDurationDetails.trim()}`
+        : "",
       service === "OUTRO" ? `Outro atendimento: ${customServiceDetails.trim()}` : "",
       notes.trim()
     ]
@@ -1202,24 +1257,45 @@ export function CareMatchApp() {
                       </label>
                       <label className="grid gap-1 text-sm font-semibold text-slate-700">
                         <span>Horario de Brasilia {requiredMark()}</span>
-                        <input
+                        <select
                           required
-                          inputMode="numeric"
-                          placeholder="14:30"
-                          maxLength={5}
+                          disabled={availabilityLoading || availableTimes.length === 0}
                           value={scheduledParts.time}
-                          onChange={(event) => updateScheduledTime(event.target.value)}
-                          onBlur={finishScheduledTime}
+                          onChange={(event) => setScheduledFor(`${scheduledParts.date}T${event.target.value}`)}
                           aria-invalid={requestFieldErrors.scheduledTime ? "true" : undefined}
                           className={requestInputClass(requestFieldErrors.scheduledTime)}
-                        />
+                        >
+                          {availabilityLoading ? <option value={scheduledParts.time}>Carregando...</option> : null}
+                          {!availabilityLoading && availableTimes.length === 0 ? <option value={scheduledParts.time}>Sem horario livre</option> : null}
+                          {!availabilityLoading
+                            ? availableTimes.map((time) => (
+                                <option key={time} value={time}>
+                                  {time}
+                                </option>
+                              ))
+                            : null}
+                        </select>
                       </label>
                     </div>
+                    {availabilityError ? (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                        {availabilityError}
+                      </div>
+                    ) : null}
                     <label className="grid gap-1 text-sm font-semibold text-slate-700">
                       Duracao do atendimento
                       <select
-                        value={String(durationHours)}
-                        onChange={(event) => setDurationHours(Number(event.target.value))}
+                        value={durationMode === "custom" ? "OUTRO" : String(durationHours)}
+                        onChange={(event) => {
+                          if (event.target.value === "OUTRO") {
+                            setDurationMode("custom");
+                            return;
+                          }
+
+                          setDurationMode("preset");
+                          setDurationHours(Number(event.target.value));
+                          setCustomDurationDetails("");
+                        }}
                         className={requestInputClass(false)}
                       >
                         {visibleDurationOptions.map((option) => (
@@ -1227,8 +1303,35 @@ export function CareMatchApp() {
                             {option.label}
                           </option>
                         ))}
+                        <option value="OUTRO">Outra duracao</option>
                       </select>
                     </label>
+                    {durationMode === "custom" ? (
+                      <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[160px_1fr]">
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                          Horas na agenda
+                          <input
+                            type="number"
+                            min="0.5"
+                            max="24"
+                            step="0.5"
+                            value={durationHours}
+                            onChange={(event) => setDurationHours(Math.min(24, Math.max(0.5, Number(event.target.value) || 2)))}
+                            className={requestInputClass(false)}
+                          />
+                        </label>
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                          <span>Detalhe da duracao {requiredMark()}</span>
+                          <input
+                            value={customDurationDetails}
+                            onChange={(event) => setCustomDurationDetails(event.target.value)}
+                            placeholder="Ex.: 3 horas, pernoite, plantao especial..."
+                            aria-invalid={requestFieldErrors.customDurationDetails ? "true" : undefined}
+                            className={requestInputClass(requestFieldErrors.customDurationDetails)}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
                     {service === "OUTRO" ? (
                       <label className="grid gap-1 text-sm font-semibold text-slate-700">
                         <span>Descricao do atendimento {requiredMark()}</span>
@@ -1307,7 +1410,7 @@ export function CareMatchApp() {
                   <Button
                     type="button"
                     onClick={submitRequest}
-                    disabled={requestPending || requestSent}
+                    disabled={requestPending || requestSent || availabilityLoading || availableTimes.length === 0}
                     className={
                       requestSent
                         ? "h-12 gap-2 bg-emerald-50 text-emerald-800 shadow-none ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:opacity-100"
