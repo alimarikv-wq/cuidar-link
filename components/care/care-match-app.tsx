@@ -1211,9 +1211,10 @@ export function CareMatchApp() {
                           <Heart aria-hidden="true" className={`h-4 w-4 ${favoriteIds.has(professional.id) ? "fill-current" : ""}`} />
                         </button>
                         <div className="md:text-right">
-                          <p className="text-sm text-slate-500">Valores</p>
-                          <p className="text-2xl font-semibold text-slate-950">{professional.priceLabel}</p>
-                          <p className="mt-1 text-sm text-slate-500">responde em {professional.responseTimeLabel}</p>
+                          <p className="text-sm text-slate-500">Pagamento</p>
+                          <p className="text-lg font-semibold text-slate-950">{professional.priceLabel}</p>
+                          <p className="mt-1 text-sm text-slate-500">combine antes do atendimento</p>
+                          <p className="text-sm text-slate-500">responde em {professional.responseTimeLabel}</p>
                         </div>
                       </div>
                       <div className="flex gap-2 md:flex-col">

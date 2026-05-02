@@ -152,6 +152,10 @@ export default function SecurityPage() {
               combinados diretamente entre paciente e profissional.
             </p>
             <p>
+              Para evitar disputa por preco, a busca publica mostra o atendimento como sob consulta. O valor exato deve ser alinhado antes da
+              confirmacao, considerando duracao, deslocamento, complexidade, viagem e necessidade de apoio fisico.
+            </p>
+            <p>
               Para evitar confusao, confirme o valor antes do atendimento e registre no pedido qualquer detalhe importante. Em atendimentos
               longos ou recorrentes, combine tambem intervalo, alimentacao, pernoite e cancelamento.
             </p>

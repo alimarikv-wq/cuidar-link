@@ -407,7 +407,11 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700">Perfil profissional</p>
-          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Servicos, agenda e valores</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Servicos, agenda e valores internos</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            Os valores abaixo ajudam na sua organizacao, mas nao aparecem como preco publico na busca. Para pacientes, o atendimento fica
+            como sob consulta e deve ser combinado antes da confirmacao.
+          </p>
         </div>
         <button
           type="button"
@@ -444,7 +448,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
             onChange={updateAddress}
           />
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Valor por hora
+            Valor de referencia por hora
             <input
               type="number"
               min={1}
@@ -454,7 +458,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Valor por sessao
+            Valor de referencia por sessao
             <input
               type="number"
               min={1}
@@ -1075,7 +1079,7 @@ function PatientFavoritesPanel({
                   <MapPin aria-hidden="true" className="h-4 w-4 text-emerald-700" />
                   {professional.neighborhood}, {professional.city}
                 </span>
-                <span>{professional.priceLabel}</span>
+                <span>Pagamento: {professional.priceLabel}</span>
                 <span>{professional.availableIn}</span>
                 <span className="inline-flex items-center gap-1">
                   <Star aria-hidden="true" className="h-4 w-4 text-amber-500" />
