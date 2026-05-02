@@ -213,6 +213,12 @@ function formatDurationLabel(durationHours: number) {
   return `${hours}h${String(minutes).padStart(2, "0")}`;
 }
 
+function formatDateLabel(value: string) {
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value || "Nao informado";
+  return `${day}/${month}/${year}`;
+}
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => {
     const entities: Record<string, string> = {
@@ -284,6 +290,7 @@ export function CareMatchApp() {
   const [requestError, setRequestError] = useState("");
   const [requestWarning, setRequestWarning] = useState("");
   const [requestPending, setRequestPending] = useState(false);
+  const [requestReviewOpen, setRequestReviewOpen] = useState(false);
   const [requestAttempted, setRequestAttempted] = useState(false);
   const [requesterName, setRequesterName] = useState("");
   const [requesterEmail, setRequesterEmail] = useState("");
@@ -451,6 +458,23 @@ export function CareMatchApp() {
   }, [results, selectedId]);
   const scheduledParts = splitScheduledFor(scheduledFor);
   const availableDurationOptions = durationOptionsFor(service);
+  const currentServiceLabel = serviceOptions.find((option) => option.id === service)?.label || "Atendimento";
+  const currentSupportLabel = supportOptions.find((option) => option.value === supportNeed)?.label || "Nao informado";
+  const currentGenderLabel = genderOptions.find((option) => option.value === genderPreference)?.label || "Nao informado";
+  const requestAddressSummary =
+    [
+      [addressLine, addressNumber].filter(Boolean).join(", "),
+      addressComplement,
+      neighborhood,
+      city,
+      stateCode
+    ]
+      .filter(Boolean)
+      .join(" - ") || "Endereco nao informado";
+  const requestDurationSummary =
+    durationMode === "custom"
+      ? `${formatDurationLabel(durationHours)} - ${customDurationDetails.trim() || "detalhe pendente"}`
+      : formatDurationLabel(durationHours);
   const visibleDurationOptions = availableDurationOptions.some((option) => option.value === durationHours)
     ? availableDurationOptions
     : [...availableDurationOptions, { value: durationHours, label: `${durationHours} horas` }].sort((a, b) => a.value - b.value);
@@ -526,6 +550,7 @@ export function CareMatchApp() {
 
   function selectService(nextService: CareServiceCode) {
     setService(nextService);
+    setRequestReviewOpen(false);
     const nextOptions = durationOptionsFor(nextService);
     if (!nextOptions.some((option) => option.value === durationHours)) {
       setDurationHours(nextOptions[0].value);
@@ -539,12 +564,14 @@ export function CareMatchApp() {
     setRequestSent(false);
     setRequestError("");
     setRequestWarning("");
+    setRequestReviewOpen(false);
   }
 
   function closeDetails() {
     setDetailOpen(false);
     setRequestAttempted(false);
     setRequestError("");
+    setRequestReviewOpen(false);
   }
 
   async function toggleFavorite(professionalId: string) {
@@ -601,6 +628,22 @@ export function CareMatchApp() {
     ].filter(Boolean);
 
     return formatValidationMessage(missingFields);
+  }
+
+  function openRequestReview() {
+    if (!selected || requestPending || requestSent) return;
+    setRequestAttempted(true);
+    setRequestReviewOpen(false);
+    const validationError = validateRequestForm();
+
+    if (validationError) {
+      setRequestError(validationError);
+      return;
+    }
+
+    setRequestError("");
+    setRequestWarning("");
+    setRequestReviewOpen(true);
   }
 
   function useCurrentLocation() {
@@ -810,6 +853,7 @@ export function CareMatchApp() {
 
     setRequestWarning(data.warning || "");
     setRequestSent(true);
+    setRequestReviewOpen(false);
   }
 
   function updateRequestAddress(nextAddress: CepAddressValue) {
@@ -1544,9 +1588,71 @@ export function CareMatchApp() {
                       </span>
                     </div>
                   ) : null}
+                  {requestReviewOpen && !requestSent ? (
+                    <div className="max-h-[42vh] overflow-y-auto rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950 sm:col-span-2">
+                      <div className="flex items-start gap-2">
+                        <ClipboardCheck aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+                        <div>
+                          <p className="font-semibold text-slate-950">Revise antes de enviar</p>
+                          <p className="mt-1 leading-6">
+                            Confira os dados principais. Depois de confirmar, o pedido fica pendente ate o profissional aceitar ou agendar.
+                          </p>
+                        </div>
+                      </div>
+                      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg bg-white/70 p-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Profissional</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">{selected.name} - {selected.roleLabel}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white/70 p-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Cuidado</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">{currentServiceLabel} - {currentSupportLabel}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white/70 p-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Data e horario</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">{formatDateLabel(scheduledParts.date)} as {completedScheduledTime}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white/70 p-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Duracao</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">{requestDurationSummary}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white/70 p-2 sm:col-span-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Paciente e contato</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">
+                            {requesterName.trim()} - {requesterPhone.trim()} - {requesterEmail.trim()}
+                          </dd>
+                        </div>
+                        <div className="rounded-lg bg-white/70 p-2 sm:col-span-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Endereco</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">{requestAddressSummary}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white/70 p-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Preferencia no cuidado</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">{currentGenderLabel}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white/70 p-2">
+                          <dt className="text-xs font-semibold uppercase text-emerald-700">Pagamento</dt>
+                          <dd className="mt-1 font-semibold text-slate-950">Combinado diretamente com o profissional</dd>
+                        </div>
+                      </dl>
+                      {travelRequested ? (
+                        <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 p-2 text-sky-950">
+                          <p className="inline-flex items-center gap-2 font-semibold">
+                            <Plane aria-hidden="true" className="h-4 w-4" />
+                            Viagem: {travelDestination.trim()}
+                          </p>
+                          <p className="mt-1">
+                            {isInternationalTravel ? "Viagem internacional" : "Viagem nacional/local"}
+                            {needsUsVisa ? " - precisa de visto EUA" : ""}
+                          </p>
+                          {travelNotes.trim() ? <p className="mt-1">{travelNotes.trim()}</p> : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <Button
                     type="button"
-                    onClick={submitRequest}
+                    onClick={requestReviewOpen ? submitRequest : openRequestReview}
                     disabled={requestPending || requestSent || availabilityLoading || availableTimes.length === 0}
                     className={
                       requestSent
@@ -1555,11 +1661,16 @@ export function CareMatchApp() {
                     }
                   >
                     <CalendarClock aria-hidden="true" className="h-4 w-4" />
-                    {requestSent ? "Pedido enviado" : requestPending ? "Enviando..." : "Solicitar atendimento"}
+                    {requestSent ? "Pedido enviado" : requestPending ? "Enviando..." : requestReviewOpen ? "Confirmar e enviar" : "Revisar pedido"}
                   </Button>
-                  <Button type="button" variant="secondary" onClick={requestSent ? closeDetails : undefined} className="h-12 gap-2">
-                    {requestSent ? <X aria-hidden="true" className="h-4 w-4" /> : <Phone aria-hidden="true" className="h-4 w-4" />}
-                    {requestSent ? "Fechar" : "Ligar para triagem"}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={requestSent ? closeDetails : requestReviewOpen ? () => setRequestReviewOpen(false) : undefined}
+                    className="h-12 gap-2"
+                  >
+                    {requestSent || requestReviewOpen ? <X aria-hidden="true" className="h-4 w-4" /> : <Phone aria-hidden="true" className="h-4 w-4" />}
+                    {requestSent ? "Fechar" : requestReviewOpen ? "Editar dados" : "Ligar para triagem"}
                   </Button>
                 </div>
               </div>
