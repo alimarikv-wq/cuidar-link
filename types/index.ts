@@ -149,6 +149,7 @@ export type CareRequestRecord = {
   id: string;
   status: string;
   statusLabel: string;
+  archivedAt: string | null;
   serviceLabel: string;
   durationHours: number;
   scheduledFor: string | null;
@@ -314,12 +315,15 @@ export type CareDashboardData = {
     unreadNotifications: number;
   };
   requests: CareRequestRecord[];
+  recentRequests: CareRequestRecord[];
+  archivedRequests: CareRequestRecord[];
   favoriteProfessionals: DashboardFavoriteProfessional[];
   notifications: CareNotificationData[];
   professionalSettings: ProfessionalSettingsData | null;
   profile: {
     name: string;
     email: string;
+    photoUrl: string | null;
     neighborhood: string | null;
     transferNeedLabel: string | null;
     professionalTypeLabel: string | null;

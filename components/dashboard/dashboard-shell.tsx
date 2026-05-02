@@ -7,6 +7,7 @@ import {
   Archive,
   Bell,
   CalendarCheck,
+  Camera,
   Check,
   CheckCheck,
   ClipboardList,
@@ -17,6 +18,7 @@ import {
   Save,
   ShieldCheck,
   Star,
+  Upload,
   UserRoundCheck,
   X
 } from "lucide-react";
@@ -39,6 +41,7 @@ type StatusAction = {
   status: RequestStatus;
   variant: "primary" | "secondary" | "danger";
 };
+type RequestView = "active" | "recent" | "archived";
 
 const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
   { value: "BANHO", label: "Banho" },
@@ -187,6 +190,94 @@ function getRequestActions(status: string, accountType: string): StatusAction[] 
   }
 
   return [];
+}
+
+function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState(dashboard.profile.photoUrl || "");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  function handleFileChange(nextFile: File | null) {
+    setFile(nextFile);
+    setMessage("");
+    setError("");
+    if (nextFile) setPreviewUrl(URL.createObjectURL(nextFile));
+  }
+
+  function submitPhoto() {
+    if (!file) {
+      setError("Escolha uma foto para enviar.");
+      return;
+    }
+
+    setMessage("");
+    setError("");
+
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/profile-photo", {
+        method: "POST",
+        body: formData
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel enviar a foto.");
+        return;
+      }
+
+      setPreviewUrl(data.photoUrl);
+      setFile(null);
+      setMessage("Foto atualizada.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid gap-4 md:grid-cols-[96px_1fr_auto] md:items-center">
+        <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-400">
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewUrl} alt={dashboard.profile.name} className="h-full w-full object-cover" />
+          ) : (
+            <Camera aria-hidden="true" className="h-8 w-8" />
+          )}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Foto do perfil</p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-950">Aumente a confianca no atendimento</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Envie uma foto clara. Profissionais aparecem com essa imagem na busca; pacientes usam no proprio painel.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => handleFileChange(event.target.files?.[0] || null)}
+              className="max-w-full text-sm text-slate-600 file:mr-3 file:h-10 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold file:text-slate-800"
+            />
+          </div>
+          {message ? <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
+          {error ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+        </div>
+        <button
+          type="button"
+          onClick={submitPhoto}
+          disabled={isPending || !file}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Upload aria-hidden="true" className="h-4 w-4" />
+          {isPending ? "Enviando..." : "Salvar foto"}
+        </button>
+      </div>
+    </article>
+  );
 }
 
 function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsData }) {
@@ -930,7 +1021,20 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
   const [removingFavoriteId, setRemovingFavoriteId] = useState("");
   const [notificationError, setNotificationError] = useState("");
   const [readingNotificationId, setReadingNotificationId] = useState("");
+  const [requestView, setRequestView] = useState<RequestView>("active");
   const isProfessional = dashboard.summary.accountType === "PROFESSIONAL";
+  const visibleRequests =
+    requestView === "active" ? dashboard.requests : requestView === "recent" ? dashboard.recentRequests : dashboard.archivedRequests;
+  const requestViewTitle =
+    requestView === "active" ? (isProfessional ? "Solicitacoes recebidas" : "Pedidos em andamento") : requestView === "recent" ? "Historico recente" : "Atendimentos arquivados";
+  const requestViewEmpty =
+    requestView === "active"
+      ? isProfessional
+        ? "Nenhuma solicitacao ativa agora. Quando um atendimento for pedido, ele aparece aqui."
+        : "Nenhum pedido em andamento agora. Quando voce solicitar atendimento, o status aparece aqui."
+      : requestView === "recent"
+        ? "Nenhum atendimento concluido ou cancelado nos ultimos 30 dias."
+        : "Nenhum atendimento arquivado ainda.";
   const summaryCards = [
     { label: "Perfil", value: dashboard.summary.accountTypeLabel, icon: UserRoundCheck },
     { label: isProfessional ? "Solicitacoes" : "Pedidos", value: String(dashboard.summary.requests), icon: ClipboardList },
@@ -961,6 +1065,29 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
 
       if (!response.ok) {
         setActionError(data.error || "Nao foi possivel atualizar a solicitacao.");
+        setUpdatingId("");
+        return;
+      }
+
+      router.refresh();
+      setUpdatingId("");
+    });
+  }
+
+  function archiveRequest(requestId: string) {
+    setActionError("");
+    setUpdatingId(requestId);
+
+    startTransition(async () => {
+      const response = await fetch(`/api/care-requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive: true })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setActionError(data.error || "Nao foi possivel arquivar o atendimento.");
         setUpdatingId("");
         return;
       }
@@ -1113,6 +1240,8 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         })}
       </div>
 
+      <ProfilePhotoForm dashboard={dashboard} />
+
       <NotificationsPanel
         dashboard={dashboard}
         pendingId={readingNotificationId}
@@ -1140,25 +1269,42 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-emerald-700">Atendimentos</p>
-            <h2 className="mt-1 text-2xl font-semibold text-slate-950">
-              {isProfessional ? "Solicitacoes recebidas" : "Pedidos enviados"}
-            </h2>
+            <h2 className="mt-1 text-2xl font-semibold text-slate-950">{requestViewTitle}</h2>
           </div>
-          <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{dashboard.requests.length}</span>
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{visibleRequests.length}</span>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            { key: "active" as const, label: `Ativos (${dashboard.requests.length})` },
+            { key: "recent" as const, label: `Ultimos 30 dias (${dashboard.recentRequests.length})` },
+            { key: "archived" as const, label: `Arquivados (${dashboard.archivedRequests.length})` }
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setRequestView(item.key)}
+              className={`inline-flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition ${
+                requestView === item.key
+                  ? "border-emerald-700 bg-emerald-700 text-white"
+                  : "border-slate-300 bg-white text-slate-800 hover:border-emerald-500"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
         <div className="mt-5 grid gap-3">
           {actionError ? <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{actionError}</div> : null}
 
-          {dashboard.requests.length === 0 ? (
+          {visibleRequests.length === 0 ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              {isProfessional
-                ? "Nenhuma solicitacao ainda. Quando um atendimento for pedido, ele aparece aqui."
-                : "Nenhum pedido enviado ainda. Quando voce solicitar atendimento, o status aparece aqui."}
+              {requestViewEmpty}
             </div>
           ) : null}
 
-          {dashboard.requests.map((request) => (
+          {visibleRequests.map((request) => (
             <div key={request.id} className="grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-[1fr_auto]">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1190,6 +1336,17 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 >
                   Ver detalhes
                 </Link>
+                {!request.archivedAt && ["CONCLUIDO", "CANCELADO"].includes(request.status) ? (
+                  <button
+                    type="button"
+                    onClick={() => archiveRequest(request.id)}
+                    disabled={isPending && updatingId === request.id}
+                    className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60 md:justify-self-end"
+                  >
+                    <Archive aria-hidden="true" className="h-3.5 w-3.5" />
+                    {isPending && updatingId === request.id ? "Arquivando..." : "Arquivar"}
+                  </button>
+                ) : null}
                 {getRequestActions(request.status, dashboard.summary.accountType).length > 0 ? (
                   <div className="flex flex-wrap gap-2 md:justify-end">
                     {getRequestActions(request.status, dashboard.summary.accountType).map((action) => (

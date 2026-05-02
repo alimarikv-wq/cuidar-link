@@ -580,11 +580,15 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
   return request;
 }
 
-function toRequestRecord(request: Prisma.CareRequestGetPayload<{ include: { professional: { include: { user: true } } } }>): CareRequestRecord {
+function toRequestRecord(
+  request: Prisma.CareRequestGetPayload<{ include: { professional: { include: { user: true } } } }>,
+  archivedAt: Date | null = null
+): CareRequestRecord {
   return {
     id: request.id,
     status: request.status,
     statusLabel: statusLabel[request.status],
+    archivedAt: archivedAt ? archivedAt.toISOString() : null,
     serviceLabel: serviceLabel[request.service],
     durationHours: Number(request.durationHours),
     scheduledFor: request.scheduledFor ? request.scheduledFor.toISOString() : null,
@@ -621,8 +625,10 @@ function toRequestDetailsData(
   }>,
   viewer: CareRequestDetailsData["viewer"]
 ): CareRequestDetailsData {
+  const archivedAt = viewer.canActAsProfessional ? request.professionalArchivedAt : request.patientArchivedAt;
+
   return {
-    ...toRequestRecord(request),
+    ...toRequestRecord(request, archivedAt),
     requesterEmail: request.requesterEmail,
     supportNeedLabel: supportLabel[request.supportNeed],
     preferredGenderLabel: genderPreferenceLabel[request.preferredGender],
@@ -814,6 +820,42 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
   }
 
   return { ok: true as const, request: toRequestRecord(updatedRequest) };
+}
+
+export async function archiveCareRequestForUser(requestId: string, userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const request = await prisma.careRequest.findUnique({
+    where: { id: requestId }
+  });
+
+  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+
+  const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
+  const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
+
+  if (!isAssignedProfessional && !isRequestPatient) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para arquivar esta solicitacao." };
+  }
+
+  if (request.status !== CareRequestStatus.CONCLUIDO && request.status !== CareRequestStatus.CANCELADO) {
+    return { ok: false as const, status: 400, error: "Arquive apenas atendimentos concluidos ou cancelados." };
+  }
+
+  await prisma.careRequest.update({
+    where: { id: requestId },
+    data: isAssignedProfessional ? { professionalArchivedAt: new Date() } : { patientArchivedAt: new Date() }
+  });
+
+  return { ok: true as const };
 }
 
 export async function updateProfessionalProfileForUser(userId: string, input: UpdateProfessionalProfileInput) {
@@ -1079,6 +1121,11 @@ export async function reviewProfessionalRegistration(adminUserId: string, profes
 }
 
 export async function getCareRequestsForUser(userId: string) {
+  const collections = await getCareRequestCollectionsForUser(userId);
+  return [...collections.activeRequests, ...collections.recentRequests];
+}
+
+export async function getCareRequestCollectionsForUser(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -1087,23 +1134,68 @@ export async function getCareRequestsForUser(userId: string) {
     }
   });
 
-  if (!user) return [];
+  if (!user) {
+    return {
+      activeRequests: [],
+      recentRequests: [],
+      archivedRequests: []
+    };
+  }
 
-  const requests = await prisma.careRequest.findMany({
-    where:
-      user.accountType === AccountType.PROFESSIONAL && user.professionalProfile
-        ? { professionalId: user.professionalProfile.id }
-        : { patientProfileId: user.patientProfile?.id || "" },
-    include: {
-      professional: {
-        include: { user: true }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 20
-  });
+  const isProfessional = user.accountType === AccountType.PROFESSIONAL && user.professionalProfile;
+  const ownerWhere = isProfessional ? { professionalId: user.professionalProfile!.id } : { patientProfileId: user.patientProfile?.id || "" };
+  const archiveField = isProfessional ? "professionalArchivedAt" : "patientArchivedAt";
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const includeProfessional = {
+    professional: {
+      include: { user: true }
+    }
+  };
 
-  return requests.map(toRequestRecord);
+  const [activeRequests, recentRequests, archivedRequests] = await Promise.all([
+    prisma.careRequest.findMany({
+      where: {
+        ...ownerWhere,
+        [archiveField]: null,
+        status: { in: [CareRequestStatus.ENVIADO, CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO] }
+      },
+      include: includeProfessional,
+      orderBy: [{ scheduledFor: "asc" }, { createdAt: "desc" }],
+      take: 30
+    }),
+    prisma.careRequest.findMany({
+      where: {
+        ...ownerWhere,
+        [archiveField]: null,
+        status: { in: [CareRequestStatus.CONCLUIDO, CareRequestStatus.CANCELADO] },
+        createdAt: { gte: thirtyDaysAgo }
+      },
+      include: includeProfessional,
+      orderBy: { createdAt: "desc" },
+      take: 30
+    }),
+    prisma.careRequest.findMany({
+      where: {
+        ...ownerWhere,
+        [archiveField]: { not: null }
+      },
+      include: includeProfessional,
+      orderBy: [{ [archiveField]: "desc" }, { createdAt: "desc" }],
+      take: 30
+    })
+  ]);
+
+  return {
+    activeRequests: activeRequests.map((request) =>
+      toRequestRecord(request, isProfessional ? request.professionalArchivedAt : request.patientArchivedAt)
+    ),
+    recentRequests: recentRequests.map((request) =>
+      toRequestRecord(request, isProfessional ? request.professionalArchivedAt : request.patientArchivedAt)
+    ),
+    archivedRequests: archivedRequests.map((request) =>
+      toRequestRecord(request, isProfessional ? request.professionalArchivedAt : request.patientArchivedAt)
+    )
+  };
 }
 
 export async function getCareDashboardData(userId: string): Promise<CareDashboardData> {
@@ -1133,13 +1225,15 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     }
   });
 
-  const requests = await getCareRequestsForUser(userId);
+  const requestCollections = await getCareRequestCollectionsForUser(userId);
+  const requests = requestCollections.activeRequests;
+  const dashboardRequests = [...requestCollections.activeRequests, ...requestCollections.recentRequests, ...requestCollections.archivedRequests];
   const [notifications, unreadNotifications] = await Promise.all([
     getCareNotificationsForUser(userId),
     getUnreadCareNotificationCount(userId)
   ]);
-  const scheduled = requests.filter((request) => ["ACEITO", "AGENDADO"].includes(request.status)).length;
-  const completed = requests.filter((request) => request.status === "CONCLUIDO").length;
+  const scheduled = dashboardRequests.filter((request) => ["ACEITO", "AGENDADO"].includes(request.status) && !request.archivedAt).length;
+  const completed = dashboardRequests.filter((request) => request.status === "CONCLUIDO").length;
 
   return {
     summary: {
@@ -1153,6 +1247,8 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
       unreadNotifications
     },
     requests,
+    recentRequests: requestCollections.recentRequests,
+    archivedRequests: requestCollections.archivedRequests,
     notifications,
     favoriteProfessionals: user.professionalFavorites.map(toDashboardFavoriteProfessional),
     professionalSettings: user.professionalProfile
@@ -1195,6 +1291,7 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     profile: {
       name: user.name,
       email: user.email,
+      photoUrl: user.patientProfile?.photoUrl || user.professionalProfile?.photoUrl || null,
       neighborhood: user.patientProfile?.neighborhood || user.professionalProfile?.neighborhood || null,
       transferNeedLabel: user.patientProfile ? supportLabel[user.patientProfile.transferNeed] : null,
       professionalTypeLabel: user.professionalProfile ? professionalTypeLabel[user.professionalProfile.professionalType] : null

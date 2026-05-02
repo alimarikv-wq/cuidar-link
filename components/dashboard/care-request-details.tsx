@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  Archive,
   CalendarClock,
   Check,
   ClipboardList,
@@ -127,6 +128,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
   const [error, setError] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState("");
   const actions = getRequestActions(request);
+  const canArchive = !request.archivedAt && ["CONCLUIDO", "CANCELADO"].includes(request.status);
 
   function updateStatus(nextStatus: RequestStatus) {
     setError("");
@@ -148,6 +150,29 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
 
       router.refresh();
       setUpdatingStatus("");
+    });
+  }
+
+  function archiveRequest() {
+    setError("");
+    setUpdatingStatus("archive");
+
+    startTransition(async () => {
+      const response = await fetch(`/api/care-requests/${request.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive: true })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel arquivar este atendimento.");
+        setUpdatingStatus("");
+        return;
+      }
+
+      router.push("/dashboard#atendimentos");
+      router.refresh();
     });
   }
 
@@ -242,6 +267,18 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                   {isPending && updatingStatus === action.status ? "Salvando..." : action.label}
                 </button>
               ))}
+
+              {canArchive ? (
+                <button
+                  type="button"
+                  onClick={archiveRequest}
+                  disabled={isPending}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Archive aria-hidden="true" className="h-4 w-4" />
+                  {isPending && updatingStatus === "archive" ? "Arquivando..." : "Arquivar atendimento"}
+                </button>
+              ) : null}
             </div>
 
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
