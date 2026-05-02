@@ -101,7 +101,7 @@ export async function notifyNewCareRequest(request: RequestNotificationPayload) 
     type: "REQUEST_CREATED",
     title: "Novo pedido recebido",
     body: `${request.requesterName} solicitou ${serviceLabel[request.service]}.`,
-    actionUrl: "/dashboard#atendimentos"
+    actionUrl: `/dashboard/atendimentos/${request.id}`
   });
 }
 
@@ -114,7 +114,7 @@ export async function notifyCareRequestStatusForPatient(request: RequestNotifica
     type: `REQUEST_${request.status}`,
     title: `Pedido ${statusLabel[request.status]}`,
     body: `Seu atendimento com ${request.professional.user.name} foi atualizado para ${statusLabel[request.status]}.`,
-    actionUrl: "/dashboard#atendimentos"
+    actionUrl: `/dashboard/atendimentos/${request.id}`
   });
 }
 
@@ -125,7 +125,7 @@ export async function notifyCareRequestCanceledForProfessional(request: RequestN
     type: "REQUEST_CANCELED_BY_PATIENT",
     title: "Pedido cancelado pelo paciente",
     body: `${request.requesterName} cancelou o pedido de ${serviceLabel[request.service]}.`,
-    actionUrl: "/dashboard#atendimentos"
+    actionUrl: `/dashboard/atendimentos/${request.id}`
   });
 }
 

@@ -1184,6 +1184,12 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 <span>
                   {request.scheduledFor ? formatBrasiliaDateTime(request.scheduledFor) : "A combinar"}
                 </span>
+                <Link
+                  href={`/dashboard/atendimentos/${request.id}`}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 md:justify-self-end"
+                >
+                  Ver detalhes
+                </Link>
                 {getRequestActions(request.status, dashboard.summary.accountType).length > 0 ? (
                   <div className="flex flex-wrap gap-2 md:justify-end">
                     {getRequestActions(request.status, dashboard.summary.accountType).map((action) => (

@@ -9,6 +9,7 @@ import {
   ProfessionalType,
   ProfessionalVerificationStatus,
   TransferSupportLevel,
+  UserRole,
   VerificationStatus
 } from "@prisma/client";
 import { maskCpf } from "@/lib/cpf";
@@ -32,6 +33,7 @@ import {
   CareAdminOverview,
   CareDashboardData,
   CareProfessional,
+  CareRequestDetailsData,
   CareRequestRecord,
   DashboardFavoriteProfessional,
   DocumentTypeCode,
@@ -85,6 +87,12 @@ const genderLabel: Record<Gender, string> = {
   FEMININO: "Feminino",
   MASCULINO: "Masculino",
   OUTRO: "Outro"
+};
+
+const genderPreferenceLabel: Record<GenderPreference, string> = {
+  FEMININO: "Mulher",
+  MASCULINO: "Homem",
+  QUALQUER: "Qualquer"
 };
 
 const supportLabel: Record<TransferSupportLevel, string> = {
@@ -593,6 +601,100 @@ function toRequestRecord(request: Prisma.CareRequestGetPayload<{ include: { prof
     professionalName: request.professional.user.name,
     professionalRole: professionalTypeLabel[request.professional.professionalType],
     neighborhood: request.neighborhood
+  };
+}
+
+function toRequestDetailsData(
+  request: Prisma.CareRequestGetPayload<{
+    include: {
+      professional: {
+        include: {
+          user: true;
+        };
+      };
+      patientProfile: {
+        include: {
+          user: true;
+        };
+      };
+    };
+  }>,
+  viewer: CareRequestDetailsData["viewer"]
+): CareRequestDetailsData {
+  return {
+    ...toRequestRecord(request),
+    requesterEmail: request.requesterEmail,
+    supportNeedLabel: supportLabel[request.supportNeed],
+    preferredGenderLabel: genderPreferenceLabel[request.preferredGender],
+    professional: {
+      id: request.professional.id,
+      name: request.professional.user.name,
+      email: request.professional.user.email,
+      phone: request.professional.phone,
+      roleLabel: professionalTypeLabel[request.professional.professionalType],
+      genderLabel: genderLabel[request.professional.gender],
+      age: request.professional.age,
+      neighborhood: request.professional.neighborhood,
+      city: request.professional.city,
+      supportLevelLabel: supportLabel[request.professional.supportLevel],
+      mobilitySupport: request.professional.mobilitySupport,
+      bio: request.professional.bio,
+      isVerified: request.professional.isVerified
+    },
+    patient: {
+      name: request.requesterName || request.patientProfile?.user.name || "Paciente",
+      email: request.requesterEmail || request.patientProfile?.user.email || null,
+      phone: request.requesterPhone
+    },
+    viewer
+  };
+}
+
+export async function getCareRequestDetailsForUser(requestId: string, userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const request = await prisma.careRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      professional: {
+        include: {
+          user: true
+        }
+      },
+      patientProfile: {
+        include: {
+          user: true
+        }
+      }
+    }
+  });
+
+  if (!request) return { ok: false as const, status: 404, error: "Atendimento nao encontrado." };
+
+  const canActAsProfessional = user.professionalProfile?.id === request.professionalId;
+  const canCancelAsPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
+  const canViewByEmail = Boolean(request.requesterEmail && request.requesterEmail.toLowerCase() === user.email.toLowerCase());
+  const canView = user.role === UserRole.ADMIN || canActAsProfessional || canCancelAsPatient || canViewByEmail;
+
+  if (!canView) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para ver este atendimento." };
+  }
+
+  return {
+    ok: true as const,
+    request: toRequestDetailsData(request, {
+      accountType: user.accountType,
+      canActAsProfessional,
+      canCancelAsPatient
+    })
   };
 }
 

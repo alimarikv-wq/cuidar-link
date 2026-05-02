@@ -167,6 +167,37 @@ export type CareRequestRecord = {
   neighborhood: string;
 };
 
+export type CareRequestDetailsData = CareRequestRecord & {
+  requesterEmail: string | null;
+  supportNeedLabel: string;
+  preferredGenderLabel: string;
+  professional: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    roleLabel: string;
+    genderLabel: string;
+    age: number;
+    neighborhood: string;
+    city: string;
+    supportLevelLabel: string;
+    mobilitySupport: string;
+    bio: string;
+    isVerified: boolean;
+  };
+  patient: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+  };
+  viewer: {
+    accountType: string;
+    canActAsProfessional: boolean;
+    canCancelAsPatient: boolean;
+  };
+};
+
 export type DashboardFavoriteProfessional = {
   id: string;
   name: string;
