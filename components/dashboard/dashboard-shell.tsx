@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Archive,
   Bell,
   CalendarCheck,
   Check,
@@ -716,7 +717,9 @@ function NotificationsPanel({
   isPending,
   error,
   onRead,
-  onReadAll
+  onReadAll,
+  onArchive,
+  onArchiveRead
 }: {
   dashboard: CareDashboardData;
   pendingId: string;
@@ -724,7 +727,11 @@ function NotificationsPanel({
   error: string;
   onRead: (notificationId: string) => void;
   onReadAll: () => void;
+  onArchive: (notificationId: string) => void;
+  onArchiveRead: () => void;
 }) {
+  const readCount = dashboard.notifications.filter((notification) => notification.readAt).length;
+
   return (
     <article id="notificacoes" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -744,6 +751,15 @@ function NotificationsPanel({
           >
             <CheckCheck aria-hidden="true" className="h-4 w-4" />
             Marcar lidas
+          </button>
+          <button
+            type="button"
+            onClick={onArchiveRead}
+            disabled={isPending || readCount === 0}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Archive aria-hidden="true" className="h-4 w-4" />
+            Arquivar lidas
           </button>
         </div>
       </div>
@@ -791,12 +807,21 @@ function NotificationsPanel({
                   <button
                     type="button"
                     onClick={() => onRead(notification.id)}
-                    disabled={pendingId === notification.id}
+                    disabled={isPending || pendingId === notification.id}
                     className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
                   >
                     {pendingId === notification.id ? "Salvando..." : "Marcar lida"}
                   </button>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={() => onArchive(notification.id)}
+                  disabled={isPending || pendingId === notification.id}
+                  className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Archive aria-hidden="true" className="h-3.5 w-3.5" />
+                  {pendingId === notification.id ? "Arquivando..." : "Arquivar"}
+                </button>
               </div>
             </div>
           );
@@ -1014,6 +1039,52 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
     });
   }
 
+  function archiveNotification(notificationId: string) {
+    setNotificationError("");
+    setReadingNotificationId(notificationId);
+
+    startNotificationTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archiveId: notificationId })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNotificationError(data.error || "Nao foi possivel arquivar a notificacao.");
+        setReadingNotificationId("");
+        return;
+      }
+
+      router.refresh();
+      setReadingNotificationId("");
+    });
+  }
+
+  function archiveReadNotifications() {
+    setNotificationError("");
+    setReadingNotificationId("archive-read");
+
+    startNotificationTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archiveRead: true })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNotificationError(data.error || "Nao foi possivel arquivar as notificacoes lidas.");
+        setReadingNotificationId("");
+        return;
+      }
+
+      router.refresh();
+      setReadingNotificationId("");
+    });
+  }
+
   return (
     <section className="surface space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -1049,6 +1120,8 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         error={notificationError}
         onRead={markNotificationRead}
         onReadAll={markAllNotificationsRead}
+        onArchive={archiveNotification}
+        onArchiveRead={archiveReadNotifications}
       />
 
       {!isProfessional ? (

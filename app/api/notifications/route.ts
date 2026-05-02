@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
 import {
+  archiveCareNotification,
+  archiveReadCareNotifications,
   getCareNotificationsForUser,
   getUnreadCareNotificationCount,
   markCareNotificationsRead
 } from "@/lib/care-in-app-notifications";
 
-const readSchema = z.object({
+const notificationUpdateSchema = z.object({
   notificationId: z.string().optional(),
-  readAll: z.boolean().optional()
+  readAll: z.boolean().optional(),
+  archiveId: z.string().optional(),
+  archiveRead: z.boolean().optional()
 });
 
 export async function GET(request: NextRequest) {
@@ -33,13 +37,22 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json();
-  const parsed = readSchema.safeParse(body);
+  const parsed = notificationUpdateSchema.safeParse(body);
 
-  if (!parsed.success || (!parsed.data.readAll && !parsed.data.notificationId)) {
+  if (
+    !parsed.success ||
+    (!parsed.data.readAll && !parsed.data.notificationId && !parsed.data.archiveId && !parsed.data.archiveRead)
+  ) {
     return NextResponse.json({ error: "Notificacao invalida." }, { status: 400 });
   }
 
-  await markCareNotificationsRead(session.userId, parsed.data.readAll ? undefined : parsed.data.notificationId);
+  if (parsed.data.archiveId) {
+    await archiveCareNotification(session.userId, parsed.data.archiveId);
+  } else if (parsed.data.archiveRead) {
+    await archiveReadCareNotifications(session.userId);
+  } else {
+    await markCareNotificationsRead(session.userId, parsed.data.readAll ? undefined : parsed.data.notificationId);
+  }
 
   return NextResponse.json({ success: true });
 }

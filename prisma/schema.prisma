@@ -128,6 +128,7 @@ model User {
   favorites             Favorite[]
   professionalFavorites ProfessionalFavorite[]
   careNotifications     CareNotification[]
+  passwordResetTokens   PasswordResetToken[]
   alerts                Alert[]
   patientProfile        PatientProfile?
   professionalProfile   ProfessionalProfile?
@@ -331,12 +332,26 @@ model CareNotification {
   body          String
   actionUrl     String?
   readAt        DateTime?
+  archivedAt    DateTime?
   createdAt     DateTime     @default(now())
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   careRequest   CareRequest? @relation(fields: [careRequestId], references: [id], onDelete: SetNull)
 
   @@index([userId, readAt, createdAt])
+  @@index([userId, archivedAt, createdAt])
   @@index([careRequestId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 model AwardOffer {

@@ -153,14 +153,18 @@ export async function getUnreadCareNotificationCount(userId: string) {
   return prisma.careNotification.count({
     where: {
       userId,
-      readAt: null
+      readAt: null,
+      archivedAt: null
     }
   });
 }
 
 export async function getCareNotificationsForUser(userId: string, take = 20) {
   const notifications = await prisma.careNotification.findMany({
-    where: { userId },
+    where: {
+      userId,
+      archivedAt: null
+    },
     orderBy: { createdAt: "desc" },
     take
   });
@@ -173,10 +177,42 @@ export async function markCareNotificationsRead(userId: string, notificationId?:
     where: {
       userId,
       readAt: null,
+      archivedAt: null,
       ...(notificationId ? { id: notificationId } : {})
     },
     data: {
       readAt: new Date()
+    }
+  });
+}
+
+export async function archiveCareNotification(userId: string, notificationId: string) {
+  const now = new Date();
+
+  await prisma.careNotification.updateMany({
+    where: {
+      userId,
+      id: notificationId,
+      archivedAt: null
+    },
+    data: {
+      readAt: now,
+      archivedAt: now
+    }
+  });
+}
+
+export async function archiveReadCareNotifications(userId: string) {
+  await prisma.careNotification.updateMany({
+    where: {
+      userId,
+      readAt: {
+        not: null
+      },
+      archivedAt: null
+    },
+    data: {
+      archivedAt: new Date()
     }
   });
 }

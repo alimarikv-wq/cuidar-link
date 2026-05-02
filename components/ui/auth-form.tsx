@@ -271,6 +271,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
               </span>
             </label>
 
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-sm font-semibold text-blue-700">
+                Esqueci minha senha
+              </Link>
+            </div>
+
             {error ? <p className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
 
             <label className="flex items-center gap-3 text-base text-slate-800">
