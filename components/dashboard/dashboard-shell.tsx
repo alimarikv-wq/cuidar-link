@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -114,6 +114,8 @@ const weekdayOptions = [
 
 const fieldClass =
   "h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+const allowedProfilePhotoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const maxProfilePhotoSizeBytes = 3 * 1024 * 1024;
 
 const statusStyles: Record<RequestStatus, string> = {
   RASCUNHO: "bg-slate-100 text-slate-700",
@@ -167,6 +169,17 @@ function parseDateInput(value: string, endOfDay = false) {
   if (!year || !month || !day) return null;
 
   return new Date(year, month - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function validateProfilePhotoFile(file: File) {
+  if (!allowedProfilePhotoTypes.has(file.type)) return "Envie uma foto JPG, JPEG, PNG ou WEBP.";
+  if (file.size > maxProfilePhotoSizeBytes) return "Envie uma foto de ate 3 MB.";
+  return "";
 }
 
 function rangeStart(days: number) {
@@ -230,17 +243,51 @@ function getRequestActions(status: string, accountType: string): StatusAction[] 
 
 function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [isPending, startTransition] = useTransition();
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState(dashboard.profile.photoUrl || "");
+  const [savedPhotoUrl, setSavedPhotoUrl] = useState(dashboard.profile.photoUrl || "");
+  const [localPreviewUrl, setLocalPreviewUrl] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const previewUrl = localPreviewUrl || savedPhotoUrl;
+
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    };
+  }, [localPreviewUrl]);
 
   function handleFileChange(nextFile: File | null) {
+    if (localPreviewUrl) {
+      URL.revokeObjectURL(localPreviewUrl);
+      setLocalPreviewUrl("");
+    }
+
     setFile(nextFile);
     setMessage("");
     setError("");
-    if (nextFile) setPreviewUrl(URL.createObjectURL(nextFile));
+
+    if (!nextFile) return;
+
+    const fileError = validateProfilePhotoFile(nextFile);
+    if (fileError) {
+      setFile(null);
+      setError(fileError);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    setLocalPreviewUrl(URL.createObjectURL(nextFile));
+  }
+
+  function clearSelectedPhoto() {
+    if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    setLocalPreviewUrl("");
+    setFile(null);
+    setError("");
+    setMessage("");
+    if (inputRef.current) inputRef.current.value = "";
   }
 
   function submitPhoto() {
@@ -267,9 +314,12 @@ function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
         return;
       }
 
-      setPreviewUrl(data.photoUrl);
+      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+      setLocalPreviewUrl("");
+      setSavedPhotoUrl(data.photoUrl);
       setFile(null);
       setMessage("Foto atualizada.");
+      if (inputRef.current) inputRef.current.value = "";
       router.refresh();
     });
   }
@@ -293,12 +343,27 @@ function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
+              ref={inputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(event) => handleFileChange(event.target.files?.[0] || null)}
               className="max-w-full text-sm text-slate-600 file:mr-3 file:h-10 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold file:text-slate-800"
             />
           </div>
+          {file ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-sm text-emerald-900">
+              <span className="font-semibold">{file.name}</span>
+              <span>{formatFileSize(file.size)}</span>
+              <button
+                type="button"
+                onClick={clearSelectedPhoto}
+                className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-800 transition hover:border-emerald-400"
+              >
+                <X aria-hidden="true" className="h-3.5 w-3.5" />
+                Trocar
+              </button>
+            </div>
+          ) : null}
           {message ? <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
           {error ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
         </div>
@@ -1336,13 +1401,25 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
   return (
     <section className="surface space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-semibold text-emerald-700">Meu painel</p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-950">{dashboard.profile.name}</h1>
-        <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-600">
-          <span>{dashboard.profile.email}</span>
-          {dashboard.profile.neighborhood ? <span>{dashboard.profile.neighborhood}</span> : null}
-          {dashboard.profile.transferNeedLabel ? <span>{dashboard.profile.transferNeedLabel}</span> : null}
-          {dashboard.profile.professionalTypeLabel ? <span>{dashboard.profile.professionalTypeLabel}</span> : null}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-400">
+            {dashboard.profile.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={dashboard.profile.photoUrl} alt={dashboard.profile.name} className="h-full w-full object-cover" />
+            ) : (
+              <Camera aria-hidden="true" className="h-8 w-8" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-emerald-700">Meu painel</p>
+            <h1 className="mt-2 text-3xl font-semibold text-slate-950">{dashboard.profile.name}</h1>
+            <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-600">
+              <span>{dashboard.profile.email}</span>
+              {dashboard.profile.neighborhood ? <span>{dashboard.profile.neighborhood}</span> : null}
+              {dashboard.profile.transferNeedLabel ? <span>{dashboard.profile.transferNeedLabel}</span> : null}
+              {dashboard.profile.professionalTypeLabel ? <span>{dashboard.profile.professionalTypeLabel}</span> : null}
+            </div>
+          </div>
         </div>
       </div>
 
