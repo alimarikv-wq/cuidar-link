@@ -141,8 +141,7 @@ function formatBrasiliaDateInput(date = new Date()) {
 }
 
 function getDefaultScheduledFor() {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  return `${formatBrasiliaDateInput(tomorrow)}T14:30`;
+  return `${formatBrasiliaDateInput()}T14:30`;
 }
 
 function splitScheduledFor(value: string) {
@@ -517,19 +516,25 @@ export function CareMatchApp() {
       signal: controller.signal
     })
       .then(async (response) => {
-        const data = (await response.json()) as { slots?: string[]; error?: string };
+        const data = (await response.json()) as { date?: string; slots?: string[]; error?: string };
         if (!response.ok) throw new Error(data.error || "Nao foi possivel carregar horarios.");
 
         const slots = data.slots || [];
+        const availableDate = data.date || scheduledParts.date;
         setAvailableTimes(slots);
         if (slots.length === 0) {
-          setAvailabilityError("Esse profissional nao tem horario livre nessa data para a duracao escolhida.");
+          setAvailabilityError("Esse profissional nao tem horario livre nos proximos dias para a duracao escolhida.");
           return;
         }
 
+        if (availableDate !== scheduledParts.date) {
+          setAvailabilityError(`Sem horario nessa data. Mostrando o primeiro horario livre em ${formatDateLabel(availableDate)}.`);
+        }
+
         setScheduledFor((current) => {
-          const currentTime = completeTimeInput(splitScheduledFor(current).time);
-          return slots.includes(currentTime) ? current : `${scheduledParts.date}T${slots[0]}`;
+          const currentParts = splitScheduledFor(current);
+          const currentTime = completeTimeInput(currentParts.time);
+          return currentParts.date === availableDate && slots.includes(currentTime) ? current : `${availableDate}T${slots[0]}`;
         });
       })
       .catch((error: Error) => {

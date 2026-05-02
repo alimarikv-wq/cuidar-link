@@ -431,6 +431,12 @@ function getWeekdayFromBrasiliaDateKey(dateKey: string) {
   return new Date(`${dateKey}T12:00:00-03:00`).getUTCDay();
 }
 
+function addDaysToBrasiliaDateKey(dateKey: string, days: number) {
+  const date = new Date(`${dateKey}T12:00:00-03:00`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return getBrasiliaDateKey(date);
+}
+
 function dateFromBrasiliaDateAndMinutes(dateKey: string, minutes: number) {
   return new Date(`${dateKey}T${minutesToTime(minutes)}:00-03:00`);
 }
@@ -526,6 +532,21 @@ export async function getAvailableCareRequestSlots(professionalId: string, dateK
   return [...new Set(availableTimes)];
 }
 
+export async function getNextAvailableCareRequestSlots(professionalId: string, dateKey: string, durationHours = 2, lookAheadDays = 21) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || durationHours < 0.5 || durationHours > 24) {
+    return { date: dateKey, slots: [] };
+  }
+
+  const daysToSearch = Math.min(Math.max(Math.round(lookAheadDays), 0), 45);
+  for (let days = 0; days <= daysToSearch; days += 1) {
+    const candidateDate = addDaysToBrasiliaDateKey(dateKey, days);
+    const slots = await getAvailableCareRequestSlots(professionalId, candidateDate, durationHours);
+    if (slots.length > 0) return { date: candidateDate, slots };
+  }
+
+  return { date: dateKey, slots: [] };
+}
+
 async function validateCareRequestSchedule(professionalId: string, scheduledFor: Date | null, durationHours: number) {
   if (!scheduledFor) return { ok: false as const, error: "Informe data e horario do atendimento." };
   if (scheduledFor <= new Date()) return { ok: false as const, error: "Escolha um horario futuro." };
@@ -564,8 +585,8 @@ function slotMatchesAvailability(slot: { weekday: number; startTime: string; end
   if (filter === "qualquer") return true;
 
   const now = new Date();
-  const weekday = now.getDay();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const weekday = getWeekdayFromBrasiliaDateKey(getBrasiliaDateKey(now));
+  const nowMinutes = getBrasiliaMinutes(now);
   const start = timeToMinutes(slot.startTime);
   const end = slotEndToMinutes(slot.endTime);
 

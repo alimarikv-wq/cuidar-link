@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAvailableCareRequestSlots } from "@/lib/care-data";
+import { getNextAvailableCareRequestSlots } from "@/lib/care-data";
 
 const availabilitySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Informe data e duracao validas." }, { status: 400 });
   }
 
-  const slots = await getAvailableCareRequestSlots(id, parsed.data.date, parsed.data.durationHours);
+  const result = await getNextAvailableCareRequestSlots(id, parsed.data.date, parsed.data.durationHours);
 
-  return NextResponse.json({ slots });
+  return NextResponse.json(result);
 }
