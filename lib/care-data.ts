@@ -476,6 +476,8 @@ function isCoveredByAvailability(
   start: Date,
   durationHours: number
 ) {
+  if (availability.length === 0) return true;
+
   const dateKey = getBrasiliaDateKey(start);
   const weekday = getWeekdayFromBrasiliaDateKey(dateKey);
   const startMinutes = getBrasiliaMinutes(start);
@@ -501,7 +503,10 @@ export async function getAvailableCareRequestSlots(professionalId: string, dateK
   if (!professional || !professional.isActive) return [];
 
   const weekday = getWeekdayFromBrasiliaDateKey(dateKey);
-  const daySlots = professional.availability.filter((slot) => slot.weekday === weekday);
+  const daySlots =
+    professional.availability.length === 0
+      ? [{ weekday, startTime: "00:00", endTime: "23:59" }]
+      : professional.availability.filter((slot) => slot.weekday === weekday);
   if (daySlots.length === 0) return [];
 
   const busyRequests = await getActiveRequestsForProfessionalDay(professionalId, dateKey);
