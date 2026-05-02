@@ -24,7 +24,7 @@ export async function Header() {
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex">
           <Link href="/">Busca</Link>
-          <Link href="/#seguranca">Seguranca</Link>
+          <Link href="/seguranca">Seguranca</Link>
           <Link href="/register">Sou profissional</Link>
         </nav>
 

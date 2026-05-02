@@ -1573,24 +1573,27 @@ export function CareMatchApp() {
       <section id="seguranca" className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <ClipboardCheck aria-hidden="true" className="h-6 w-6 text-emerald-700" />
-          <h3 className="mt-3 text-lg font-semibold text-slate-950">Triagem objetiva</h3>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">Pedido nao confirmado automaticamente</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            O pedido registra peso aproximado, mobilidade, equipamentos, endereco e privacidade antes do aceite.
+            O profissional precisa aceitar ou agendar antes do paciente considerar o atendimento confirmado.
           </p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <ShieldCheck aria-hidden="true" className="h-6 w-6 text-violet-700" />
-          <h3 className="mt-3 text-lg font-semibold text-slate-950">Credenciais checadas</h3>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">Documentos e dados no painel</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Documentos, certificados, registros profissionais quando aplicavel e historico ficam ligados ao perfil profissional.
+            Documentos profissionais, pedidos, notificacoes e historico ficam ligados aos perfis quando enviados.
           </p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <HeartHandshake aria-hidden="true" className="h-6 w-6 text-rose-700" />
-          <h3 className="mt-3 text-lg font-semibold text-slate-950">Contratacao segura</h3>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">Combinados claros</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Solicitacao, agenda, avaliacao e recorrencia semanal agora tem base para persistencia no banco.
+            Pagamento, deslocamento, viagem, pernoite e horas extras devem ser confirmados antes do atendimento.
           </p>
+          <a href="/seguranca" className="mt-3 inline-flex text-sm font-semibold text-emerald-700">
+            Ver regras completas
+          </a>
         </div>
       </section>
     </div>
