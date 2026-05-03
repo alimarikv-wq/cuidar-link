@@ -862,13 +862,15 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
 
 function toRequestRecord(
   request: Prisma.CareRequestGetPayload<{ include: { professional: { include: { user: true } } } }>,
-  archivedAt: Date | null = null
+  archivedAt: Date | null = null,
+  deletedAt: Date | null = null
 ): CareRequestRecord {
   return {
     id: request.id,
     status: request.status,
     statusLabel: statusLabel[request.status],
     archivedAt: archivedAt ? archivedAt.toISOString() : null,
+    deletedAt: deletedAt ? deletedAt.toISOString() : null,
     serviceLabel: serviceLabel[request.service],
     durationHours: Number(request.durationHours),
     scheduledFor: request.scheduledFor ? request.scheduledFor.toISOString() : null,
@@ -912,9 +914,10 @@ function toRequestDetailsData(
   viewer: CareRequestDetailsData["viewer"]
 ): CareRequestDetailsData {
   const archivedAt = viewer.canActAsProfessional ? request.professionalArchivedAt : request.patientArchivedAt;
+  const deletedAt = viewer.canActAsProfessional ? request.professionalDeletedAt : request.patientDeletedAt;
 
   return {
-    ...toRequestRecord(request, archivedAt),
+    ...toRequestRecord(request, archivedAt, deletedAt),
     requesterEmail: request.requesterEmail,
     supportNeedLabel: supportLabel[request.supportNeed],
     preferredGenderLabel: genderPreferenceLabel[request.preferredGender],
@@ -996,6 +999,11 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
 
   if (!canView) {
     return { ok: false as const, status: 403, error: "Voce nao tem permissao para ver este atendimento." };
+  }
+
+  const viewerDeletedAt = canActAsProfessional ? request.professionalDeletedAt : request.patientDeletedAt;
+  if (user.role !== UserRole.ADMIN && viewerDeletedAt) {
+    return { ok: false as const, status: 404, error: "Atendimento nao encontrado no seu historico." };
   }
 
   return {
@@ -1295,6 +1303,43 @@ export async function restoreCareRequestForUser(requestId: string, userId: strin
   return { ok: true as const };
 }
 
+export async function deleteCareRequestFromHistoryForUser(requestId: string, userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const request = await prisma.careRequest.findUnique({
+    where: { id: requestId }
+  });
+
+  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+
+  const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
+  const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
+
+  if (!isAssignedProfessional && !isRequestPatient) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para excluir esta solicitacao." };
+  }
+
+  const archivedAt = isAssignedProfessional ? request.professionalArchivedAt : request.patientArchivedAt;
+  if (!archivedAt) {
+    return { ok: false as const, status: 400, error: "Arquive o atendimento antes de excluir do historico." };
+  }
+
+  await prisma.careRequest.update({
+    where: { id: requestId },
+    data: isAssignedProfessional ? { professionalDeletedAt: new Date() } : { patientDeletedAt: new Date() }
+  });
+
+  return { ok: true as const };
+}
+
 export async function updateProfessionalProfileForUser(userId: string, input: UpdateProfessionalProfileInput) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -1586,6 +1631,7 @@ export async function getCareRequestCollectionsForUser(userId: string) {
   const isProfessional = user.accountType === AccountType.PROFESSIONAL && user.professionalProfile;
   const ownerWhere = isProfessional ? { professionalId: user.professionalProfile!.id } : { patientProfileId: user.patientProfile?.id || "" };
   const archiveField = isProfessional ? "professionalArchivedAt" : "patientArchivedAt";
+  const deletedField = isProfessional ? "professionalDeletedAt" : "patientDeletedAt";
   const includeProfessional = {
     professional: {
       include: { user: true }
@@ -1597,6 +1643,7 @@ export async function getCareRequestCollectionsForUser(userId: string) {
       where: {
         ...ownerWhere,
         [archiveField]: null,
+        [deletedField]: null,
         status: { in: [CareRequestStatus.ENVIADO, CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO] }
       },
       include: includeProfessional,
@@ -1607,6 +1654,7 @@ export async function getCareRequestCollectionsForUser(userId: string) {
       where: {
         ...ownerWhere,
         [archiveField]: null,
+        [deletedField]: null,
         status: { in: [CareRequestStatus.CONCLUIDO, CareRequestStatus.CANCELADO] }
       },
       include: includeProfessional,
@@ -1616,7 +1664,8 @@ export async function getCareRequestCollectionsForUser(userId: string) {
     prisma.careRequest.findMany({
       where: {
         ...ownerWhere,
-        [archiveField]: { not: null }
+        [archiveField]: { not: null },
+        [deletedField]: null
       },
       include: includeProfessional,
       orderBy: [{ [archiveField]: "desc" }, { createdAt: "desc" }],
@@ -1626,13 +1675,25 @@ export async function getCareRequestCollectionsForUser(userId: string) {
 
   return {
     activeRequests: activeRequests.map((request) =>
-      toRequestRecord(request, isProfessional ? request.professionalArchivedAt : request.patientArchivedAt)
+      toRequestRecord(
+        request,
+        isProfessional ? request.professionalArchivedAt : request.patientArchivedAt,
+        isProfessional ? request.professionalDeletedAt : request.patientDeletedAt
+      )
     ),
     recentRequests: recentRequests.map((request) =>
-      toRequestRecord(request, isProfessional ? request.professionalArchivedAt : request.patientArchivedAt)
+      toRequestRecord(
+        request,
+        isProfessional ? request.professionalArchivedAt : request.patientArchivedAt,
+        isProfessional ? request.professionalDeletedAt : request.patientDeletedAt
+      )
     ),
     archivedRequests: archivedRequests.map((request) =>
-      toRequestRecord(request, isProfessional ? request.professionalArchivedAt : request.patientArchivedAt)
+      toRequestRecord(
+        request,
+        isProfessional ? request.professionalArchivedAt : request.patientArchivedAt,
+        isProfessional ? request.professionalDeletedAt : request.patientDeletedAt
+      )
     )
   };
 }

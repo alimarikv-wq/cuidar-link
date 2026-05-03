@@ -161,6 +161,7 @@ export type CareRequestRecord = {
   status: string;
   statusLabel: string;
   archivedAt: string | null;
+  deletedAt: string | null;
   serviceLabel: string;
   durationHours: number;
   scheduledFor: string | null;

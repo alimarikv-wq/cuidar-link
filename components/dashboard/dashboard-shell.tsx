@@ -20,6 +20,7 @@ import {
   Save,
   ShieldCheck,
   Star,
+  Trash2,
   Upload,
   UserRoundCheck,
   X
@@ -1330,6 +1331,35 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
     });
   }
 
+  function deleteRequestFromHistory(requestId: string) {
+    const confirmed = window.confirm(
+      "Voce tem certeza que quer excluir este atendimento do seu historico? Ele nao vai aparecer mais para voce. Esta acao nao cancela atendimento nem apaga o registro administrativo da plataforma."
+    );
+
+    if (!confirmed) return;
+
+    setActionError("");
+    setUpdatingId(requestId);
+
+    startTransition(async () => {
+      const response = await fetch(`/api/care-requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteFromHistory: true })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setActionError(data.error || "Nao foi possivel excluir o atendimento do historico.");
+        setUpdatingId("");
+        return;
+      }
+
+      router.refresh();
+      setUpdatingId("");
+    });
+  }
+
   function removeFavorite(professionalId: string) {
     setFavoriteError("");
     setRemovingFavoriteId(professionalId);
@@ -1643,15 +1673,26 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                   Ver detalhes
                 </Link>
                 {request.archivedAt ? (
-                  <button
-                    type="button"
-                    onClick={() => restoreRequest(request.id)}
-                    disabled={isPending && updatingId === request.id}
-                    className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60 md:justify-self-end"
-                  >
-                    <Archive aria-hidden="true" className="h-3.5 w-3.5" />
-                    {isPending && updatingId === request.id ? "Restaurando..." : "Restaurar"}
-                  </button>
+                  <div className="flex flex-wrap gap-2 md:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => restoreRequest(request.id)}
+                      disabled={isPending && updatingId === request.id}
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <Archive aria-hidden="true" className="h-3.5 w-3.5" />
+                      {isPending && updatingId === request.id ? "Restaurando..." : "Restaurar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteRequestFromHistory(request.id)}
+                      disabled={isPending && updatingId === request.id}
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                      {isPending && updatingId === request.id ? "Excluindo..." : "Excluir"}
+                    </button>
+                  </div>
                 ) : ["CONCLUIDO", "CANCELADO"].includes(request.status) ? (
                   <button
                     type="button"

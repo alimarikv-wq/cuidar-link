@@ -2,11 +2,17 @@ import { CareRequestStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
-import { archiveCareRequestForUser, restoreCareRequestForUser, updateCareRequestStatus } from "@/lib/care-data";
+import {
+  archiveCareRequestForUser,
+  deleteCareRequestFromHistoryForUser,
+  restoreCareRequestForUser,
+  updateCareRequestStatus
+} from "@/lib/care-data";
 
 const updateSchema = z.object({
   status: z.nativeEnum(CareRequestStatus).optional(),
-  archive: z.boolean().optional()
+  archive: z.boolean().optional(),
+  deleteFromHistory: z.boolean().optional()
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +28,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const { id } = await params;
+
+  if (parsed.data.deleteFromHistory) {
+    const result = await deleteCareRequestFromHistoryForUser(id, session.userId);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    return NextResponse.json({ success: true });
+  }
 
   if (typeof parsed.data.archive === "boolean") {
     const result = parsed.data.archive
