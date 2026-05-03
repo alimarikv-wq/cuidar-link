@@ -2,7 +2,7 @@ import { CareRequestStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
-import { archiveCareRequestForUser, updateCareRequestStatus } from "@/lib/care-data";
+import { archiveCareRequestForUser, restoreCareRequestForUser, updateCareRequestStatus } from "@/lib/care-data";
 
 const updateSchema = z.object({
   status: z.nativeEnum(CareRequestStatus).optional(),
@@ -23,8 +23,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { id } = await params;
 
-  if (parsed.data.archive) {
-    const result = await archiveCareRequestForUser(id, session.userId);
+  if (typeof parsed.data.archive === "boolean") {
+    const result = parsed.data.archive
+      ? await archiveCareRequestForUser(id, session.userId)
+      : await restoreCareRequestForUser(id, session.userId);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

@@ -44,8 +44,8 @@ type StatusAction = {
   status: RequestStatus;
   variant: "primary" | "secondary" | "danger";
 };
-type RequestView = "active" | "recent" | "archived";
-type HistoryRange = "30" | "90" | "custom";
+type RequestView = "active" | "completed" | "canceled" | "archived";
+type HistoryRange = "30" | "90" | "all" | "custom";
 
 const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
   { value: "BANHO", label: "Banho" },
@@ -195,7 +195,8 @@ function filterRequestsByHistoryRange(
   startDate = "",
   endDate = ""
 ) {
-  const start = range === "30" ? rangeStart(30) : range === "90" ? rangeStart(90) : parseDateInput(startDate);
+  const start =
+    range === "30" ? rangeStart(30) : range === "90" ? rangeStart(90) : range === "custom" ? parseDateInput(startDate) : null;
   const end = range === "custom" ? parseDateInput(endDate, true) : null;
 
   return requests.filter((request) => {
@@ -1201,26 +1202,49 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
   const [historyStartDate, setHistoryStartDate] = useState("");
   const [historyEndDate, setHistoryEndDate] = useState("");
   const isProfessional = dashboard.summary.accountType === "PROFESSIONAL";
+  const completedRequests = dashboard.recentRequests.filter((request) => request.status === "CONCLUIDO");
+  const canceledRequests = dashboard.recentRequests.filter((request) => request.status === "CANCELADO");
+  const historySource =
+    requestView === "completed"
+      ? completedRequests
+      : requestView === "canceled"
+        ? canceledRequests
+        : requestView === "archived"
+          ? dashboard.archivedRequests
+          : [];
   const visibleHistoryRequests = filterRequestsByHistoryRange(
-    requestView === "archived" ? dashboard.archivedRequests : dashboard.recentRequests,
+    historySource,
     historyRange,
     historyStartDate,
     historyEndDate
   );
-  const visibleRequests =
-    requestView === "active" ? dashboard.requests : visibleHistoryRequests;
-  const recentThirtyDaysCount = filterRequestsByHistoryRange(dashboard.recentRequests, "30").length;
-  const recentNinetyDaysCount = filterRequestsByHistoryRange(dashboard.recentRequests, "90").length;
+  const visibleRequests = requestView === "active" ? dashboard.requests : visibleHistoryRequests;
   const requestViewTitle =
-    requestView === "active" ? (isProfessional ? "Solicitacoes recebidas" : "Pedidos em andamento") : requestView === "recent" ? "Historico de atendimentos" : "Atendimentos arquivados";
+    requestView === "active"
+      ? isProfessional
+        ? "Solicitacoes ativas"
+        : "Pedidos em andamento"
+      : requestView === "completed"
+        ? "Atendimentos concluidos"
+        : requestView === "canceled"
+          ? "Atendimentos cancelados"
+          : "Atendimentos arquivados";
   const requestViewEmpty =
     requestView === "active"
       ? isProfessional
         ? "Nenhuma solicitacao ativa agora. Quando um atendimento for pedido, ele aparece aqui."
         : "Nenhum pedido em andamento agora. Quando voce solicitar atendimento, o status aparece aqui."
-      : requestView === "recent"
-        ? "Nenhum atendimento concluido ou cancelado nesse periodo."
-        : "Nenhum atendimento arquivado nesse periodo.";
+      : requestView === "completed"
+        ? "Nenhum atendimento concluido nesse periodo."
+        : requestView === "canceled"
+          ? "Nenhum atendimento cancelado nesse periodo."
+          : "Nenhum atendimento arquivado nesse periodo.";
+  const requestTabs: Array<{ key: RequestView; label: string; count: number }> = [
+    { key: "active", label: "Ativos", count: dashboard.requests.length },
+    { key: "completed", label: "Concluidos", count: completedRequests.length },
+    { key: "canceled", label: "Cancelados", count: canceledRequests.length },
+    { key: "archived", label: "Arquivados", count: dashboard.archivedRequests.length }
+  ];
   const summaryCards = [
     { label: "Perfil", value: dashboard.summary.accountTypeLabel, icon: UserRoundCheck },
     { label: isProfessional ? "Solicitacoes" : "Pedidos", value: String(dashboard.summary.requests), icon: ClipboardList },
@@ -1274,6 +1298,29 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
 
       if (!response.ok) {
         setActionError(data.error || "Nao foi possivel arquivar o atendimento.");
+        setUpdatingId("");
+        return;
+      }
+
+      router.refresh();
+      setUpdatingId("");
+    });
+  }
+
+  function restoreRequest(requestId: string) {
+    setActionError("");
+    setUpdatingId(requestId);
+
+    startTransition(async () => {
+      const response = await fetch(`/api/care-requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive: false })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setActionError(data.error || "Nao foi possivel restaurar o atendimento.");
         setUpdatingId("");
         return;
       }
@@ -1473,11 +1520,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {[
-            { key: "active" as const, label: `Ativos (${dashboard.requests.length})` },
-            { key: "recent" as const, label: `Historico (${recentThirtyDaysCount}/${recentNinetyDaysCount})` },
-            { key: "archived" as const, label: `Arquivados (${dashboard.archivedRequests.length})` }
-          ].map((item) => (
+          {requestTabs.map((item) => (
             <button
               key={item.key}
               type="button"
@@ -1488,7 +1531,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                   : "border-slate-300 bg-white text-slate-800 hover:border-emerald-500"
               }`}
             >
-              {item.label}
+              {item.label} ({item.count})
             </button>
           ))}
         </div>
@@ -1499,6 +1542,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
               {[
                 { key: "30" as const, label: "Ultimos 30 dias" },
                 { key: "90" as const, label: "Ultimos 3 meses" },
+                { key: "all" as const, label: "Todos" },
                 { key: "custom" as const, label: "Escolher periodo" }
               ].map((item) => (
                 <button
@@ -1587,13 +1631,28 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 <span>
                   {request.scheduledFor ? formatBrasiliaDateTime(request.scheduledFor) : "A combinar"}
                 </span>
+                {request.archivedAt ? (
+                  <span className="text-xs text-slate-400">
+                    Arquivado em {formatBrasiliaDateTime(request.archivedAt)}
+                  </span>
+                ) : null}
                 <Link
                   href={`/dashboard/atendimentos/${request.id}`}
                   className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 md:justify-self-end"
                 >
                   Ver detalhes
                 </Link>
-                {!request.archivedAt && ["CONCLUIDO", "CANCELADO"].includes(request.status) ? (
+                {request.archivedAt ? (
+                  <button
+                    type="button"
+                    onClick={() => restoreRequest(request.id)}
+                    disabled={isPending && updatingId === request.id}
+                    className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60 md:justify-self-end"
+                  >
+                    <Archive aria-hidden="true" className="h-3.5 w-3.5" />
+                    {isPending && updatingId === request.id ? "Restaurando..." : "Restaurar"}
+                  </button>
+                ) : ["CONCLUIDO", "CANCELADO"].includes(request.status) ? (
                   <button
                     type="button"
                     onClick={() => archiveRequest(request.id)}

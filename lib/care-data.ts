@@ -1263,6 +1263,38 @@ export async function archiveCareRequestForUser(requestId: string, userId: strin
   return { ok: true as const };
 }
 
+export async function restoreCareRequestForUser(requestId: string, userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const request = await prisma.careRequest.findUnique({
+    where: { id: requestId }
+  });
+
+  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+
+  const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
+  const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
+
+  if (!isAssignedProfessional && !isRequestPatient) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para restaurar esta solicitacao." };
+  }
+
+  await prisma.careRequest.update({
+    where: { id: requestId },
+    data: isAssignedProfessional ? { professionalArchivedAt: null } : { patientArchivedAt: null }
+  });
+
+  return { ok: true as const };
+}
+
 export async function updateProfessionalProfileForUser(userId: string, input: UpdateProfessionalProfileInput) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -1554,7 +1586,6 @@ export async function getCareRequestCollectionsForUser(userId: string) {
   const isProfessional = user.accountType === AccountType.PROFESSIONAL && user.professionalProfile;
   const ownerWhere = isProfessional ? { professionalId: user.professionalProfile!.id } : { patientProfileId: user.patientProfile?.id || "" };
   const archiveField = isProfessional ? "professionalArchivedAt" : "patientArchivedAt";
-  const historySince = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const includeProfessional = {
     professional: {
       include: { user: true }
@@ -1576,12 +1607,11 @@ export async function getCareRequestCollectionsForUser(userId: string) {
       where: {
         ...ownerWhere,
         [archiveField]: null,
-        status: { in: [CareRequestStatus.CONCLUIDO, CareRequestStatus.CANCELADO] },
-        createdAt: { gte: historySince }
+        status: { in: [CareRequestStatus.CONCLUIDO, CareRequestStatus.CANCELADO] }
       },
       include: includeProfessional,
       orderBy: { createdAt: "desc" },
-      take: 200
+      take: 500
     }),
     prisma.careRequest.findMany({
       where: {
@@ -1590,7 +1620,7 @@ export async function getCareRequestCollectionsForUser(userId: string) {
       },
       include: includeProfessional,
       orderBy: [{ [archiveField]: "desc" }, { createdAt: "desc" }],
-      take: 200
+      take: 500
     })
   ]);
 
