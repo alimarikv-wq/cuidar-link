@@ -103,6 +103,25 @@ function documentRequirementText(status: ProfessionalSettingsData["requiredDocum
   return "Reenviar";
 }
 
+function isCouncilDocument(type: DocumentTypeCode) {
+  return type === "COREN" || type === "CREFITO";
+}
+
+function cleanRegistrationNumber(value: string) {
+  return value.replace(/\D/g, "").slice(0, 12);
+}
+
+function professionalRegistrationError(type: DocumentTypeCode, value: string) {
+  if (!isCouncilDocument(type)) return "";
+
+  const digits = cleanRegistrationNumber(value);
+  if (digits.length < 4 || digits.length > 12) {
+    return `${type} deve ter de 4 a 12 numeros.`;
+  }
+
+  return "";
+}
+
 const weekdayOptions = [
   { value: 0, label: "Dom" },
   { value: 1, label: "Seg" },
@@ -713,9 +732,10 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
   const firstActionableDocument =
     settings.requiredDocuments.find((document) => document.status === "FALTANDO" || document.status === "RECUSADO") ||
     settings.requiredDocuments[0];
-  const [type, setType] = useState<DocumentTypeCode>(firstActionableDocument?.type || "CPF");
+  const initialDocumentType = firstActionableDocument?.type || "CPF";
+  const [type, setType] = useState<DocumentTypeCode>(initialDocumentType);
   const [cpf, setCpf] = useState(settings.cpf ? formatCpf(settings.cpf) : "");
-  const [documentNumber, setDocumentNumber] = useState(settings.professionalRegistrationNumber || "");
+  const [documentNumber, setDocumentNumber] = useState(isCouncilDocument(initialDocumentType) ? settings.professionalRegistrationNumber || "" : "");
   const [registrationUf, setRegistrationUf] = useState(settings.professionalRegistrationUf || settings.state || "RS");
   const [expiresAt, setExpiresAt] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -723,6 +743,20 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const councilDocument = isCouncilDocument(type);
+  const selectedDocumentLabel = documentOptions.find((option) => option.value === type)?.label || "documento";
+
+  function selectDocumentType(nextType: DocumentTypeCode, clearFeedback = true) {
+    setType(nextType);
+    if (clearFeedback) {
+      setError("");
+      setMessage("");
+    }
+    setExpiresAt("");
+    setFile(null);
+    setFileName("");
+    setDocumentNumber(isCouncilDocument(nextType) ? settings.professionalRegistrationNumber || "" : "");
+  }
 
   function readDocumentFile(nextFile: File | undefined) {
     setError("");
@@ -761,7 +795,13 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
       return;
     }
 
-    if ((type === "COREN" || type === "CREFITO") && (!documentNumber.trim() || registrationUf.trim().length !== 2)) {
+    const registrationError = professionalRegistrationError(type, documentNumber);
+    if (registrationError) {
+      setError(registrationError);
+      return;
+    }
+
+    if (councilDocument && registrationUf.trim().length !== 2) {
       setError("Informe numero e UF do registro profissional.");
       return;
     }
@@ -780,8 +820,8 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
       const formData = new FormData();
       formData.set("type", type);
       formData.set("cpf", cpf);
-      formData.set("documentNumber", type === "CPF" ? cpf : documentNumber);
-      formData.set("registrationUf", registrationUf);
+      formData.set("documentNumber", type === "CPF" ? cpf : councilDocument ? cleanRegistrationNumber(documentNumber) : "");
+      formData.set("registrationUf", councilDocument ? registrationUf : "");
       formData.set("expiresAt", expiresAt);
       formData.set("consentAccepted", String(consentAccepted));
       formData.set("file", file);
@@ -802,10 +842,11 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
       setFile(null);
       setFileName("");
       setConsentAccepted(false);
-      setDocumentNumber("");
       const nextType = nextRequiredDocumentType(settings.requiredDocuments, type);
       if (nextType) {
-        setType(nextType);
+        selectDocumentType(nextType, false);
+      } else {
+        setDocumentNumber("");
       }
       router.refresh();
     });
@@ -840,6 +881,11 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
             ))}
           </div>
 
+          <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-5 text-blue-900">
+            Envie um arquivo por tipo para manter CPF, RG ou CNH, comprovante e registro profissional corretamente identificados.
+            O numero do registro aparece somente para COREN ou CREFITO.
+          </div>
+
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {settings.requiredDocuments.map((document) => {
               const active = documentRequirementMatches(document.type, type);
@@ -849,7 +895,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 <button
                   key={document.type}
                   type="button"
-                  onClick={() => setType(document.type)}
+                  onClick={() => selectDocumentType(document.type)}
                   className={`grid min-h-16 rounded-lg border px-3 py-2 text-left text-sm transition ${
                     active
                       ? "border-emerald-700 bg-emerald-50 text-emerald-950"
@@ -876,7 +922,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
             </label>
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
               Tipo de documento
-              <select value={type} onChange={(event) => setType(event.target.value as DocumentTypeCode)} className={fieldClass}>
+              <select value={type} onChange={(event) => selectDocumentType(event.target.value as DocumentTypeCode)} className={fieldClass}>
                 {documentOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -884,25 +930,29 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-semibold text-slate-700">
-              Numero ou registro
-              <input
-                value={documentNumber}
-                onChange={(event) => setDocumentNumber(event.target.value)}
-                placeholder="Ex: COREN-RS 123456"
-                className={fieldClass}
-              />
-            </label>
-            {(type === "COREN" || type === "CREFITO") ? (
-              <label className="grid gap-1 text-sm font-semibold text-slate-700">
-                UF do registro
-                <input
-                  value={registrationUf}
-                  onChange={(event) => setRegistrationUf(event.target.value.toUpperCase().slice(0, 2))}
-                  placeholder="RS"
-                  className={fieldClass}
-                />
-              </label>
+            {councilDocument ? (
+              <>
+                <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                  Numero do {type}
+                  <input
+                    value={documentNumber}
+                    onChange={(event) => setDocumentNumber(cleanRegistrationNumber(event.target.value))}
+                    placeholder={type === "COREN" ? "Ex: 123456" : "Ex: 256709756"}
+                    inputMode="numeric"
+                    className={fieldClass}
+                  />
+                  <span className="text-xs font-medium text-slate-500">Use apenas numeros, de 4 a 12 digitos.</span>
+                </label>
+                <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                  UF do registro
+                  <input
+                    value={registrationUf}
+                    onChange={(event) => setRegistrationUf(event.target.value.toUpperCase().slice(0, 2))}
+                    placeholder="RS"
+                    className={fieldClass}
+                  />
+                </label>
+              </>
             ) : null}
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
               Validade, se houver
@@ -911,7 +961,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
             <label className="grid gap-2 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-700">
               <span className="inline-flex items-center gap-2">
                 <FileUp aria-hidden="true" className="h-4 w-4 text-emerald-700" />
-                Arquivo do documento
+                Arquivo do {selectedDocumentLabel}
               </span>
               <input type="file" accept="image/*,.pdf" onChange={(event) => readDocumentFile(event.target.files?.[0])} className="text-sm" />
               {fileName ? <span className="text-sm font-medium text-emerald-700">{fileName}</span> : null}

@@ -19,6 +19,14 @@ function equivalentDocumentTypes(type: DocumentType) {
   return type === DocumentType.RG || type === DocumentType.CNH ? [DocumentType.RG, DocumentType.CNH] : [type];
 }
 
+function isCouncilDocument(type: DocumentType) {
+  return type === DocumentType.COREN || type === DocumentType.CREFITO;
+}
+
+function cleanRegistrationNumber(value: string) {
+  return value.replace(/\D/g, "").slice(0, 12);
+}
+
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) {
@@ -38,6 +46,7 @@ export async function POST(request: NextRequest) {
   const type = readText(form, "type");
   const cpf = cleanCpf(readText(form, "cpf"));
   const documentNumber = readText(form, "documentNumber");
+  const registrationNumber = cleanRegistrationNumber(documentNumber);
   const registrationUf = readText(form, "registrationUf").toUpperCase();
   const expiresAt = readText(form, "expiresAt");
   const consentAccepted = readText(form, "consentAccepted") === "true";
@@ -51,7 +60,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Informe um CPF valido." }, { status: 400 });
   }
 
-  if ((type === DocumentType.COREN || type === DocumentType.CREFITO) && (!documentNumber || registrationUf.length !== 2)) {
+  const councilDocument = isCouncilDocument(type);
+  if (councilDocument && (registrationNumber.length < 4 || registrationNumber.length > 12 || registrationUf.length !== 2)) {
     return NextResponse.json({ error: "Informe numero e UF do registro profissional." }, { status: 400 });
   }
 
@@ -96,8 +106,8 @@ export async function POST(request: NextRequest) {
   const result = await createProfessionalDocumentForUser(session.userId, {
     type,
     cpf,
-    documentNumber: type === DocumentType.CPF ? cpf : documentNumber || undefined,
-    registrationUf: registrationUf || undefined,
+    documentNumber: type === DocumentType.CPF ? cpf : councilDocument ? registrationNumber : undefined,
+    registrationUf: councilDocument ? registrationUf : undefined,
     storagePath: upload.path,
     fileName: file.name,
     mimeType: file.type,

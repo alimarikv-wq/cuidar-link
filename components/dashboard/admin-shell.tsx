@@ -376,7 +376,7 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
 }
 
 export function AdminShell({ overview }: { overview: CareAdminOverview }) {
-  const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [statusFilter, setStatusFilter] = useState("ABERTOS");
   const [typeFilter, setTypeFilter] = useState("TODOS");
   const [documentTypeFilter, setDocumentTypeFilter] = useState("TODOS");
   const [ufFilter, setUfFilter] = useState("TODAS");
@@ -385,7 +385,11 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
   const [emailTestMessage, setEmailTestMessage] = useState("");
   const [emailTestError, setEmailTestError] = useState("");
   const filteredDocuments = overview.documentsForReview.filter((document) => {
-    const statusMatches = statusFilter === "TODOS" || document.professionalVerificationStatus === statusFilter || document.status === statusFilter;
+    const statusMatches =
+      statusFilter === "TODOS" ||
+      (statusFilter === "ABERTOS" && (document.status !== "VERIFICADO" || document.professionalVerificationStatus !== "APROVADO")) ||
+      document.professionalVerificationStatus === statusFilter ||
+      document.status === statusFilter;
     const typeMatches = typeFilter === "TODOS" || document.professionalTypeLabel === typeFilter;
     const documentTypeMatches = documentTypeFilter === "TODOS" || document.type === documentTypeFilter;
     const ufMatches = ufFilter === "TODAS" || document.professionalRegistrationUf === ufFilter;
@@ -805,12 +809,16 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
       <article id="documentos" className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-semibold text-emerald-700">Verificacao</p>
         <h3 className="mt-2 text-2xl font-semibold text-slate-950">Documentos para revisar</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          A fila abre mostrando apenas pendencias. Para auditoria ou conferencia historica, altere o filtro para todos os status.
+        </p>
         <div className="mt-5 grid gap-3 md:grid-cols-4">
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
             className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
           >
+            <option value="ABERTOS">Somente pendencias</option>
             <option value="TODOS">Todos os status</option>
             <option value="PENDENTE">Pendente / enviado</option>
             <option value="EM_ANALISE">Em analise</option>
