@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarClock, Check, CheckCircle2, ExternalLink, MailCheck, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, CheckCircle2, ExternalLink, ListChecks, MailCheck, X } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AdminDocumentReviewData,
@@ -58,6 +58,62 @@ const requestStatusStyles: Record<string, string> = {
   CANCELADO: "bg-rose-50 text-rose-700",
   RASCUNHO: "bg-slate-100 text-slate-700"
 };
+
+const operationalAlertStyles: Record<string, { panel: string; badge: string; label: string }> = {
+  OK: {
+    panel: "border-emerald-200 bg-emerald-50/60",
+    badge: "bg-emerald-700 text-white",
+    label: "OK"
+  },
+  INFO: {
+    panel: "border-sky-200 bg-sky-50/60",
+    badge: "bg-sky-700 text-white",
+    label: "Info"
+  },
+  WARNING: {
+    panel: "border-amber-200 bg-amber-50/70",
+    badge: "bg-amber-600 text-white",
+    label: "Atencao"
+  },
+  ACTION: {
+    panel: "border-rose-200 bg-rose-50/70",
+    badge: "bg-rose-700 text-white",
+    label: "Acao"
+  }
+};
+
+const launchTestSteps = [
+  {
+    title: "1. Paciente entra e busca",
+    detail: "Entrar com uma conta de paciente, usar localizacao, filtros, favoritos e abrir detalhes de um profissional.",
+    href: "/",
+    action: "Abrir busca"
+  },
+  {
+    title: "2. Pedido e e-mail",
+    detail: "Solicitar atendimento com telefone, e-mail, CEP, data, horario e revisar se o profissional recebeu aviso.",
+    href: "/admin#pedidos-recentes",
+    action: "Ver pedidos"
+  },
+  {
+    title: "3. Profissional responde",
+    detail: "No painel do profissional, aceitar, agendar, cancelar ou concluir o pedido e conferir notificacoes do paciente.",
+    href: "/dashboard#atendimentos",
+    action: "Abrir painel"
+  },
+  {
+    title: "4. Documentos e selo",
+    detail: "Enviar documentos, revisar no admin, aprovar cadastro e confirmar o selo de profissional verificado na busca.",
+    href: "/admin#documentos",
+    action: "Revisar docs"
+  },
+  {
+    title: "5. Historico final",
+    detail: "Concluir atendimento, avaliar profissional, arquivar historico e testar restaurar ou apagar um item arquivado.",
+    href: "/dashboard#atendimentos",
+    action: "Ver historico"
+  }
+];
 
 function formatAdminDate(value: string | null) {
   if (!value) return "Sem horario";
@@ -362,6 +418,33 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
       </article>
 
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Teste guiado</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Roteiro de validacao ponta a ponta</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Siga esta ordem quando for testar com contas reais. Ela cobre o caminho principal de paciente, profissional e admin.
+            </p>
+          </div>
+          <ListChecks aria-hidden="true" className="h-6 w-6 text-emerald-700" />
+        </div>
+        <div className="mt-5 grid gap-3 lg:grid-cols-5">
+          {launchTestSteps.map((step) => (
+            <div key={step.title} className="flex min-h-44 flex-col rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="font-semibold leading-5 text-slate-950">{step.title}</p>
+              <p className="mt-2 flex-1 text-sm leading-5 text-slate-600">{step.detail}</p>
+              <Link
+                href={step.href}
+                className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500"
+              >
+                {step.action}
+              </Link>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article id="email" className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-emerald-700">Notificacoes</p>
@@ -387,6 +470,50 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
       </article>
 
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Atencao operacional</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Pontos para acompanhar</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Alertas calculados com base nos pedidos, profissionais, documentos e notificacoes configuradas.
+            </p>
+          </div>
+          <span className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+            {overview.operationalAlerts.length} item(ns)
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {overview.operationalAlerts.map((alert) => {
+            const style = operationalAlertStyles[alert.severity];
+            const Icon = alert.severity === "OK" ? CheckCircle2 : AlertTriangle;
+
+            return (
+              <div key={alert.key} className={`rounded-lg border p-4 ${style.panel}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <Icon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-slate-700" />
+                    <div>
+                      <p className="font-semibold text-slate-950">{alert.title}</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-600">{alert.detail}</p>
+                    </div>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${style.badge}`}>{style.label}</span>
+                </div>
+                {alert.actionHref && alert.actionLabel ? (
+                  <Link
+                    href={alert.actionHref}
+                    className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500"
+                  >
+                    {alert.actionLabel}
+                  </Link>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </article>
+
+      <article id="pedidos-recentes" className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-emerald-700">Operacao</p>
@@ -479,7 +606,7 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
         </article>
       </div>
 
-      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <article id="documentos" className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-semibold text-emerald-700">Verificacao</p>
         <h3 className="mt-2 text-2xl font-semibold text-slate-950">Documentos para revisar</h3>
         <div className="mt-5 grid gap-3 md:grid-cols-4">

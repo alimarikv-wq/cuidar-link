@@ -321,6 +321,15 @@ export type AdminCareRequestSummary = {
   city: string;
 };
 
+export type AdminOperationalAlert = {
+  key: string;
+  severity: "OK" | "INFO" | "WARNING" | "ACTION";
+  title: string;
+  detail: string;
+  actionLabel: string | null;
+  actionHref: string | null;
+};
+
 export type ProfessionalSettingsData = {
   professionalType: ProfessionalTypeCode;
   gender: GenderCode;
@@ -398,6 +407,7 @@ export type CareAdminOverview = {
   requestsByStatus: Array<{ label: string; count: number }>;
   readinessChecks: AdminReadinessCheck[];
   recentCareRequests: AdminCareRequestSummary[];
+  operationalAlerts: AdminOperationalAlert[];
   documentsForReview: AdminDocumentReviewData[];
   auditLogs: Array<{
     id: string;

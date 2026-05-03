@@ -177,6 +177,106 @@ function toReadinessChecks(checks: AppHealthChecks): CareAdminOverview["readines
   ];
 }
 
+function toOperationalAlerts(input: {
+  unansweredRequests: number;
+  staleUnansweredRequests: number;
+  pendingDocuments: number;
+  unverifiedActiveProfessionals: number;
+  professionalsWithoutAvailability: number;
+  activeProfessionalsMissingPhoto: number;
+  emailNotifications: boolean;
+}): CareAdminOverview["operationalAlerts"] {
+  const alerts: CareAdminOverview["operationalAlerts"] = [];
+
+  if (input.staleUnansweredRequests > 0) {
+    alerts.push({
+      key: "stale-unanswered-requests",
+      severity: "ACTION",
+      title: "Pedidos parados ha mais de 4 horas",
+      detail: `${input.staleUnansweredRequests} pedido(s) enviados ainda sem aceite ou agendamento. Vale acionar o profissional.`,
+      actionLabel: "Ver pedidos",
+      actionHref: "/admin#pedidos-recentes"
+    });
+  } else if (input.unansweredRequests > 0) {
+    alerts.push({
+      key: "unanswered-requests",
+      severity: "WARNING",
+      title: "Pedidos aguardando resposta",
+      detail: `${input.unansweredRequests} pedido(s) enviados ainda sem aceite ou agendamento.`,
+      actionLabel: "Ver pedidos",
+      actionHref: "/admin#pedidos-recentes"
+    });
+  }
+
+  if (input.pendingDocuments > 0) {
+    alerts.push({
+      key: "pending-documents",
+      severity: "ACTION",
+      title: "Documentos para revisar",
+      detail: `${input.pendingDocuments} documento(s) aguardando revisao administrativa.`,
+      actionLabel: "Revisar documentos",
+      actionHref: "/admin#documentos"
+    });
+  }
+
+  if (input.unverifiedActiveProfessionals > 0) {
+    alerts.push({
+      key: "unverified-professionals",
+      severity: "WARNING",
+      title: "Profissionais ainda sem selo",
+      detail: `${input.unverifiedActiveProfessionals} profissional(is) ativo(s) ainda nao aparecem como verificados.`,
+      actionLabel: "Ver documentos",
+      actionHref: "/admin#documentos"
+    });
+  }
+
+  if (input.professionalsWithoutAvailability > 0) {
+    alerts.push({
+      key: "professionals-without-availability",
+      severity: "WARNING",
+      title: "Profissionais sem agenda",
+      detail: `${input.professionalsWithoutAvailability} profissional(is) ativo(s) nao tem horario cadastrado. Eles quase nao aparecem em buscas por horario.`,
+      actionLabel: "Abrir painel",
+      actionHref: "/dashboard"
+    });
+  }
+
+  if (input.activeProfessionalsMissingPhoto > 0) {
+    alerts.push({
+      key: "professionals-without-photo",
+      severity: "INFO",
+      title: "Perfis sem foto",
+      detail: `${input.activeProfessionalsMissingPhoto} profissional(is) ativo(s) ainda nao colocaram foto. Isso reduz confianca na busca.`,
+      actionLabel: "Orientar profissionais",
+      actionHref: "/dashboard"
+    });
+  }
+
+  if (!input.emailNotifications) {
+    alerts.push({
+      key: "email-notifications",
+      severity: "ACTION",
+      title: "E-mail automatico desligado",
+      detail: "Pedidos e atualizacoes ficam menos confiaveis sem notificacao por e-mail.",
+      actionLabel: "Testar e-mail",
+      actionHref: "/admin#email"
+    });
+  }
+
+  if (alerts.length === 0) {
+    alerts.push({
+      key: "operational-ok",
+      severity: "OK",
+      title: "Operacao sem alerta critico",
+      detail: "Nenhum pedido parado, documento pendente ou configuracao critica encontrada agora.",
+      actionLabel: null,
+      actionHref: null
+    });
+  }
+
+  return alerts;
+}
+
 export type CareSearchParams = {
   service: CareService;
   professionalType?: ProfessionalType;
@@ -1847,6 +1947,7 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
 }
 
 export async function getCareAdminOverview(): Promise<CareAdminOverview> {
+  const staleRequestThreshold = new Date(Date.now() - 4 * 60 * 60 * 1000);
   const [
     users,
     patients,
@@ -1855,6 +1956,11 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     openRequests,
     completedRequests,
     pendingDocuments,
+    unansweredRequests,
+    staleUnansweredRequests,
+    unverifiedActiveProfessionals,
+    professionalsWithoutAvailability,
+    activeProfessionalsMissingPhoto,
     professionalsByType,
     requestsByStatus,
     documentsForReview,
@@ -1869,6 +1975,11 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.careRequest.count({ where: { status: { in: [CareRequestStatus.ENVIADO, CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO] } } }),
       prisma.careRequest.count({ where: { status: CareRequestStatus.CONCLUIDO } }),
       prisma.professionalDocument.count({ where: { status: VerificationStatus.PENDENTE } }),
+      prisma.careRequest.count({ where: { status: CareRequestStatus.ENVIADO } }),
+      prisma.careRequest.count({ where: { status: CareRequestStatus.ENVIADO, createdAt: { lte: staleRequestThreshold } } }),
+      prisma.professionalProfile.count({ where: { isActive: true, isVerified: false } }),
+      prisma.professionalProfile.count({ where: { isActive: true, availability: { none: {} } } }),
+      prisma.professionalProfile.count({ where: { isActive: true, photoUrl: null } }),
       prisma.professionalProfile.groupBy({
         by: ["professionalType"],
         _count: { _all: true }
@@ -1919,6 +2030,15 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       count: item._count._all
     })),
     readinessChecks: toReadinessChecks(healthChecks),
+    operationalAlerts: toOperationalAlerts({
+      unansweredRequests,
+      staleUnansweredRequests,
+      pendingDocuments,
+      unverifiedActiveProfessionals,
+      professionalsWithoutAvailability,
+      activeProfessionalsMissingPhoto,
+      emailNotifications: healthChecks.emailNotifications
+    }),
     recentCareRequests: recentCareRequests.map((request) => ({
       id: request.id,
       status: request.status,
