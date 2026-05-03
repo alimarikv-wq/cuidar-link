@@ -278,6 +278,8 @@ function formatValidationMessage(items: string[]) {
 
 export function CareMatchApp() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const detailScrollRef = useRef<HTMLDivElement | null>(null);
+  const reviewsSectionRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRefs = useRef<Marker[]>([]);
   const favoriteProfessionalIdRef = useRef("");
@@ -331,6 +333,7 @@ export function CareMatchApp() {
   const [travelNotes, setTravelNotes] = useState("");
   const [notes, setNotes] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
+  const [highlightReviews, setHighlightReviews] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
   const [favoritePendingId, setFavoritePendingId] = useState("");
   const [favoriteError, setFavoriteError] = useState("");
@@ -514,6 +517,28 @@ export function CareMatchApp() {
   };
 
   useEffect(() => {
+    if (!detailOpen || !highlightReviews || !selected?.recentReviews.length) return;
+
+    const scrollTimer = window.setTimeout(() => {
+      const scrollContainer = detailScrollRef.current;
+      const reviewsSection = reviewsSectionRef.current;
+      if (!scrollContainer || !reviewsSection) return;
+
+      scrollContainer.scrollTo({
+        top: Math.max(reviewsSection.offsetTop - 12, 0),
+        behavior: "smooth"
+      });
+    }, 80);
+
+    const highlightTimer = window.setTimeout(() => setHighlightReviews(false), 2400);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(highlightTimer);
+    };
+  }, [detailOpen, highlightReviews, selected?.id, selected?.recentReviews.length]);
+
+  useEffect(() => {
     if (!detailOpen || !selected || !scheduledParts.date) {
       queueMicrotask(() => {
         setAvailableTimes([]);
@@ -578,9 +603,10 @@ export function CareMatchApp() {
     }
   }
 
-  function selectProfessional(id: string) {
+  function selectProfessional(id: string, options?: { showReviews?: boolean }) {
     setSelectedId(id);
     setDetailOpen(true);
+    setHighlightReviews(Boolean(options?.showReviews));
     setRequestAttempted(false);
     setRequestSent(false);
     setRequestError("");
@@ -590,6 +616,7 @@ export function CareMatchApp() {
 
   function closeDetails() {
     setDetailOpen(false);
+    setHighlightReviews(false);
     setRequestAttempted(false);
     setRequestError("");
     setRequestReviewOpen(false);
@@ -1169,21 +1196,22 @@ export function CareMatchApp() {
                         <span className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">
                           {professional.matchScore}% match
                         </span>
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold ${
-                            professional.reviewCount > 0
-                              ? "bg-amber-50 text-amber-800"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          <Star
-                            aria-hidden="true"
-                            className={`h-3.5 w-3.5 ${
-                              professional.reviewCount > 0 ? "fill-amber-400 text-amber-500" : "text-slate-400"
-                            }`}
-                          />
-                          {formatRatingSummary(professional.rating, professional.reviewCount)}
-                        </span>
+                        {professional.reviewCount > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => selectProfessional(professional.id, { showReviews: true })}
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                            aria-label={`Abrir avaliacoes de ${professional.name}`}
+                          >
+                            <Star aria-hidden="true" className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                            {formatRatingSummary(professional.rating, professional.reviewCount)}
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                            <Star aria-hidden="true" className="h-3.5 w-3.5 text-slate-400" />
+                            {formatRatingSummary(professional.rating, professional.reviewCount)}
+                          </span>
+                        )}
                         <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                           {professional.age} anos
                         </span>
@@ -1290,7 +1318,7 @@ export function CareMatchApp() {
                 >
                   <X aria-hidden="true" className="h-5 w-5" />
                 </button>
-                <div className="overflow-y-auto p-4 pb-5 sm:p-5">
+                <div ref={detailScrollRef} className="overflow-y-auto p-4 pb-5 sm:p-5">
                   <div className="relative h-32 overflow-hidden rounded-lg bg-slate-100 sm:h-40">
                     {selected.photoUrl ? (
                       <Image src={selected.photoUrl} alt={selected.name} fill sizes="360px" className="object-cover" />
@@ -1337,7 +1365,12 @@ export function CareMatchApp() {
                   </div>
 
                   {selected.recentReviews.length > 0 ? (
-                    <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50 p-3">
+                    <div
+                      ref={reviewsSectionRef}
+                      className={`mt-4 rounded-lg border bg-amber-50 p-3 transition ${
+                        highlightReviews ? "border-amber-400 ring-2 ring-amber-200" : "border-amber-100"
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-amber-950">Avaliacoes recentes</p>
                         <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-amber-800">
