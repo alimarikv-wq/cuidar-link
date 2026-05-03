@@ -81,21 +81,6 @@ const documentOptions: Array<{ value: DocumentTypeCode; label: string }> = [
   { value: "REFERENCIA", label: "Referencia" }
 ];
 
-function documentRequirementMatches(requirementType: DocumentTypeCode, documentType: DocumentTypeCode) {
-  return requirementType === "RG" ? documentType === "RG" || documentType === "CNH" : requirementType === documentType;
-}
-
-function nextRequiredDocumentType(requiredDocuments: ProfessionalSettingsData["requiredDocuments"], currentType?: DocumentTypeCode) {
-  const nextDocument = requiredDocuments.find((document) => {
-    return (
-      (document.status === "FALTANDO" || document.status === "RECUSADO") &&
-      (!currentType || !documentRequirementMatches(document.type, currentType))
-    );
-  });
-
-  return nextDocument?.type;
-}
-
 function documentRequirementText(status: ProfessionalSettingsData["requiredDocuments"][number]["status"]) {
   if (status === "FALTANDO") return "Faltando";
   if (status === "PENDENTE") return "Enviado";
@@ -729,40 +714,32 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
 function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSettingsData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const firstActionableDocument =
-    settings.requiredDocuments.find((document) => document.status === "FALTANDO" || document.status === "RECUSADO") ||
-    settings.requiredDocuments[0];
-  const initialDocumentType = firstActionableDocument?.type || "CPF";
-  const [type, setType] = useState<DocumentTypeCode>(initialDocumentType);
+  const actionableDocuments = settings.requiredDocuments.filter((document) => document.status === "FALTANDO" || document.status === "RECUSADO");
+  const councilRequirement = actionableDocuments.find((document) => isCouncilDocument(document.type));
+  const needsCouncilData = Boolean(councilRequirement);
   const [cpf, setCpf] = useState(settings.cpf ? formatCpf(settings.cpf) : "");
-  const [documentNumber, setDocumentNumber] = useState(isCouncilDocument(initialDocumentType) ? settings.professionalRegistrationNumber || "" : "");
+  const [documentNumber, setDocumentNumber] = useState(needsCouncilData ? settings.professionalRegistrationNumber || "" : "");
   const [registrationUf, setRegistrationUf] = useState(settings.professionalRegistrationUf || settings.state || "RS");
   const [expiresAt, setExpiresAt] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState("");
+  const [documentFiles, setDocumentFiles] = useState<Partial<Record<DocumentTypeCode, File>>>({});
+  const [uploadTypes, setUploadTypes] = useState<Partial<Record<DocumentTypeCode, DocumentTypeCode>>>({});
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const councilDocument = isCouncilDocument(type);
-  const selectedDocumentLabel = documentOptions.find((option) => option.value === type)?.label || "documento";
 
-  function selectDocumentType(nextType: DocumentTypeCode, clearFeedback = true) {
-    setType(nextType);
-    if (clearFeedback) {
-      setError("");
-      setMessage("");
-    }
-    setExpiresAt("");
-    setFile(null);
-    setFileName("");
-    setDocumentNumber(isCouncilDocument(nextType) ? settings.professionalRegistrationNumber || "" : "");
+  function actualUploadType(requirementType: DocumentTypeCode) {
+    return uploadTypes[requirementType] || requirementType;
   }
 
-  function readDocumentFile(nextFile: File | undefined) {
+  function readDocumentFile(requirementType: DocumentTypeCode, nextFile: File | undefined) {
     setError("");
     setMessage("");
-    setFile(null);
-    setFileName("");
+    setDocumentFiles((current) => {
+      const next = { ...current };
+      delete next[requirementType];
+      return next;
+    });
 
     if (!nextFile) return;
     if (nextFile.size > 2_000_000) {
@@ -776,38 +753,42 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
       return;
     }
 
-    setFile(nextFile);
-    setFileName(nextFile.name);
+    setDocumentFiles((current) => ({ ...current, [requirementType]: nextFile }));
   }
 
   function submitDocument() {
     setError("");
     setMessage("");
 
-    const currentRequirement = settings.requiredDocuments.find((document) => documentRequirementMatches(document.type, type));
-    if (currentRequirement && (currentRequirement.status === "PENDENTE" || currentRequirement.status === "VERIFICADO")) {
-      setError(`${currentRequirement.label} ja foi enviado. Escolha outro documento obrigatorio ou aguarde a revisao.`);
-      return;
-    }
-
     if (!isValidCpf(cpf)) {
       setError("Informe um CPF valido.");
       return;
     }
 
-    const registrationError = professionalRegistrationError(type, documentNumber);
+    const selectedDocuments = actionableDocuments
+      .map((document) => ({
+        requirement: document,
+        uploadType: actualUploadType(document.type),
+        file: documentFiles[document.type]
+      }))
+      .filter((document): document is { requirement: ProfessionalSettingsData["requiredDocuments"][number]; uploadType: DocumentTypeCode; file: File } =>
+        Boolean(document.file)
+      );
+
+    if (selectedDocuments.length === 0) {
+      setError("Anexe pelo menos um documento antes de enviar.");
+      return;
+    }
+
+    const selectedCouncilDocument = selectedDocuments.find((document) => isCouncilDocument(document.uploadType));
+    const registrationError = selectedCouncilDocument ? professionalRegistrationError(selectedCouncilDocument.uploadType, documentNumber) : "";
     if (registrationError) {
       setError(registrationError);
       return;
     }
 
-    if (councilDocument && registrationUf.trim().length !== 2) {
+    if (selectedCouncilDocument && registrationUf.trim().length !== 2) {
       setError("Informe numero e UF do registro profissional.");
-      return;
-    }
-
-    if (!file) {
-      setError("Anexe uma imagem ou PDF do documento.");
       return;
     }
 
@@ -817,37 +798,39 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
     }
 
     startTransition(async () => {
-      const formData = new FormData();
-      formData.set("type", type);
-      formData.set("cpf", cpf);
-      formData.set("documentNumber", type === "CPF" ? cpf : councilDocument ? cleanRegistrationNumber(documentNumber) : "");
-      formData.set("registrationUf", councilDocument ? registrationUf : "");
-      formData.set("expiresAt", expiresAt);
-      formData.set("consentAccepted", String(consentAccepted));
-      formData.set("file", file);
+      for (const document of selectedDocuments) {
+        const councilDocument = isCouncilDocument(document.uploadType);
+        const formData = new FormData();
+        formData.set("type", document.uploadType);
+        formData.set("cpf", cpf);
+        formData.set("documentNumber", document.uploadType === "CPF" ? cpf : councilDocument ? cleanRegistrationNumber(documentNumber) : "");
+        formData.set("registrationUf", councilDocument ? registrationUf : "");
+        formData.set("expiresAt", expiresAt);
+        formData.set("consentAccepted", String(consentAccepted));
+        formData.set("file", document.file);
 
-      const response = await fetch("/api/professional-documents", {
-        method: "POST",
-        body: formData
-      });
-      const data = await response.json();
+        const response = await fetch("/api/professional-documents", {
+          method: "POST",
+          body: formData
+        });
+        const data = await response.json();
 
-      if (!response.ok) {
-        setError(data.error || "Nao foi possivel enviar o documento.");
-        return;
+        if (!response.ok) {
+          setError(`${document.requirement.label}: ${data.error || "Nao foi possivel enviar o documento."}`);
+          router.refresh();
+          return;
+        }
       }
 
-      setMessage("Seus documentos foram enviados e estao em analise. Voce sera notificado quando a validacao for concluida.");
+      setMessage(
+        selectedDocuments.length === 1
+          ? "Documento enviado e em analise. Voce sera notificado quando a validacao for concluida."
+          : "Documentos enviados e em analise. Voce sera notificado quando a validacao for concluida."
+      );
       setExpiresAt("");
-      setFile(null);
-      setFileName("");
+      setDocumentFiles({});
       setConsentAccepted(false);
-      const nextType = nextRequiredDocumentType(settings.requiredDocuments, type);
-      if (nextType) {
-        selectDocumentType(nextType, false);
-      } else {
-        setDocumentNumber("");
-      }
+      setFileInputKey((current) => current + 1);
       router.refresh();
     });
   }
@@ -886,29 +869,6 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
             O numero do registro aparece somente para COREN ou CREFITO.
           </div>
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {settings.requiredDocuments.map((document) => {
-              const active = documentRequirementMatches(document.type, type);
-              const locked = document.status === "PENDENTE" || document.status === "VERIFICADO";
-
-              return (
-                <button
-                  key={document.type}
-                  type="button"
-                  onClick={() => selectDocumentType(document.type)}
-                  className={`grid min-h-16 rounded-lg border px-3 py-2 text-left text-sm transition ${
-                    active
-                      ? "border-emerald-700 bg-emerald-50 text-emerald-950"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
-                  }`}
-                >
-                  <span className="font-semibold">{document.label}</span>
-                  <span className={locked ? "text-slate-500" : "text-emerald-700"}>{documentRequirementText(document.status)}</span>
-                </button>
-              );
-            })}
-          </div>
-
           <div className="mt-4 grid gap-3">
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
               CPF
@@ -920,24 +880,15 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 className={fieldClass}
               />
             </label>
-            <label className="grid gap-1 text-sm font-semibold text-slate-700">
-              Tipo de documento
-              <select value={type} onChange={(event) => selectDocumentType(event.target.value as DocumentTypeCode)} className={fieldClass}>
-                {documentOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {councilDocument ? (
+
+            {needsCouncilData ? (
               <>
                 <label className="grid gap-1 text-sm font-semibold text-slate-700">
-                  Numero do {type}
+                  Numero do {councilRequirement?.type}
                   <input
                     value={documentNumber}
                     onChange={(event) => setDocumentNumber(cleanRegistrationNumber(event.target.value))}
-                    placeholder={type === "COREN" ? "Ex: 123456" : "Ex: 256709756"}
+                    placeholder={councilRequirement?.type === "COREN" ? "Ex: 123456" : "Ex: 256709756"}
                     inputMode="numeric"
                     className={fieldClass}
                   />
@@ -954,18 +905,70 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 </label>
               </>
             ) : null}
-            <label className="grid gap-1 text-sm font-semibold text-slate-700">
-              Validade, se houver
-              <input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className={fieldClass} />
-            </label>
-            <label className="grid gap-2 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-700">
-              <span className="inline-flex items-center gap-2">
-                <FileUp aria-hidden="true" className="h-4 w-4 text-emerald-700" />
-                Arquivo do {selectedDocumentLabel}
-              </span>
-              <input type="file" accept="image/*,.pdf" onChange={(event) => readDocumentFile(event.target.files?.[0])} className="text-sm" />
-              {fileName ? <span className="text-sm font-medium text-emerald-700">{fileName}</span> : null}
-            </label>
+
+            {needsCouncilData ? (
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Validade do registro, se houver
+                <input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className={fieldClass} />
+              </label>
+            ) : null}
+
+            {actionableDocuments.length > 0 ? (
+              <div className="grid gap-3">
+                {actionableDocuments.map((document) => {
+                  const uploadType = actualUploadType(document.type);
+                  const selectedFile = documentFiles[document.type];
+
+                  return (
+                    <div key={document.type} className="rounded-lg border border-slate-200 bg-white p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-slate-950">{document.label}</p>
+                          <p className="mt-1 text-sm text-slate-500">{documentRequirementText(document.status)}</p>
+                        </div>
+                        {document.type === "RG" ? (
+                          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                            Enviar como
+                            <select
+                              value={uploadType}
+                              onChange={(event) =>
+                                setUploadTypes((current) => ({
+                                  ...current,
+                                  [document.type]: event.target.value as DocumentTypeCode
+                                }))
+                              }
+                              className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-950 outline-none focus:border-emerald-600"
+                            >
+                              <option value="RG">RG</option>
+                              <option value="CNH">CNH</option>
+                            </select>
+                          </label>
+                        ) : null}
+                      </div>
+                      <label className="mt-3 grid gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                        <span className="inline-flex items-center gap-2">
+                          <FileUp aria-hidden="true" className="h-4 w-4 text-emerald-700" />
+                          Arquivo do {document.type === "RG" ? documentOptions.find((option) => option.value === uploadType)?.label : document.label}
+                        </span>
+                        <input
+                          key={`${fileInputKey}-${document.type}-${uploadType}`}
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(event) => readDocumentFile(document.type, event.target.files?.[0])}
+                          className="text-sm"
+                        />
+                        {selectedFile ? <span className="text-sm font-medium text-emerald-700">{selectedFile.name}</span> : null}
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+                Todos os documentos obrigatorios ja foram enviados ou aprovados. Se algum for recusado, ele reaparece aqui para reenvio.
+              </div>
+            )}
+
             <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
               <input
                 type="checkbox"
@@ -980,10 +983,10 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
             <button
               type="button"
               onClick={submitDocument}
-              disabled={isPending}
+              disabled={isPending || actionableDocuments.length === 0}
               className="inline-flex h-11 items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
             >
-              {isPending ? "Enviando..." : "Enviar documento"}
+              {isPending ? "Enviando..." : "Enviar documentos selecionados"}
             </button>
             {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{message}</p> : null}
             {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
