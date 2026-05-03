@@ -7,6 +7,7 @@ import { AlertTriangle, CalendarClock, Check, CheckCircle2, ExternalLink, ListCh
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AdminDocumentReviewData,
+  AdminProfessionalSummary,
   CareAdminOverview,
   DocumentTypeCode,
   ProfessionalVerificationStatusCode,
@@ -134,6 +135,52 @@ function formatAdminDate(value: string | null) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function professionalNextSteps(professional: AdminProfessionalSummary) {
+  const steps: string[] = [];
+
+  if (!professional.isVerified) {
+    if (professional.missingRequiredDocuments.length > 0) {
+      steps.push(`Selo: faltam ${professional.missingRequiredDocuments.join(", ")}.`);
+    }
+    if (professional.pendingDocuments > 0) {
+      steps.push("Revisar os documentos enviados e depois aprovar o cadastro.");
+    } else if (professional.verifiedDocuments === 0) {
+      steps.push("Solicitar que o profissional envie os documentos no Meu painel.");
+    } else if (professional.verificationStatusLabel !== "Aprovado") {
+      steps.push("Aprovar o cadastro depois que os documentos obrigatorios estiverem corretos.");
+    }
+  }
+
+  if (professional.availabilityCount === 0) {
+    steps.push("Agenda: o profissional precisa marcar dias e horarios no Meu painel e salvar o perfil.");
+  }
+
+  if (!professional.hasPhoto) {
+    steps.push("Foto: pedir envio da foto do perfil para aumentar confianca na busca.");
+  }
+
+  if (professional.servicesCount === 0) {
+    steps.push("Servicos: pedir que o profissional marque os atendimentos que realiza.");
+  }
+
+  return steps.length > 0 ? steps : ["Perfil operacionalmente pronto."];
+}
+
+function professionalMailto(professional: AdminProfessionalSummary) {
+  const subject = "CuidarLink - completar perfil profissional";
+  const body = [
+    `Ola, ${professional.name}.`,
+    "",
+    "Para seu perfil aparecer melhor na CuidarLink, precisamos ajustar os pontos abaixo:",
+    ...professionalNextSteps(professional).map((step) => `- ${step}`),
+    "",
+    "Entre no Meu painel da CuidarLink, atualize as informacoes e salve o perfil.",
+    "Obrigado!"
+  ].join("\n");
+
+  return `mailto:${professional.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) {
@@ -567,6 +614,12 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
           ) : null}
           {filteredProfessionals.map((professional) => (
             <div key={professional.id} className="rounded-lg border border-slate-200 p-4">
+              {(() => {
+                const hasDocuments = professional.pendingDocuments + professional.verifiedDocuments > 0;
+                const nextSteps = professionalNextSteps(professional);
+
+                return (
+                  <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-emerald-700">{professional.professionalTypeLabel}</p>
@@ -611,24 +664,46 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
                   </span>
                 )}
               </div>
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase text-slate-500">Proximo passo</p>
+                <ul className="mt-2 grid gap-1 text-sm leading-5 text-slate-700">
+                  {nextSteps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ul>
+                {professional.missingRequiredDocuments.length > 0 ? (
+                  <p className="mt-2 text-xs font-semibold text-amber-800">
+                    Documentos obrigatorios pendentes: {professional.missingRequiredDocuments.join(", ")}.
+                  </p>
+                ) : null}
+              </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">Atualizado em {formatAdminDate(professional.updatedAt)}</p>
                 <div className="flex flex-wrap gap-2">
-                  <Link
-                    href="/admin#documentos"
-                    className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500"
-                  >
-                    Ver docs
-                  </Link>
+                  {hasDocuments ? (
+                    <Link
+                      href="/admin#documentos"
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500"
+                    >
+                      Ver docs
+                    </Link>
+                  ) : (
+                    <span className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-500">
+                      Sem docs enviados
+                    </span>
+                  )}
                   <a
-                    href={`mailto:${professional.email}`}
+                    href={professionalMailto(professional)}
                     className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                   >
                     <Mail aria-hidden="true" className="h-4 w-4" />
-                    E-mail
+                    Orientar
                   </a>
                 </div>
               </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>

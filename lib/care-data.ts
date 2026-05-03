@@ -1993,7 +1993,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
         include: {
           user: true,
           availability: { select: { id: true } },
-          documents: { select: { status: true } }
+          documents: { select: { type: true, status: true } }
         },
         orderBy: [{ isVerified: "asc" }, { updatedAt: "desc" }],
         take: 50
@@ -2052,11 +2052,15 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     professionalDirectory: professionalDirectory.map((professional) => {
       const pendingDocumentCount = professional.documents.filter((document) => document.status === VerificationStatus.PENDENTE).length;
       const verifiedDocumentCount = professional.documents.filter((document) => document.status === VerificationStatus.VERIFICADO).length;
+      const missingRequiredDocuments = requiredDocumentStatus(professional.professionalType, professional.documents)
+        .filter((document) => document.status !== "VERIFICADO")
+        .map((document) => document.label);
       const issues = [
         professional.isVerified ? null : "Sem selo",
         professional.availability.length > 0 ? null : "Sem agenda",
         professional.photoUrl ? null : "Sem foto",
         pendingDocumentCount > 0 ? `${pendingDocumentCount} doc pendente(s)` : null,
+        missingRequiredDocuments.length > 0 ? `${missingRequiredDocuments.length} doc obrigatorio(s)` : null,
         professional.services.length > 0 ? null : "Sem servicos"
       ].filter(Boolean) as string[];
 
@@ -2073,6 +2077,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
         availabilityCount: professional.availability.length,
         pendingDocuments: pendingDocumentCount,
         verifiedDocuments: verifiedDocumentCount,
+        missingRequiredDocuments,
         servicesCount: professional.services.length,
         neighborhood: professional.neighborhood,
         city: professional.city,

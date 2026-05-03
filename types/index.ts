@@ -343,6 +343,7 @@ export type AdminProfessionalSummary = {
   availabilityCount: number;
   pendingDocuments: number;
   verifiedDocuments: number;
+  missingRequiredDocuments: string[];
   servicesCount: number;
   neighborhood: string;
   city: string;
