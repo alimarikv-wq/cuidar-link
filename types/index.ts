@@ -166,6 +166,7 @@ export type CareRequestRecord = {
   durationHours: number;
   scheduledFor: string | null;
   createdAt: string;
+  updatedAt: string;
   requesterName: string;
   requesterPhone: string | null;
   addressLine: string;

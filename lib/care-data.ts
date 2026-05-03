@@ -875,6 +875,7 @@ function toRequestRecord(
     durationHours: Number(request.durationHours),
     scheduledFor: request.scheduledFor ? request.scheduledFor.toISOString() : null,
     createdAt: request.createdAt.toISOString(),
+    updatedAt: request.updatedAt.toISOString(),
     requesterName: request.requesterName,
     requesterPhone: request.requesterPhone,
     addressLine: request.addressLine,

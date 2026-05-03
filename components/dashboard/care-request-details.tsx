@@ -17,6 +17,7 @@ import {
   Plane,
   ShieldCheck,
   Star,
+  Trash2,
   UserRound,
   X
 } from "lucide-react";
@@ -99,6 +100,7 @@ function getRequestActions(request: CareRequestDetailsData): StatusAction[] {
 }
 
 function guidanceFor(request: CareRequestDetailsData) {
+  if (request.archivedAt) return "Este atendimento esta arquivado no seu historico. Voce pode restaurar se quiser acompanhar novamente no painel.";
   if (request.status === "CANCELADO") return "Este pedido foi cancelado. Combine um novo atendimento somente se ainda houver necessidade.";
   if (request.status === "CONCLUIDO") return "Este atendimento foi marcado como concluido.";
 
@@ -124,6 +126,122 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+const statusRanks: Record<RequestStatus, number> = {
+  RASCUNHO: 0,
+  ENVIADO: 1,
+  ACEITO: 2,
+  AGENDADO: 3,
+  CONCLUIDO: 4,
+  CANCELADO: 5
+};
+
+function TimelineItem({
+  done,
+  active,
+  label,
+  description,
+  date
+}: {
+  done: boolean;
+  active: boolean;
+  label: string;
+  description: string;
+  date?: string | null;
+}) {
+  return (
+    <div className="relative grid gap-1 pl-8">
+      <span
+        className={`absolute left-0 top-1 grid h-5 w-5 place-items-center rounded-full border ${
+          done
+            ? active
+              ? "border-emerald-700 bg-emerald-700 text-white"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-slate-200 bg-white text-slate-300"
+        }`}
+      >
+        {done ? <Check aria-hidden="true" className="h-3 w-3" /> : null}
+      </span>
+      <p className={`text-sm font-semibold ${done ? "text-slate-950" : "text-slate-500"}`}>{label}</p>
+      <p className="text-sm leading-6 text-slate-600">{description}</p>
+      {date ? <p className="text-xs font-semibold text-slate-500">{formatBrasiliaDateTime(date)}</p> : null}
+    </div>
+  );
+}
+
+function StatusTimeline({ request }: { request: CareRequestDetailsData }) {
+  const currentRank = statusRanks[request.status as RequestStatus] ?? 0;
+  const canceled = request.status === "CANCELADO";
+  const steps = canceled
+    ? [
+        {
+          rank: 1,
+          label: "Pedido enviado",
+          description: "Solicitacao criada e registrada na plataforma.",
+          date: request.createdAt
+        },
+        {
+          rank: 5,
+          label: "Pedido cancelado",
+          description: "Atendimento encerrado sem conclusao.",
+          date: request.updatedAt
+        }
+      ]
+    : [
+        {
+          rank: 1,
+          label: "Pedido enviado",
+          description: "Solicitacao criada e registrada na plataforma.",
+          date: request.createdAt
+        },
+        {
+          rank: 2,
+          label: "Aceito pelo profissional",
+          description: "Profissional confirmou que pode seguir com o atendimento."
+        },
+        {
+          rank: 3,
+          label: "Agendado",
+          description: "Horario confirmado para o atendimento.",
+          date: request.status === "AGENDADO" ? request.updatedAt : null
+        },
+        {
+          rank: 4,
+          label: "Concluido",
+          description: "Atendimento marcado como realizado.",
+          date: request.status === "CONCLUIDO" ? request.updatedAt : null
+        }
+      ];
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Historico</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Linha do tempo</h2>
+        </div>
+        {request.archivedAt ? (
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            Arquivado em {formatBrasiliaDateTime(request.archivedAt)}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-5 grid gap-5 border-l border-slate-200 pl-4">
+        {steps.map((step) => (
+          <TimelineItem
+            key={step.label}
+            done={canceled ? step.rank <= currentRank : currentRank >= step.rank}
+            active={request.status === "CANCELADO" ? step.rank === 5 : currentRank === step.rank}
+            label={step.label}
+            description={step.description}
+            date={step.date}
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
 export function CareRequestDetails({ request }: { request: CareRequestDetailsData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -136,7 +254,10 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
   const [reviewError, setReviewError] = useState("");
   const actions = getRequestActions(request);
   const canArchive = !request.archivedAt && ["CONCLUIDO", "CANCELADO"].includes(request.status);
+  const canRestore = Boolean(request.archivedAt);
+  const canDeleteFromHistory = Boolean(request.archivedAt);
   const canReview = request.viewer.canReview && !review;
+  const hasAnyAction = actions.length > 0 || canArchive || canRestore || canDeleteFromHistory;
 
   function updateStatus(nextStatus: RequestStatus) {
     setError("");
@@ -184,6 +305,58 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
     });
   }
 
+  function restoreRequest() {
+    setError("");
+    setUpdatingStatus("restore");
+
+    startTransition(async () => {
+      const response = await fetch(`/api/care-requests/${request.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive: false })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel restaurar este atendimento.");
+        setUpdatingStatus("");
+        return;
+      }
+
+      router.refresh();
+      setUpdatingStatus("");
+    });
+  }
+
+  function deleteRequestFromHistory() {
+    const confirmed = window.confirm(
+      "Voce tem certeza que quer excluir este atendimento do seu historico? Ele nao vai aparecer mais para voce. Esta acao nao cancela atendimento nem apaga o registro administrativo da plataforma."
+    );
+
+    if (!confirmed) return;
+
+    setError("");
+    setUpdatingStatus("delete");
+
+    startTransition(async () => {
+      const response = await fetch(`/api/care-requests/${request.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteFromHistory: true })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel excluir este atendimento do historico.");
+        setUpdatingStatus("");
+        return;
+      }
+
+      router.push("/dashboard#atendimentos");
+      router.refresh();
+    });
+  }
+
   function submitReview() {
     setReviewError("");
 
@@ -221,6 +394,9 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
             <p className="mt-2 text-sm text-slate-600">
               {request.professional.name} - {request.professional.roleLabel}
             </p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Pedido #{request.id.slice(-6)} - atualizado em {formatBrasiliaDateTime(request.updatedAt)}
+            </p>
           </div>
           <span className={`rounded-lg px-3 py-1 text-sm font-semibold ${statusStyles[request.status as RequestStatus] || statusStyles.ENVIADO}`}>
             {request.statusLabel}
@@ -231,6 +407,8 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
           {guidanceFor(request)}
         </div>
       </div>
+
+      <StatusTimeline request={request} />
 
       {request.status === "CONCLUIDO" ? (
         <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -372,7 +550,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
             {error ? <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
 
             <div className="mt-4 grid gap-2">
-              {actions.length === 0 ? (
+              {!hasAnyAction ? (
                 <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
                   Nenhuma acao disponivel neste status.
                 </p>
@@ -400,6 +578,28 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                 >
                   <Archive aria-hidden="true" className="h-4 w-4" />
                   {isPending && updatingStatus === "archive" ? "Arquivando..." : "Arquivar atendimento"}
+                </button>
+              ) : null}
+              {canRestore ? (
+                <button
+                  type="button"
+                  onClick={restoreRequest}
+                  disabled={isPending}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Archive aria-hidden="true" className="h-4 w-4" />
+                  {isPending && updatingStatus === "restore" ? "Restaurando..." : "Restaurar para o painel"}
+                </button>
+              ) : null}
+              {canDeleteFromHistory ? (
+                <button
+                  type="button"
+                  onClick={deleteRequestFromHistory}
+                  disabled={isPending}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                  {isPending && updatingStatus === "delete" ? "Excluindo..." : "Excluir do meu historico"}
                 </button>
               ) : null}
             </div>
