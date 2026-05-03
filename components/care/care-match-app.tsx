@@ -212,6 +212,22 @@ function formatDurationLabel(durationHours: number) {
   return `${hours}h${String(minutes).padStart(2, "0")}`;
 }
 
+function formatRatingValue(rating: number) {
+  return rating.toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  });
+}
+
+function formatReviewCount(count: number) {
+  return count === 1 ? "1 avaliacao" : `${count} avaliacoes`;
+}
+
+function formatRatingSummary(rating: number, reviewCount: number) {
+  if (reviewCount <= 0) return "Sem avaliacoes";
+  return `${formatRatingValue(rating)} (${formatReviewCount(reviewCount)})`;
+}
+
 function formatDateLabel(value: string) {
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return value || "Nao informado";
@@ -1153,6 +1169,21 @@ export function CareMatchApp() {
                         <span className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">
                           {professional.matchScore}% match
                         </span>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold ${
+                            professional.reviewCount > 0
+                              ? "bg-amber-50 text-amber-800"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <Star
+                            aria-hidden="true"
+                            className={`h-3.5 w-3.5 ${
+                              professional.reviewCount > 0 ? "fill-amber-400 text-amber-500" : "text-slate-400"
+                            }`}
+                          />
+                          {formatRatingSummary(professional.rating, professional.reviewCount)}
+                        </span>
                         <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                           {professional.age} anos
                         </span>
@@ -1168,10 +1199,6 @@ export function CareMatchApp() {
                         <span className="inline-flex items-center gap-1">
                           <MapPin aria-hidden="true" className="h-4 w-4 text-emerald-700" />
                           {professional.neighborhood}, {professional.distanceKm.toFixed(1)} km
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Star aria-hidden="true" className="h-4 w-4 fill-amber-400 text-amber-400" />
-                          {professional.rating} ({professional.reviewCount})
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <CalendarClock aria-hidden="true" className="h-4 w-4 text-violet-700" />
@@ -1296,7 +1323,12 @@ export function CareMatchApp() {
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Avaliacao</p>
-                      <p className="font-semibold text-slate-950">{selected.rating}/5</p>
+                      <p className="font-semibold text-slate-950">
+                        {selected.reviewCount > 0 ? `${formatRatingValue(selected.rating)} de 5` : "Sem avaliacoes"}
+                      </p>
+                      {selected.reviewCount > 0 ? (
+                        <p className="text-xs text-slate-500">{formatReviewCount(selected.reviewCount)}</p>
+                      ) : null}
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Cuidado</p>
@@ -1306,7 +1338,13 @@ export function CareMatchApp() {
 
                   {selected.recentReviews.length > 0 ? (
                     <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50 p-3">
-                      <p className="text-sm font-semibold text-amber-950">Avaliacoes recentes</p>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-amber-950">Avaliacoes recentes</p>
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-amber-800">
+                          <Star aria-hidden="true" className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                          Nota {formatRatingValue(selected.rating)}
+                        </span>
+                      </div>
                       <div className="mt-3 grid gap-3">
                         {selected.recentReviews.map((review) => (
                           <div key={review.id} className="rounded-lg bg-white/80 p-3 text-sm text-slate-700">
@@ -1314,7 +1352,7 @@ export function CareMatchApp() {
                               <span className="font-semibold text-slate-950">{review.reviewerName}</span>
                               <span className="inline-flex items-center gap-1 text-amber-700">
                                 <Star aria-hidden="true" className="h-4 w-4 fill-amber-500" />
-                                {review.rating}/5
+                                {formatRatingValue(review.rating)}/5
                               </span>
                             </div>
                             {review.comment ? <p className="mt-2 leading-6">{review.comment}</p> : null}
