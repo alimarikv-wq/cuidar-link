@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, HeartHandshake, LogIn, PanelRightOpen, UserPlus } from "lucide-react";
+import { Bell, HeartHandshake, LogIn, PanelRightOpen, ShieldCheck, UserPlus } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { getUnreadCareNotificationCount } from "@/lib/care-in-app-notifications";
 import { buttonStyles } from "@/components/ui/button";
@@ -43,6 +43,12 @@ export async function Header() {
                   </span>
                 ) : null}
               </Link>
+              {user.role === "ADMIN" ? (
+                <Link href="/admin" className={`${buttonStyles("secondary")} gap-2`} aria-label="Abrir painel administrativo">
+                  <ShieldCheck aria-hidden="true" className="h-4 w-4" />
+                  <span className="hidden sm:inline">Admin</span>
+                </Link>
+              ) : null}
               <Link href="/dashboard" className={`${buttonStyles()} gap-2`}>
                 <PanelRightOpen aria-hidden="true" className="h-4 w-4" />
                 Meu painel
