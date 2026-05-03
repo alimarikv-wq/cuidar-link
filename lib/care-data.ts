@@ -236,8 +236,8 @@ function toOperationalAlerts(input: {
       severity: "WARNING",
       title: "Profissionais sem agenda",
       detail: `${input.professionalsWithoutAvailability} profissional(is) ativo(s) nao tem horario cadastrado. Eles quase nao aparecem em buscas por horario.`,
-      actionLabel: "Abrir painel",
-      actionHref: "/dashboard"
+      actionLabel: "Ver profissionais",
+      actionHref: "/admin#profissionais-operacao"
     });
   }
 
@@ -247,8 +247,8 @@ function toOperationalAlerts(input: {
       severity: "INFO",
       title: "Perfis sem foto",
       detail: `${input.activeProfessionalsMissingPhoto} profissional(is) ativo(s) ainda nao colocaram foto. Isso reduz confianca na busca.`,
-      actionLabel: "Orientar profissionais",
-      actionHref: "/dashboard"
+      actionLabel: "Ver profissionais",
+      actionHref: "/admin#profissionais-operacao"
     });
   }
 
@@ -1963,6 +1963,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     activeProfessionalsMissingPhoto,
     professionalsByType,
     requestsByStatus,
+    professionalDirectory,
     documentsForReview,
     recentCareRequests,
     auditLogs,
@@ -1987,6 +1988,15 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.careRequest.groupBy({
         by: ["status"],
         _count: { _all: true }
+      }),
+      prisma.professionalProfile.findMany({
+        include: {
+          user: true,
+          availability: { select: { id: true } },
+          documents: { select: { status: true } }
+        },
+        orderBy: [{ isVerified: "asc" }, { updatedAt: "desc" }],
+        take: 50
       }),
       prisma.professionalDocument.findMany({
         include: {
@@ -2038,6 +2048,37 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       professionalsWithoutAvailability,
       activeProfessionalsMissingPhoto,
       emailNotifications: healthChecks.emailNotifications
+    }),
+    professionalDirectory: professionalDirectory.map((professional) => {
+      const pendingDocumentCount = professional.documents.filter((document) => document.status === VerificationStatus.PENDENTE).length;
+      const verifiedDocumentCount = professional.documents.filter((document) => document.status === VerificationStatus.VERIFICADO).length;
+      const issues = [
+        professional.isVerified ? null : "Sem selo",
+        professional.availability.length > 0 ? null : "Sem agenda",
+        professional.photoUrl ? null : "Sem foto",
+        pendingDocumentCount > 0 ? `${pendingDocumentCount} doc pendente(s)` : null,
+        professional.services.length > 0 ? null : "Sem servicos"
+      ].filter(Boolean) as string[];
+
+      return {
+        id: professional.id,
+        name: professional.user.name,
+        email: professional.user.email,
+        phone: professional.phone,
+        professionalTypeLabel: professionalTypeLabel[professional.professionalType],
+        verificationStatusLabel: professionalVerificationStatusLabel[professional.verificationStatus],
+        isVerified: professional.isVerified,
+        isActive: professional.isActive,
+        hasPhoto: Boolean(professional.photoUrl),
+        availabilityCount: professional.availability.length,
+        pendingDocuments: pendingDocumentCount,
+        verifiedDocuments: verifiedDocumentCount,
+        servicesCount: professional.services.length,
+        neighborhood: professional.neighborhood,
+        city: professional.city,
+        updatedAt: professional.updatedAt.toISOString(),
+        issues
+      };
     }),
     recentCareRequests: recentCareRequests.map((request) => ({
       id: request.id,

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarClock, Check, CheckCircle2, ExternalLink, ListChecks, MailCheck, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, CheckCircle2, ExternalLink, ListChecks, Mail, MailCheck, X } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AdminDocumentReviewData,
@@ -113,6 +113,14 @@ const launchTestSteps = [
     href: "/dashboard#atendimentos",
     action: "Ver historico"
   }
+];
+
+const professionalFilters = [
+  { value: "PENDENCIAS", label: "Com pendencias" },
+  { value: "SEM_SELO", label: "Sem selo" },
+  { value: "SEM_AGENDA", label: "Sem agenda" },
+  { value: "SEM_FOTO", label: "Sem foto" },
+  { value: "TODOS", label: "Todos" }
 ];
 
 function formatAdminDate(value: string | null) {
@@ -325,6 +333,7 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
   const [typeFilter, setTypeFilter] = useState("TODOS");
   const [documentTypeFilter, setDocumentTypeFilter] = useState("TODOS");
   const [ufFilter, setUfFilter] = useState("TODAS");
+  const [professionalFilter, setProfessionalFilter] = useState("PENDENCIAS");
   const [emailTestPending, startEmailTestTransition] = useTransition();
   const [emailTestMessage, setEmailTestMessage] = useState("");
   const [emailTestError, setEmailTestError] = useState("");
@@ -337,6 +346,13 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
   });
   const professionalTypes = Array.from(new Set(overview.documentsForReview.map((document) => document.professionalTypeLabel)));
   const registrationUfs = Array.from(new Set(overview.documentsForReview.map((document) => document.professionalRegistrationUf).filter(Boolean)));
+  const filteredProfessionals = overview.professionalDirectory.filter((professional) => {
+    if (professionalFilter === "TODOS") return true;
+    if (professionalFilter === "SEM_SELO") return !professional.isVerified;
+    if (professionalFilter === "SEM_AGENDA") return professional.availabilityCount === 0;
+    if (professionalFilter === "SEM_FOTO") return !professional.hasPhoto;
+    return professional.issues.length > 0;
+  });
   const summaryCards = [
     { label: "Usuarios", value: String(overview.users) },
     { label: "Pacientes", value: String(overview.patients) },
@@ -510,6 +526,111 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
               </div>
             );
           })}
+        </div>
+      </article>
+
+      <article id="profissionais-operacao" className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Rede profissional</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Profissionais para acompanhar</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Lista operacional para ver rapidamente quem precisa de selo, agenda, foto ou revisao de documentos.
+            </p>
+          </div>
+          <span className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+            {filteredProfessionals.length}/{overview.professionalDirectory.length}
+          </span>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {professionalFilters.map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              onClick={() => setProfessionalFilter(filter.value)}
+              aria-pressed={professionalFilter === filter.value}
+              className={`h-9 rounded-lg px-3 text-sm font-semibold transition ${
+                professionalFilter === filter.value
+                  ? "bg-emerald-700 text-white"
+                  : "border border-slate-300 bg-white text-slate-700 hover:border-emerald-500"
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-5 grid gap-3 xl:grid-cols-2">
+          {filteredProfessionals.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Nenhum profissional encontrado para este filtro.
+            </div>
+          ) : null}
+          {filteredProfessionals.map((professional) => (
+            <div key={professional.id} className="rounded-lg border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700">{professional.professionalTypeLabel}</p>
+                  <h4 className="mt-1 text-lg font-semibold text-slate-950">{professional.name}</h4>
+                  <p className="mt-1 text-sm text-slate-600">{professional.email}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {professional.neighborhood}, {professional.city}
+                  </p>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${professional.isVerified ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
+                  {professional.isVerified ? "Verificado" : professional.verificationStatusLabel}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                <div className="rounded-lg bg-slate-50 p-2">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Agenda</p>
+                  <p className="mt-1 font-semibold text-slate-950">{professional.availabilityCount} horario(s)</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-2">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Docs OK</p>
+                  <p className="mt-1 font-semibold text-slate-950">{professional.verifiedDocuments}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-2">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Pendentes</p>
+                  <p className="mt-1 font-semibold text-slate-950">{professional.pendingDocuments}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-2">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Foto</p>
+                  <p className="mt-1 font-semibold text-slate-950">{professional.hasPhoto ? "Sim" : "Nao"}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {professional.issues.length > 0 ? (
+                  professional.issues.map((issue) => (
+                    <span key={issue} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                      {issue}
+                    </span>
+                  ))
+                ) : (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                    Perfil operacionalmente pronto
+                  </span>
+                )}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">Atualizado em {formatAdminDate(professional.updatedAt)}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href="/admin#documentos"
+                    className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500"
+                  >
+                    Ver docs
+                  </Link>
+                  <a
+                    href={`mailto:${professional.email}`}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    <Mail aria-hidden="true" className="h-4 w-4" />
+                    E-mail
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </article>
 

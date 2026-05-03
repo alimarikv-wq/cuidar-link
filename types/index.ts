@@ -330,6 +330,26 @@ export type AdminOperationalAlert = {
   actionHref: string | null;
 };
 
+export type AdminProfessionalSummary = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  professionalTypeLabel: string;
+  verificationStatusLabel: string;
+  isVerified: boolean;
+  isActive: boolean;
+  hasPhoto: boolean;
+  availabilityCount: number;
+  pendingDocuments: number;
+  verifiedDocuments: number;
+  servicesCount: number;
+  neighborhood: string;
+  city: string;
+  updatedAt: string;
+  issues: string[];
+};
+
 export type ProfessionalSettingsData = {
   professionalType: ProfessionalTypeCode;
   gender: GenderCode;
@@ -408,6 +428,7 @@ export type CareAdminOverview = {
   readinessChecks: AdminReadinessCheck[];
   recentCareRequests: AdminCareRequestSummary[];
   operationalAlerts: AdminOperationalAlert[];
+  professionalDirectory: AdminProfessionalSummary[];
   documentsForReview: AdminDocumentReviewData[];
   auditLogs: Array<{
     id: string;
