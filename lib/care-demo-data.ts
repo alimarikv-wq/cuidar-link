@@ -50,7 +50,8 @@ const demoProfessionals: CareProfessional[] = [
     credentials: ["COREN ativo", "BLS", "Experiencia bariatrica"],
     bio: "Atua em cuidado domiciliar para PCD, pos-operatorio e rotina de higiene com privacidade.",
     isVerified: true,
-    matchScore: 97
+    matchScore: 97,
+    recentReviews: []
   },
   {
     id: "demo-marina",
@@ -83,7 +84,8 @@ const demoProfessionals: CareProfessional[] = [
     credentials: ["Curso de cuidador", "Referencias verificadas", "Treino de transferencia"],
     bio: "Especializada em plantao curto para banho, higiene e apoio de rotina em Porto Alegre.",
     isVerified: true,
-    matchScore: 95
+    matchScore: 95,
+    recentReviews: []
   },
   {
     id: "demo-bruno",
@@ -116,7 +118,8 @@ const demoProfessionals: CareProfessional[] = [
     credentials: ["CREFITO ativo", "Neurofuncional", "Atendimento PCD adulto"],
     bio: "Foco em seguranca de transferencia, condicionamento e autonomia para atividades diarias.",
     isVerified: true,
-    matchScore: 90
+    matchScore: 90,
+    recentReviews: []
   },
   {
     id: "demo-camila",
@@ -149,7 +152,8 @@ const demoProfessionals: CareProfessional[] = [
     credentials: ["Curso de cuidador", "Treino PCD", "Plantao noturno"],
     bio: "Atendimento direto e organizado para demandas pontuais ou recorrentes na zona sul.",
     isVerified: true,
-    matchScore: 88
+    matchScore: 88,
+    recentReviews: []
   }
 ];
 

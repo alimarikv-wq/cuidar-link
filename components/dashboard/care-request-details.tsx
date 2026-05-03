@@ -16,6 +16,7 @@ import {
   Phone,
   Plane,
   ShieldCheck,
+  Star,
   UserRound,
   X
 } from "lucide-react";
@@ -126,10 +127,16 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
 export function CareRequestDetails({ request }: { request: CareRequestDetailsData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isReviewPending, startReviewTransition] = useTransition();
   const [error, setError] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState("");
+  const [review, setReview] = useState(request.review);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewError, setReviewError] = useState("");
   const actions = getRequestActions(request);
   const canArchive = !request.archivedAt && ["CONCLUIDO", "CANCELADO"].includes(request.status);
+  const canReview = request.viewer.canReview && !review;
 
   function updateStatus(nextStatus: RequestStatus) {
     setError("");
@@ -177,6 +184,28 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
     });
   }
 
+  function submitReview() {
+    setReviewError("");
+
+    startReviewTransition(async () => {
+      const response = await fetch(`/api/care-requests/${request.id}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating: reviewRating, comment: reviewComment })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setReviewError(data.error || "Nao foi possivel salvar a avaliacao.");
+        return;
+      }
+
+      setReview(data.review);
+      setReviewComment("");
+      router.refresh();
+    });
+  }
+
   return (
     <section className="surface space-y-5">
       <Link href="/dashboard#atendimentos" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
@@ -202,6 +231,84 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
           {guidanceFor(request)}
         </div>
       </div>
+
+      {request.status === "CONCLUIDO" ? (
+        <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-emerald-700">Avaliacao</p>
+              <h2 className="mt-1 text-2xl font-semibold text-slate-950">
+                {review ? "Atendimento avaliado" : "Como foi o atendimento?"}
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                A nota ajuda outros pacientes a escolherem com mais seguranca e melhora a qualidade da rede.
+              </p>
+            </div>
+            {review ? (
+              <div className="flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-2 text-amber-800">
+                {Array.from({ length: 5 }, (_, index) => (
+                  <Star key={index} aria-hidden="true" className={`h-4 w-4 ${index < review.rating ? "fill-amber-500 text-amber-500" : "text-amber-200"}`} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {review ? (
+            <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+              <p className="font-semibold">Nota enviada: {review.rating}/5</p>
+              {review.comment ? <p className="mt-2">{review.comment}</p> : <p className="mt-2">Sem comentario adicional.</p>}
+            </div>
+          ) : null}
+
+          {canReview ? (
+            <div className="mt-4 grid gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Nota</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {Array.from({ length: 5 }, (_, index) => {
+                    const value = index + 1;
+                    const active = value <= reviewRating;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setReviewRating(value)}
+                        className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border transition ${
+                          active ? "border-amber-300 bg-amber-50 text-amber-600" : "border-slate-200 bg-white text-slate-300 hover:border-amber-200"
+                        }`}
+                        aria-label={`${value} de 5`}
+                      >
+                        <Star aria-hidden="true" className={`h-5 w-5 ${active ? "fill-amber-500" : ""}`} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <label className="grid gap-2 text-sm font-semibold text-slate-800">
+                Comentario opcional
+                <textarea
+                  value={reviewComment}
+                  onChange={(event) => setReviewComment(event.target.value)}
+                  maxLength={600}
+                  rows={4}
+                  placeholder="Ex.: profissional pontual, cuidadoso e respeitoso durante o atendimento."
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                />
+              </label>
+              {reviewError ? <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{reviewError}</div> : null}
+              <button
+                type="button"
+                onClick={submitReview}
+                disabled={isReviewPending}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:w-fit"
+              >
+                <Star aria-hidden="true" className="h-4 w-4" />
+                {isReviewPending ? "Salvando..." : "Enviar avaliacao"}
+              </button>
+            </div>
+          ) : null}
+        </article>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
         <div className="space-y-5">

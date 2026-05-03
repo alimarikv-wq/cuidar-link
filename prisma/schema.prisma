@@ -170,6 +170,7 @@ model PatientProfile {
   updatedAt           DateTime             @updatedAt
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   careRequests        CareRequest[]
+  reviews             CareReview[]
 }
 
 model ProfessionalProfile {
@@ -218,6 +219,7 @@ model ProfessionalProfile {
   availability                   AvailabilitySlot[]
   careRequests                   CareRequest[]
   favoritedBy                    ProfessionalFavorite[]
+  reviews                        CareReview[]
 
   @@index([professionalType])
   @@index([gender])
@@ -318,23 +320,41 @@ model CareRequest {
   notes             String?
   travelRequested   Boolean              @default(false)
   travelDestination String?
-  isInternationalTravel Boolean          @default(false)
-  needsUsVisa       Boolean              @default(false)
+  isInternationalTravel Boolean           @default(false)
+  needsUsVisa       Boolean               @default(false)
   travelNotes       String?
-  status            CareRequestStatus    @default(ENVIADO)
+  status            CareRequestStatus     @default(ENVIADO)
   patientArchivedAt DateTime?
   professionalArchivedAt DateTime?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  patientProfile    PatientProfile?      @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
-  professional      ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  patientProfile    PatientProfile?       @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  professional      ProfessionalProfile   @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   notifications     CareNotification[]
+  review            CareReview?
 
   @@index([professionalId, status])
   @@index([professionalId, professionalArchivedAt, createdAt])
   @@index([patientProfileId])
   @@index([patientProfileId, patientArchivedAt, createdAt])
   @@index([scheduledFor])
+}
+
+model CareReview {
+  id               String              @id @default(cuid())
+  careRequestId    String              @unique
+  patientProfileId String?
+  professionalId   String
+  rating           Int
+  comment          String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  careRequest      CareRequest         @relation(fields: [careRequestId], references: [id], onDelete: Cascade)
+  patientProfile   PatientProfile?     @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  professional     ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, createdAt])
+  @@index([patientProfileId])
 }
 
 model CareNotification {

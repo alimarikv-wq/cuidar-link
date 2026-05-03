@@ -21,6 +21,7 @@ import {
   notifyCareRequestStatusForPatient,
   notifyNewCareRequest,
   notifyProfessionalDocumentReview,
+  notifyProfessionalReview,
   notifyProfessionalVerificationReview
 } from "@/lib/care-in-app-notifications";
 import { BRAZIL_TIME_ZONE, parseBrasiliaDateTime } from "@/lib/date-time";
@@ -180,8 +181,24 @@ type ProfessionalWithRelations = Prisma.ProfessionalProfileGetPayload<{
     user: true;
     documents: true;
     availability: true;
+    reviews: {
+      take: 3;
+      orderBy: { createdAt: "desc" };
+      include: {
+        patientProfile: {
+          include: {
+            user: true;
+          };
+        };
+      };
+    };
   };
 }>;
+
+type CreateCareReviewInput = {
+  rating: number;
+  comment?: string;
+};
 
 type UpdateProfessionalProfileInput = {
   phone?: string;
@@ -675,7 +692,14 @@ function toCareProfessional(professional: ProfessionalWithRelations, params: Car
     credentials: verifiedDocs.map((document) => document.label),
     bio: professional.bio,
     isVerified: professional.isVerified,
-    matchScore: calculateScore(professional, distance, params, hasAvailability)
+    matchScore: calculateScore(professional, distance, params, hasAvailability),
+    recentReviews: professional.reviews.map((review) => ({
+      id: review.id,
+      rating: review.rating,
+      comment: review.comment,
+      reviewerName: review.patientProfile?.user.name || "Paciente",
+      createdAt: review.createdAt.toISOString()
+    }))
   };
 }
 
@@ -703,7 +727,18 @@ export async function searchCareProfessionals(params: CareSearchParams) {
     include: {
       user: true,
       documents: { orderBy: { createdAt: "asc" } },
-      availability: { orderBy: [{ weekday: "asc" }, { startTime: "asc" }] }
+      availability: { orderBy: [{ weekday: "asc" }, { startTime: "asc" }] },
+      reviews: {
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        include: {
+          patientProfile: {
+            include: {
+              user: true
+            }
+          }
+        }
+      }
     }
   });
 
@@ -871,6 +906,7 @@ function toRequestDetailsData(
           user: true;
         };
       };
+      review: true;
     };
   }>,
   viewer: CareRequestDetailsData["viewer"]
@@ -906,6 +942,14 @@ function toRequestDetailsData(
       email: request.requesterEmail || request.patientProfile?.user.email || null,
       phone: request.requesterPhone
     },
+    review: request.review
+      ? {
+          id: request.review.id,
+          rating: request.review.rating,
+          comment: request.review.comment,
+          createdAt: request.review.createdAt.toISOString()
+        }
+      : null,
     viewer
   };
 }
@@ -933,7 +977,8 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
         include: {
           user: true
         }
-      }
+      },
+      review: true
     }
   });
 
@@ -943,6 +988,11 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
   const canCancelAsPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
   const canViewByEmail = Boolean(request.requesterEmail && request.requesterEmail.toLowerCase() === user.email.toLowerCase());
   const canView = user.role === UserRole.ADMIN || canActAsProfessional || canCancelAsPatient || canViewByEmail;
+  const canReview =
+    request.status === CareRequestStatus.CONCLUIDO &&
+    !request.review &&
+    !canActAsProfessional &&
+    (canCancelAsPatient || canViewByEmail);
 
   if (!canView) {
     return { ok: false as const, status: 403, error: "Voce nao tem permissao para ver este atendimento." };
@@ -953,9 +1003,110 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
     request: toRequestDetailsData(request, {
       accountType: user.accountType,
       canActAsProfessional,
-      canCancelAsPatient
+      canCancelAsPatient,
+      canReview
     })
   };
+}
+
+export async function createCareRequestReview(requestId: string, userId: string, input: CreateCareReviewInput) {
+  const rating = Math.round(input.rating);
+  const comment = input.comment?.trim() || null;
+
+  if (rating < 1 || rating > 5) {
+    return { ok: false as const, status: 400, error: "Escolha uma nota de 1 a 5." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const request = await prisma.careRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      professional: {
+        include: {
+          user: true
+        }
+      },
+      patientProfile: true,
+      review: true
+    }
+  });
+
+  if (!request) return { ok: false as const, status: 404, error: "Atendimento nao encontrado." };
+  if (request.status !== CareRequestStatus.CONCLUIDO) {
+    return { ok: false as const, status: 409, error: "A avaliacao fica disponivel depois que o atendimento for concluido." };
+  }
+  if (request.review) {
+    return { ok: false as const, status: 409, error: "Este atendimento ja foi avaliado." };
+  }
+
+  const canReviewByProfile = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
+  const canReviewByEmail = Boolean(request.requesterEmail && request.requesterEmail.toLowerCase() === user.email.toLowerCase());
+  const isSameProfessional = user.professionalProfile?.id === request.professionalId;
+
+  if (isSameProfessional || (!canReviewByProfile && !canReviewByEmail)) {
+    return { ok: false as const, status: 403, error: "Somente o paciente deste atendimento pode avaliar." };
+  }
+
+  try {
+    const review = await prisma.$transaction(async (tx) => {
+      const createdReview = await tx.careReview.create({
+        data: {
+          careRequestId: request.id,
+          patientProfileId: user.patientProfile?.id || request.patientProfileId || null,
+          professionalId: request.professionalId,
+          rating,
+          comment
+        }
+      });
+
+      const aggregate = await tx.careReview.aggregate({
+        where: { professionalId: request.professionalId },
+        _avg: { rating: true },
+        _count: { _all: true }
+      });
+
+      await tx.professionalProfile.update({
+        where: { id: request.professionalId },
+        data: {
+          rating: Number((aggregate._avg.rating || 0).toFixed(2)),
+          reviewCount: aggregate._count._all
+        }
+      });
+
+      return createdReview;
+    });
+
+    try {
+      await notifyProfessionalReview(request.professional.userId, request.id, request.requesterName, rating);
+    } catch (error) {
+      console.error("Nao foi possivel criar notificacao interna de avaliacao.", error);
+    }
+
+    return {
+      ok: true as const,
+      review: {
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString()
+      }
+    };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { ok: false as const, status: 409, error: "Este atendimento ja foi avaliado." };
+    }
+
+    throw error;
+  }
 }
 
 function toDashboardFavoriteProfessional(

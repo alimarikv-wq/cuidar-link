@@ -135,6 +135,13 @@ export type CareProfessional = {
   bio: string;
   isVerified: boolean;
   matchScore: number;
+  recentReviews: Array<{
+    id: string;
+    rating: number;
+    comment: string | null;
+    reviewerName: string;
+    createdAt: string;
+  }>;
 };
 
 export type CareSearchResponse = {
@@ -205,10 +212,17 @@ export type CareRequestDetailsData = CareRequestRecord & {
     email: string | null;
     phone: string | null;
   };
+  review: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    createdAt: string;
+  } | null;
   viewer: {
     accountType: string;
     canActAsProfessional: boolean;
     canCancelAsPatient: boolean;
+    canReview: boolean;
   };
 };
 

@@ -1304,6 +1304,26 @@ export function CareMatchApp() {
                     </div>
                   </div>
 
+                  {selected.recentReviews.length > 0 ? (
+                    <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50 p-3">
+                      <p className="text-sm font-semibold text-amber-950">Avaliacoes recentes</p>
+                      <div className="mt-3 grid gap-3">
+                        {selected.recentReviews.map((review) => (
+                          <div key={review.id} className="rounded-lg bg-white/80 p-3 text-sm text-slate-700">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-semibold text-slate-950">{review.reviewerName}</span>
+                              <span className="inline-flex items-center gap-1 text-amber-700">
+                                <Star aria-hidden="true" className="h-4 w-4 fill-amber-500" />
+                                {review.rating}/5
+                              </span>
+                            </div>
+                            {review.comment ? <p className="mt-2 leading-6">{review.comment}</p> : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="mt-4 space-y-3">
                     {selected.credentials.map((credential) => (
                       <div key={credential} className="flex items-center gap-2 text-sm text-slate-700">

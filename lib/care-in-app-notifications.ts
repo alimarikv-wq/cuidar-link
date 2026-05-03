@@ -129,6 +129,17 @@ export async function notifyCareRequestCanceledForProfessional(request: RequestN
   });
 }
 
+export async function notifyProfessionalReview(userId: string, requestId: string, requesterName: string, rating: number) {
+  await createCareNotification({
+    userId,
+    careRequestId: requestId,
+    type: "REQUEST_REVIEWED",
+    title: "Nova avaliacao recebida",
+    body: `${requesterName} avaliou o atendimento com ${rating}/5.`,
+    actionUrl: `/dashboard/atendimentos/${requestId}`
+  });
+}
+
 export async function notifyProfessionalDocumentReview(userId: string, documentLabel: string, status: VerificationStatus) {
   await createCareNotification({
     userId,
