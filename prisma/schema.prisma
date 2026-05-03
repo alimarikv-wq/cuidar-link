@@ -323,6 +323,9 @@ model CareRequest {
   isInternationalTravel Boolean           @default(false)
   needsUsVisa       Boolean               @default(false)
   travelNotes       String?
+  rulesAcceptedAt   DateTime?
+  rulesVersion      String?
+  paymentAgreement  String                @default("DIRECT_WITH_PROFESSIONAL")
   status            CareRequestStatus     @default(ENVIADO)
   patientArchivedAt DateTime?
   professionalArchivedAt DateTime?

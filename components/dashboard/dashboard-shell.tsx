@@ -1697,6 +1697,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 {request.addressComplement ? <p className="mt-1 text-sm text-slate-500">{request.addressComplement}</p> : null}
                 {request.requesterPhone ? <p className="mt-1 text-sm text-slate-500">Telefone: {request.requesterPhone}</p> : null}
                 <p className="mt-1 text-sm text-slate-500">Duracao: {formatDurationHours(request.durationHours)}</p>
+                <p className="mt-1 text-sm text-slate-500">{request.paymentAgreementLabel}</p>
                 {request.travelRequested ? (
                   <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm leading-6 text-sky-950">
                     <p className="inline-flex items-center gap-2 font-semibold">

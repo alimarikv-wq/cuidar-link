@@ -1,4 +1,5 @@
 import { CareRequestStatus, CareService, TransferSupportLevel } from "@prisma/client";
+import { CARE_REQUEST_PAYMENT_LABEL, careRequestRulesText } from "@/lib/care-request-disclosures";
 import { formatBrasiliaDateTime } from "@/lib/date-time";
 
 export type EmailPayload = {
@@ -107,7 +108,11 @@ function requestDetailsText(request: CareRequestNotificationData) {
     `Apoio: ${supportLabel[request.supportNeed]}`,
     `Horario: ${formatDate(request.scheduledFor)}`,
     `Endereco: ${formatAddress(request)}`,
+    `Pagamento: ${CARE_REQUEST_PAYMENT_LABEL}`,
     request.notes ? `Observacoes: ${request.notes}` : "",
+    "",
+    "Regras principais:",
+    careRequestRulesText(),
     `Painel: ${appUrl()}/dashboard`
   ]
     .filter(Boolean)
@@ -122,6 +127,7 @@ function requestDetailsHtml(request: CareRequestNotificationData) {
     ["Apoio", supportLabel[request.supportNeed]],
     ["Horario", formatDate(request.scheduledFor)],
     ["Endereco", formatAddress(request)],
+    ["Pagamento", CARE_REQUEST_PAYMENT_LABEL],
     ["Observacoes", request.notes || "Sem observacoes"]
   ];
 
@@ -140,6 +146,10 @@ function requestDetailsHtml(request: CareRequestNotificationData) {
           )
           .join("")}
       </table>
+      <div style="margin:16px 0 0;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px">
+        <p style="margin:0 0 8px;font-weight:700">Regras principais</p>
+        <p style="margin:0;white-space:pre-line">${escapeHtml(careRequestRulesText())}</p>
+      </div>
       <p style="margin:16px 0 0">
         <a href="${appUrl()}/dashboard" style="color:#047857;font-weight:700">Abrir painel</a>
       </p>

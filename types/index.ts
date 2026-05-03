@@ -181,6 +181,10 @@ export type CareRequestRecord = {
   isInternationalTravel: boolean;
   needsUsVisa: boolean;
   travelNotes: string | null;
+  rulesAcceptedAt: string | null;
+  rulesVersion: string | null;
+  paymentAgreement: string;
+  paymentAgreementLabel: string;
   professionalName: string;
   professionalRole: string;
   neighborhood: string;

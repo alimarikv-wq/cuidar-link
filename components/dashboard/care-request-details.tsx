@@ -500,6 +500,11 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
               <InfoRow label="Duracao" value={formatDurationHours(request.durationHours)} />
               <InfoRow label="Apoio solicitado" value={request.supportNeedLabel} />
               <InfoRow label="Preferencia no cuidado" value={request.preferredGenderLabel} />
+              <InfoRow label="Pagamento" value={request.paymentAgreementLabel} />
+              <InfoRow
+                label="Regras aceitas"
+                value={request.rulesAcceptedAt ? `${formatBrasiliaDateTime(request.rulesAcceptedAt)} - versao ${request.rulesVersion || "registrada"}` : "Nao registrado"}
+              />
             </div>
           </article>
 

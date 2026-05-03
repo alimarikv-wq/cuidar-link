@@ -29,7 +29,8 @@ const createSchema = z.object({
   travelDestination: z.string().max(160).optional().or(z.literal("")),
   isInternationalTravel: z.boolean().optional(),
   needsUsVisa: z.boolean().optional(),
-  travelNotes: z.string().max(500).optional().or(z.literal(""))
+  travelNotes: z.string().max(500).optional().or(z.literal("")),
+  rulesAccepted: z.boolean().refine(Boolean)
 });
 
 export async function GET(request: NextRequest) {
@@ -44,6 +45,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
+  if (!body || typeof body !== "object" || (body as { rulesAccepted?: unknown }).rulesAccepted !== true) {
+    return NextResponse.json({ error: "Leia e aceite as regras do atendimento para enviar o pedido." }, { status: 400 });
+  }
+
   const parsed = createSchema.safeParse(body);
 
   if (!parsed.success) {

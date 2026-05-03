@@ -13,6 +13,7 @@ import {
   VerificationStatus
 } from "@prisma/client";
 import { AppHealthChecks, getAppHealthChecks } from "@/lib/app-health";
+import { CARE_REQUEST_PAYMENT_AGREEMENT, CARE_REQUEST_PAYMENT_LABEL, CARE_REQUEST_RULES_VERSION } from "@/lib/care-request-disclosures";
 import { maskCpf } from "@/lib/cpf";
 import { sendCareRequestStatusNotification, sendNewCareRequestNotifications } from "@/lib/care-notifications";
 import {
@@ -316,6 +317,7 @@ export type CreateCareRequestInput = {
   isInternationalTravel?: boolean;
   needsUsVisa?: boolean;
   travelNotes?: string;
+  rulesAccepted?: boolean;
 };
 
 type ProfessionalWithRelations = Prisma.ProfessionalProfileGetPayload<{
@@ -910,6 +912,10 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
   const durationHours = input.durationHours ?? 2;
   const scheduledFor = input.scheduledFor ? parseBrasiliaDateTime(input.scheduledFor) : null;
 
+  if (!input.rulesAccepted) {
+    return { ok: false as const, status: 400, error: "Leia e aceite as regras do atendimento para enviar o pedido." };
+  }
+
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -978,6 +984,9 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       isInternationalTravel: Boolean(input.isInternationalTravel),
       needsUsVisa: Boolean(input.needsUsVisa),
       travelNotes: input.travelRequested ? input.travelNotes : null,
+      rulesAcceptedAt: new Date(),
+      rulesVersion: CARE_REQUEST_RULES_VERSION,
+      paymentAgreement: CARE_REQUEST_PAYMENT_AGREEMENT,
       status: CareRequestStatus.ENVIADO
     },
     include: {
@@ -1032,6 +1041,10 @@ function toRequestRecord(
     isInternationalTravel: request.isInternationalTravel,
     needsUsVisa: request.needsUsVisa,
     travelNotes: request.travelNotes,
+    rulesAcceptedAt: request.rulesAcceptedAt ? request.rulesAcceptedAt.toISOString() : null,
+    rulesVersion: request.rulesVersion,
+    paymentAgreement: request.paymentAgreement,
+    paymentAgreementLabel: request.paymentAgreement === CARE_REQUEST_PAYMENT_AGREEMENT ? CARE_REQUEST_PAYMENT_LABEL : "Pagamento a combinar",
     professionalName: request.professional.user.name,
     professionalRole: professionalTypeLabel[request.professional.professionalType],
     neighborhood: request.neighborhood

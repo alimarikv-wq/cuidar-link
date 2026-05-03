@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
+import { CARE_REQUEST_PAYMENT_LABEL, careRequestRules } from "@/lib/care-request-disclosures";
 import {
   AvailabilityFilter,
   CareProfessional,
@@ -309,6 +310,7 @@ export function CareMatchApp() {
   const [requestPending, setRequestPending] = useState(false);
   const [requestReviewOpen, setRequestReviewOpen] = useState(false);
   const [requestAttempted, setRequestAttempted] = useState(false);
+  const [requestRulesAccepted, setRequestRulesAccepted] = useState(false);
   const [requesterName, setRequesterName] = useState("");
   const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterPhone, setRequesterPhone] = useState("");
@@ -513,7 +515,8 @@ export function CareMatchApp() {
     state: requestAttempted && !stateCode.trim(),
     customDurationDetails: requestAttempted && durationMode === "custom" && customDurationDetails.trim().length < 3,
     customServiceDetails: requestAttempted && service === "OUTRO" && customServiceDetails.trim().length < 3,
-    travelDestination: requestAttempted && travelRequested && travelDestination.trim().length < 2
+    travelDestination: requestAttempted && travelRequested && travelDestination.trim().length < 2,
+    rulesAccepted: requestAttempted && !requestRulesAccepted
   };
 
   useEffect(() => {
@@ -612,6 +615,7 @@ export function CareMatchApp() {
     setRequestError("");
     setRequestWarning("");
     setRequestReviewOpen(false);
+    setRequestRulesAccepted(false);
   }
 
   function closeDetails() {
@@ -620,6 +624,7 @@ export function CareMatchApp() {
     setRequestAttempted(false);
     setRequestError("");
     setRequestReviewOpen(false);
+    setRequestRulesAccepted(false);
   }
 
   async function toggleFavorite(professionalId: string) {
@@ -672,7 +677,8 @@ export function CareMatchApp() {
       service === "OUTRO" && customServiceDetails.trim().length < 3 ? "descricao do outro atendimento" : "",
       travelRequested && travelDestination.trim().length < 2 ? "destino da viagem" : "",
       travelRequested && isInternationalTravel && selected && !selected.hasPassport ? "profissional com passaporte informado" : "",
-      travelRequested && needsUsVisa && selected && !selected.hasUsVisa ? "profissional com visto americano informado" : ""
+      travelRequested && needsUsVisa && selected && !selected.hasUsVisa ? "profissional com visto americano informado" : "",
+      !requestRulesAccepted ? "aceite das regras do atendimento" : ""
     ].filter(Boolean);
 
     return formatValidationMessage(missingFields);
@@ -887,7 +893,8 @@ export function CareMatchApp() {
         isInternationalTravel,
         needsUsVisa,
         travelNotes,
-        notes: requestNotes
+        notes: requestNotes,
+        rulesAccepted: requestRulesAccepted
       })
     });
 
@@ -1729,7 +1736,7 @@ export function CareMatchApp() {
                         </div>
                         <div className="rounded-lg bg-white/70 p-2">
                           <dt className="text-xs font-semibold uppercase text-emerald-700">Pagamento</dt>
-                          <dd className="mt-1 font-semibold text-slate-950">Combinado diretamente com o profissional</dd>
+                          <dd className="mt-1 font-semibold text-slate-950">{CARE_REQUEST_PAYMENT_LABEL}</dd>
                         </div>
                       </dl>
                       {travelRequested ? (
@@ -1745,6 +1752,28 @@ export function CareMatchApp() {
                           {travelNotes.trim() ? <p className="mt-1">{travelNotes.trim()}</p> : null}
                         </div>
                       ) : null}
+                    </div>
+                  ) : null}
+                  {!requestSent ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 sm:col-span-2">
+                      <p className="font-semibold text-slate-950">Regras do pedido</p>
+                      <ul className="mt-2 grid gap-1 leading-5">
+                        {careRequestRules.map((rule) => (
+                          <li key={rule.title}>
+                            <span className="font-semibold">{rule.title}:</span> {rule.detail}
+                          </li>
+                        ))}
+                      </ul>
+                      <label className="mt-3 flex items-start gap-3 rounded-lg bg-white p-3 font-semibold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={requestRulesAccepted}
+                          onChange={(event) => setRequestRulesAccepted(event.target.checked)}
+                          aria-invalid={requestFieldErrors.rulesAccepted ? "true" : undefined}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700"
+                        />
+                        <span>Li e entendi as regras do atendimento. {requiredMark()}</span>
+                      </label>
                     </div>
                   ) : null}
                   <Button
