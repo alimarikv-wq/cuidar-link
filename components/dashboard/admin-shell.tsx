@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, MailCheck, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, CheckCircle2, ExternalLink, MailCheck, X } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AdminDocumentReviewData,
@@ -30,6 +31,46 @@ const documentStatusStyles: Record<string, string> = {
   VERIFICADO: "bg-emerald-50 text-emerald-800",
   RECUSADO: "bg-rose-50 text-rose-800"
 };
+
+const readinessStyles: Record<string, { badge: string; panel: string; label: string }> = {
+  OK: {
+    badge: "bg-emerald-50 text-emerald-800 ring-emerald-100",
+    panel: "border-emerald-200 bg-emerald-50/60",
+    label: "Pronto"
+  },
+  WARNING: {
+    badge: "bg-amber-50 text-amber-900 ring-amber-100",
+    panel: "border-amber-200 bg-amber-50/60",
+    label: "Atencao"
+  },
+  PENDING: {
+    badge: "bg-rose-50 text-rose-800 ring-rose-100",
+    panel: "border-rose-200 bg-rose-50/60",
+    label: "Pendente"
+  }
+};
+
+const requestStatusStyles: Record<string, string> = {
+  ENVIADO: "bg-emerald-50 text-emerald-800",
+  ACEITO: "bg-blue-50 text-blue-800",
+  AGENDADO: "bg-violet-50 text-violet-800",
+  CONCLUIDO: "bg-slate-950 text-white",
+  CANCELADO: "bg-rose-50 text-rose-700",
+  RASCUNHO: "bg-slate-100 text-slate-700"
+};
+
+function formatAdminDate(value: string | null) {
+  if (!value) return "Sem horario";
+
+  return new Date(value).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
 
 function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) {
   const router = useRouter();
@@ -248,6 +289,8 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
     { label: "Pedidos abertos", value: String(overview.openRequests) },
     { label: "Docs pendentes", value: String(overview.pendingDocuments) }
   ];
+  const readyChecks = overview.readinessChecks.filter((check) => check.status === "OK").length;
+  const blockingChecks = overview.readinessChecks.filter((check) => check.status === "PENDING").length;
 
   function sendEmailTest() {
     setEmailTestMessage("");
@@ -278,6 +321,47 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
       </div>
 
       <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Pre-lancamento</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Checklist de producao</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Use esta lista antes de chamar usuarios reais para testar cadastro, busca, documentos, pedidos e notificacoes.
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-600">
+            <p className="font-semibold text-slate-950">
+              {readyChecks}/{overview.readinessChecks.length} prontos
+            </p>
+            <p>{blockingChecks > 0 ? `${blockingChecks} pendencia bloqueante` : "Sem pendencia bloqueante"}</p>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {overview.readinessChecks.map((check) => {
+            const style = readinessStyles[check.status];
+            const Icon = check.status === "OK" ? CheckCircle2 : AlertTriangle;
+
+            return (
+              <div key={check.key} className={`rounded-lg border p-4 ${style.panel}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <Icon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-slate-700" />
+                    <div>
+                      <p className="font-semibold text-slate-950">{check.label}</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-600">{check.detail}</p>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${style.badge}`}>
+                    {style.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </article>
+
+      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-emerald-700">Notificacoes</p>
@@ -300,6 +384,65 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
           <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{emailTestMessage}</p>
         ) : null}
         {emailTestError ? <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{emailTestError}</p> : null}
+      </article>
+
+      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Operacao</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Pedidos recentes</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Ultimos pedidos criados na plataforma, com link direto para conferencia do atendimento.
+            </p>
+          </div>
+          <Link
+            href="/dashboard#atendimentos"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-emerald-500"
+          >
+            <CalendarClock aria-hidden="true" className="h-4 w-4" />
+            Ver painel
+          </Link>
+        </div>
+        <div className="mt-5 grid gap-3">
+          {overview.recentCareRequests.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Nenhum pedido criado ainda.
+            </div>
+          ) : null}
+          {overview.recentCareRequests.map((request) => (
+            <div key={request.id} className="rounded-lg border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-slate-950">{request.serviceLabel}</p>
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${requestStatusStyles[request.status] || "bg-slate-100 text-slate-700"}`}>
+                      {request.statusLabel}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Paciente: {request.requesterName} {request.requesterPhone ? `- ${request.requesterPhone}` : ""}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Profissional: {request.professionalName} - {request.professionalRole}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Local: {request.neighborhood}, {request.city}
+                  </p>
+                </div>
+                <div className="grid gap-2 text-left sm:text-right">
+                  <p className="text-sm font-semibold text-slate-700">{formatAdminDate(request.scheduledFor)}</p>
+                  <p className="text-xs text-slate-500">Criado em {formatAdminDate(request.createdAt)}</p>
+                  <Link
+                    href={`/dashboard/atendimentos/${request.id}`}
+                    className="inline-flex h-9 items-center justify-center rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Abrir pedido
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </article>
 
       <div className="grid gap-6 xl:grid-cols-2">

@@ -12,6 +12,7 @@ import {
   UserRole,
   VerificationStatus
 } from "@prisma/client";
+import { AppHealthChecks, getAppHealthChecks } from "@/lib/app-health";
 import { maskCpf } from "@/lib/cpf";
 import { sendCareRequestStatusNotification, sendNewCareRequestNotifications } from "@/lib/care-notifications";
 import {
@@ -134,6 +135,47 @@ const professionalVerificationStatusLabel: Record<ProfessionalVerificationStatus
   APROVADO: "Aprovado",
   REPROVADO: "Reprovado"
 };
+
+function toReadinessChecks(checks: AppHealthChecks): CareAdminOverview["readinessChecks"] {
+  return [
+    {
+      key: "database",
+      label: "Banco de dados",
+      status: checks.database ? "OK" : "PENDING",
+      detail: checks.database ? "Conectado e respondendo." : "Verificar DATABASE_URL e DIRECT_URL no Vercel."
+    },
+    {
+      key: "googleOAuth",
+      label: "Login com Google",
+      status: checks.googleOAuth ? "OK" : "PENDING",
+      detail: checks.googleOAuth ? "Configurado para cadastro e entrada." : "Falta configurar client ID e secret do Google."
+    },
+    {
+      key: "documentStorage",
+      label: "Documentos privados",
+      status: checks.documentStorage ? "OK" : "PENDING",
+      detail: checks.documentStorage ? "Storage privado pronto para documentos." : "Falta configurar Supabase URL e service role."
+    },
+    {
+      key: "emailNotifications",
+      label: "E-mails automaticos",
+      status: checks.emailNotifications ? "OK" : "WARNING",
+      detail: checks.emailNotifications ? "Pedidos e atualizacoes podem disparar e-mail." : "Configure Resend antes de testes com usuarios externos."
+    },
+    {
+      key: "demoFallback",
+      label: "Modo demonstracao",
+      status: checks.demoFallback ? "WARNING" : "OK",
+      detail: checks.demoFallback ? "Desative para nao misturar dados ficticios com producao." : "Desativado em producao."
+    },
+    {
+      key: "appleOAuth",
+      label: "Login com Apple",
+      status: checks.appleOAuth ? "OK" : "WARNING",
+      detail: checks.appleOAuth ? "Configurado." : "Opcional para o lancamento inicial; pode ficar para depois."
+    }
+  ];
+}
 
 export type CareSearchParams = {
   service: CareService;
@@ -1816,7 +1858,9 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     professionalsByType,
     requestsByStatus,
     documentsForReview,
-    auditLogs
+    recentCareRequests,
+    auditLogs,
+    healthChecks
   ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { accountType: AccountType.PATIENT } }),
@@ -1842,10 +1886,20 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
         orderBy: [{ status: "asc" }, { createdAt: "desc" }],
         take: 30
       }),
+      prisma.careRequest.findMany({
+        include: {
+          professional: {
+            include: { user: true }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10
+      }),
       prisma.adminAuditLog.findMany({
         orderBy: { createdAt: "desc" },
         take: 20
-      })
+      }),
+      getAppHealthChecks()
     ]);
 
   return {
@@ -1863,6 +1917,22 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     requestsByStatus: requestsByStatus.map((item) => ({
       label: statusLabel[item.status],
       count: item._count._all
+    })),
+    readinessChecks: toReadinessChecks(healthChecks),
+    recentCareRequests: recentCareRequests.map((request) => ({
+      id: request.id,
+      status: request.status,
+      statusLabel: statusLabel[request.status],
+      serviceLabel: serviceLabel[request.service],
+      scheduledFor: request.scheduledFor ? request.scheduledFor.toISOString() : null,
+      createdAt: request.createdAt.toISOString(),
+      requesterName: request.requesterName,
+      requesterEmail: request.requesterEmail,
+      requesterPhone: request.requesterPhone,
+      professionalName: request.professional.user.name,
+      professionalRole: professionalTypeLabel[request.professional.professionalType],
+      neighborhood: request.neighborhood,
+      city: request.city
     })),
     documentsForReview: documentsForReview.map((document): AdminDocumentReviewData => ({
       ...toProfessionalDocumentData(document),

@@ -298,6 +298,29 @@ export type AdminDocumentReviewData = ProfessionalDocumentData & {
   professionalCpfMasked: string | null;
 };
 
+export type AdminReadinessCheck = {
+  key: string;
+  label: string;
+  status: "OK" | "WARNING" | "PENDING";
+  detail: string;
+};
+
+export type AdminCareRequestSummary = {
+  id: string;
+  status: string;
+  statusLabel: string;
+  serviceLabel: string;
+  scheduledFor: string | null;
+  createdAt: string;
+  requesterName: string;
+  requesterEmail: string | null;
+  requesterPhone: string | null;
+  professionalName: string;
+  professionalRole: string;
+  neighborhood: string;
+  city: string;
+};
+
 export type ProfessionalSettingsData = {
   professionalType: ProfessionalTypeCode;
   gender: GenderCode;
@@ -373,6 +396,8 @@ export type CareAdminOverview = {
   pendingDocuments: number;
   professionalsByType: Array<{ label: string; count: number }>;
   requestsByStatus: Array<{ label: string; count: number }>;
+  readinessChecks: AdminReadinessCheck[];
+  recentCareRequests: AdminCareRequestSummary[];
   documentsForReview: AdminDocumentReviewData[];
   auditLogs: Array<{
     id: string;
