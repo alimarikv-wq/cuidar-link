@@ -114,6 +114,12 @@ enum CareRequestStatus {
   CANCELADO
 }
 
+enum ProfessionalInquiryStatus {
+  ABERTA
+  RESPONDIDA
+  ARQUIVADA
+}
+
 model User {
   id                    String                 @id @default(cuid())
   name                  String
@@ -129,6 +135,7 @@ model User {
   professionalFavorites ProfessionalFavorite[]
   careNotifications     CareNotification[]
   careMessages          CareMessage[]
+  inquiryMessages       ProfessionalInquiryMessage[]
   passwordResetTokens   PasswordResetToken[]
   alerts                Alert[]
   patientProfile        PatientProfile?
@@ -172,6 +179,7 @@ model PatientProfile {
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   careRequests        CareRequest[]
   reviews             CareReview[]
+  inquiries           ProfessionalInquiry[]
 }
 
 model ProfessionalProfile {
@@ -219,6 +227,7 @@ model ProfessionalProfile {
   documents                      ProfessionalDocument[]
   availability                   AvailabilitySlot[]
   careRequests                   CareRequest[]
+  inquiries                      ProfessionalInquiry[]
   favoritedBy                    ProfessionalFavorite[]
   reviews                        CareReview[]
 
@@ -365,6 +374,44 @@ model CareMessage {
   sender        User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([careRequestId, createdAt])
+  @@index([senderId])
+  @@index([readAt])
+}
+
+model ProfessionalInquiry {
+  id                     String                    @id @default(cuid())
+  patientProfileId       String?
+  professionalId         String
+  requesterName          String
+  requesterEmail         String?
+  requesterPhone         String?
+  status                 ProfessionalInquiryStatus @default(ABERTA)
+  patientArchivedAt      DateTime?
+  professionalArchivedAt DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  patientProfile         PatientProfile?           @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  professional           ProfessionalProfile       @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  messages               ProfessionalInquiryMessage[]
+
+  @@index([professionalId, status, updatedAt])
+  @@index([patientProfileId, status, updatedAt])
+  @@index([requesterEmail, updatedAt])
+}
+
+model ProfessionalInquiryMessage {
+  id          String              @id @default(cuid())
+  inquiryId   String
+  senderId    String?
+  senderName  String
+  senderEmail String?
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime            @default(now())
+  inquiry     ProfessionalInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  sender      User?               @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([inquiryId, createdAt])
   @@index([senderId])
   @@index([readAt])
 }

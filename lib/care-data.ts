@@ -6,6 +6,7 @@ import {
   Gender,
   GenderPreference,
   Prisma,
+  ProfessionalInquiryStatus,
   ProfessionalType,
   ProfessionalVerificationStatus,
   TransferSupportLevel,
@@ -15,8 +16,15 @@ import {
 import { AppHealthChecks, getAppHealthChecks } from "@/lib/app-health";
 import { CARE_REQUEST_PAYMENT_AGREEMENT, CARE_REQUEST_PAYMENT_LABEL, CARE_REQUEST_RULES_VERSION } from "@/lib/care-request-disclosures";
 import { maskCpf } from "@/lib/cpf";
-import { sendCareMessageNotification, sendCareRequestStatusNotification, sendNewCareRequestNotifications } from "@/lib/care-notifications";
 import {
+  sendCareMessageNotification,
+  sendCareRequestStatusNotification,
+  sendNewCareRequestNotifications,
+  sendProfessionalInquiryNotification,
+  sendProfessionalInquiryReplyNotification
+} from "@/lib/care-notifications";
+import {
+  createCareNotification,
   getCareNotificationsForUser,
   getUnreadCareNotificationCount,
   notifyCareRequestCanceledForProfessional,
@@ -38,6 +46,9 @@ import {
   CareDashboardData,
   CareMessageData,
   CareProfessional,
+  ProfessionalInquiryDetailsData,
+  ProfessionalInquiryMessageData,
+  ProfessionalInquirySummary,
   CareRequestDetailsData,
   CareRequestRecord,
   DashboardFavoriteProfessional,
@@ -137,6 +148,12 @@ const professionalVerificationStatusLabel: Record<ProfessionalVerificationStatus
   EM_ANALISE: "Em analise",
   APROVADO: "Aprovado",
   REPROVADO: "Reprovado"
+};
+
+const professionalInquiryStatusLabel: Record<ProfessionalInquiryStatus, string> = {
+  ABERTA: "Aberta",
+  RESPONDIDA: "Respondida",
+  ARQUIVADA: "Arquivada"
 };
 
 const completionGraceMinutes = 1;
@@ -322,6 +339,14 @@ export type CreateCareRequestInput = {
   needsUsVisa?: boolean;
   travelNotes?: string;
   rulesAccepted?: boolean;
+};
+
+export type CreateProfessionalInquiryInput = {
+  professionalId: string;
+  requesterName: string;
+  requesterEmail?: string;
+  requesterPhone?: string;
+  body: string;
 };
 
 type ProfessionalWithRelations = Prisma.ProfessionalProfileGetPayload<{
@@ -1198,6 +1223,388 @@ function toCareMessageData(
     readAt: message.readAt ? message.readAt.toISOString() : null,
     createdAt: message.createdAt.toISOString()
   };
+}
+
+function toProfessionalInquiryMessageData(
+  message: Prisma.ProfessionalInquiryMessageGetPayload<{ include: { sender: true } }>,
+  viewerUserId: string
+): ProfessionalInquiryMessageData {
+  return {
+    id: message.id,
+    senderId: message.senderId,
+    senderName: message.sender?.name || message.senderName,
+    body: message.body,
+    isOwn: message.senderId === viewerUserId,
+    readAt: message.readAt ? message.readAt.toISOString() : null,
+    createdAt: message.createdAt.toISOString()
+  };
+}
+
+function toProfessionalInquirySummary(
+  inquiry: Prisma.ProfessionalInquiryGetPayload<{
+    include: {
+      professional: { include: { user: true } };
+      messages: { include: { sender: true } };
+    };
+  }>,
+  viewerUserId: string,
+  archivedAt: Date | null = null
+): ProfessionalInquirySummary {
+  const messages = [...inquiry.messages].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const lastMessage = messages[messages.length - 1];
+  const lastMessageBody = lastMessage?.body || "Mensagem inicial enviada.";
+
+  return {
+    id: inquiry.id,
+    status: inquiry.status,
+    statusLabel: professionalInquiryStatusLabel[inquiry.status],
+    archivedAt: archivedAt ? archivedAt.toISOString() : null,
+    professionalName: inquiry.professional.user.name,
+    professionalRole: professionalTypeLabel[inquiry.professional.professionalType],
+    requesterName: inquiry.requesterName,
+    requesterEmail: inquiry.requesterEmail,
+    requesterPhone: inquiry.requesterPhone,
+    lastMessage: lastMessageBody.length > 180 ? `${lastMessageBody.slice(0, 180)}...` : lastMessageBody,
+    lastMessageAt: (lastMessage?.createdAt || inquiry.updatedAt).toISOString(),
+    createdAt: inquiry.createdAt.toISOString(),
+    unreadCount: messages.filter((message) => message.senderId !== viewerUserId && !message.readAt).length
+  };
+}
+
+function toProfessionalInquiryDetailsData(
+  inquiry: Prisma.ProfessionalInquiryGetPayload<{
+    include: {
+      professional: { include: { user: true } };
+      patientProfile: { include: { user: true } };
+      messages: { include: { sender: true } };
+    };
+  }>,
+  viewer: ProfessionalInquiryDetailsData["viewer"]
+): ProfessionalInquiryDetailsData {
+  const archivedAt = viewer.canActAsProfessional ? inquiry.professionalArchivedAt : inquiry.patientArchivedAt;
+
+  return {
+    ...toProfessionalInquirySummary(inquiry, viewer.userId, archivedAt),
+    professional: {
+      id: inquiry.professional.id,
+      name: inquiry.professional.user.name,
+      email: inquiry.professional.user.email,
+      phone: inquiry.professional.phone,
+      roleLabel: professionalTypeLabel[inquiry.professional.professionalType],
+      isVerified: inquiry.professional.isVerified
+    },
+    patient: {
+      name: inquiry.requesterName || inquiry.patientProfile?.user.name || "Paciente",
+      email: inquiry.requesterEmail || inquiry.patientProfile?.user.email || null,
+      phone: inquiry.requesterPhone
+    },
+    messages: inquiry.messages.map((message) => toProfessionalInquiryMessageData(message, viewer.userId)),
+    viewer
+  };
+}
+
+export async function createProfessionalInquiryForUser(input: CreateProfessionalInquiryInput, userId?: string) {
+  const requesterName = input.requesterName.trim();
+  const requesterEmail = input.requesterEmail?.trim().toLowerCase() || "";
+  const requesterPhone = input.requesterPhone?.trim() || "";
+  const body = input.body.trim();
+
+  if (requesterName.length < 2) {
+    return { ok: false as const, status: 400, error: "Informe o nome de quem esta entrando em contato." };
+  }
+
+  if (!requesterEmail && !requesterPhone) {
+    return { ok: false as const, status: 400, error: "Informe e-mail ou telefone para o profissional responder." };
+  }
+
+  if (requesterEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail)) {
+    return { ok: false as const, status: 400, error: "Informe um e-mail valido." };
+  }
+
+  if (body.length < 1 || body.length > 1000) {
+    return { ok: false as const, status: 400, error: "Escreva uma mensagem de ate 1000 caracteres." };
+  }
+
+  const [user, professional] = await Promise.all([
+    userId
+      ? prisma.user.findUnique({
+          where: { id: userId },
+          include: { patientProfile: true, professionalProfile: true }
+        })
+      : null,
+    prisma.professionalProfile.findUnique({
+      where: { id: input.professionalId },
+      include: { user: true }
+    })
+  ]);
+
+  if (!professional || !professional.isActive) {
+    return { ok: false as const, status: 404, error: "Profissional nao encontrado." };
+  }
+
+  const inquiry = await prisma.professionalInquiry.create({
+    data: {
+      patientProfileId: user?.patientProfile?.id || null,
+      professionalId: professional.id,
+      requesterName,
+      requesterEmail: requesterEmail || user?.email || null,
+      requesterPhone: requesterPhone || user?.patientProfile?.phone || null,
+      status: ProfessionalInquiryStatus.ABERTA,
+      messages: {
+        create: {
+          senderId: user?.id || null,
+          senderName: user?.name || requesterName,
+          senderEmail: user?.email || requesterEmail || null,
+          body
+        }
+      }
+    },
+    include: {
+      professional: { include: { user: true } },
+      messages: { include: { sender: true }, orderBy: { createdAt: "asc" } }
+    }
+  });
+
+  try {
+    await createCareNotification({
+      userId: professional.userId,
+      type: "PROFESSIONAL_INQUIRY_CREATED",
+      title: "Nova mensagem antes do pedido",
+      body: `${requesterName} enviou uma duvida antes de solicitar atendimento.`,
+      actionUrl: `/dashboard/mensagens/${inquiry.id}`
+    });
+  } catch (error) {
+    console.error("Nao foi possivel criar notificacao interna de mensagem inicial.", error);
+  }
+
+  try {
+    await sendProfessionalInquiryNotification({
+      to: professional.user.email,
+      professionalName: professional.user.name,
+      requesterName,
+      requesterEmail: requesterEmail || user?.email || null,
+      requesterPhone: requesterPhone || user?.patientProfile?.phone || null,
+      inquiryId: inquiry.id,
+      body
+    });
+  } catch (error) {
+    console.error("Nao foi possivel enviar e-mail de mensagem inicial.", error);
+  }
+
+  return {
+    ok: true as const,
+    inquiry: toProfessionalInquirySummary(inquiry, user?.id || "")
+  };
+}
+
+export async function getProfessionalInquiriesForUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return [];
+
+  const isProfessional = user.accountType === AccountType.PROFESSIONAL && user.professionalProfile;
+  const where = isProfessional
+    ? { professionalId: user.professionalProfile!.id, professionalArchivedAt: null }
+    : {
+        patientArchivedAt: null,
+        OR: [
+          ...(user.patientProfile?.id ? [{ patientProfileId: user.patientProfile.id }] : []),
+          { requesterEmail: user.email.toLowerCase() }
+        ]
+      };
+
+  const inquiries = await prisma.professionalInquiry.findMany({
+    where,
+    include: {
+      professional: { include: { user: true } },
+      messages: {
+        include: { sender: true },
+        orderBy: { createdAt: "asc" }
+      }
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 30
+  });
+
+  return inquiries.map((inquiry) =>
+    toProfessionalInquirySummary(inquiry, user.id, isProfessional ? inquiry.professionalArchivedAt : inquiry.patientArchivedAt)
+  );
+}
+
+export async function getProfessionalInquiryDetailsForUser(inquiryId: string, userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const inquiry = await prisma.professionalInquiry.findUnique({
+    where: { id: inquiryId },
+    include: {
+      professional: { include: { user: true } },
+      patientProfile: { include: { user: true } },
+      messages: {
+        include: { sender: true },
+        orderBy: { createdAt: "asc" }
+      }
+    }
+  });
+
+  if (!inquiry) return { ok: false as const, status: 404, error: "Conversa nao encontrada." };
+
+  const canActAsProfessional = user.professionalProfile?.id === inquiry.professionalId;
+  const canActAsPatient = Boolean(
+    (user.patientProfile?.id && user.patientProfile.id === inquiry.patientProfileId) ||
+      (inquiry.requesterEmail && inquiry.requesterEmail.toLowerCase() === user.email.toLowerCase())
+  );
+  const canView = user.role === UserRole.ADMIN || canActAsProfessional || canActAsPatient;
+
+  if (!canView) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para ver esta conversa." };
+  }
+
+  await prisma.professionalInquiryMessage.updateMany({
+    where: {
+      inquiryId: inquiry.id,
+      senderId: { not: user.id },
+      readAt: null
+    },
+    data: { readAt: new Date() }
+  });
+
+  return {
+    ok: true as const,
+    inquiry: toProfessionalInquiryDetailsData(inquiry, {
+      userId: user.id,
+      accountType: user.accountType,
+      canActAsProfessional,
+      canActAsPatient
+    })
+  };
+}
+
+export async function createProfessionalInquiryMessageForUser(inquiryId: string, userId: string, body: string) {
+  const trimmedBody = body.trim();
+
+  if (trimmedBody.length < 1 || trimmedBody.length > 1000) {
+    return { ok: false as const, status: 400, error: "Escreva uma mensagem de ate 1000 caracteres." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const inquiry = await prisma.professionalInquiry.findUnique({
+    where: { id: inquiryId },
+    include: {
+      professional: { include: { user: true } },
+      patientProfile: { include: { user: true } }
+    }
+  });
+
+  if (!inquiry) return { ok: false as const, status: 404, error: "Conversa nao encontrada." };
+
+  const canActAsProfessional = user.professionalProfile?.id === inquiry.professionalId;
+  const canActAsPatient = Boolean(
+    (user.patientProfile?.id && user.patientProfile.id === inquiry.patientProfileId) ||
+      (inquiry.requesterEmail && inquiry.requesterEmail.toLowerCase() === user.email.toLowerCase())
+  );
+  const canMessage = user.role === UserRole.ADMIN || canActAsProfessional || canActAsPatient;
+
+  if (!canMessage) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para responder esta conversa." };
+  }
+
+  const recipientUser =
+    canActAsProfessional || (user.role === UserRole.ADMIN && !canActAsPatient)
+      ? inquiry.patientProfile?.user ||
+        (inquiry.requesterEmail
+          ? await prisma.user.findUnique({
+              where: { email: inquiry.requesterEmail }
+            })
+          : null)
+      : inquiry.professional.user;
+  const recipientEmail =
+    canActAsProfessional || (user.role === UserRole.ADMIN && !canActAsPatient)
+      ? inquiry.requesterEmail || inquiry.patientProfile?.user.email || null
+      : inquiry.professional.user.email;
+
+  const message = await prisma.$transaction(async (tx) => {
+    await tx.professionalInquiryMessage.updateMany({
+      where: {
+        inquiryId: inquiry.id,
+        senderId: { not: user.id },
+        readAt: null
+      },
+      data: { readAt: new Date() }
+    });
+
+    const createdMessage = await tx.professionalInquiryMessage.create({
+      data: {
+        inquiryId: inquiry.id,
+        senderId: user.id,
+        senderName: user.name,
+        senderEmail: user.email,
+        body: trimmedBody
+      },
+      include: { sender: true }
+    });
+
+    await tx.professionalInquiry.update({
+      where: { id: inquiry.id },
+      data: {
+        status: canActAsProfessional ? ProfessionalInquiryStatus.RESPONDIDA : ProfessionalInquiryStatus.ABERTA
+      }
+    });
+
+    return createdMessage;
+  });
+
+  if (recipientUser && recipientUser.id !== user.id) {
+    try {
+      await createCareNotification({
+        userId: recipientUser.id,
+        type: "PROFESSIONAL_INQUIRY_MESSAGE",
+        title: "Nova mensagem na conversa",
+        body: `${user.name} respondeu uma conversa antes do pedido.`,
+        actionUrl: `/dashboard/mensagens/${inquiry.id}`
+      });
+    } catch (error) {
+      console.error("Nao foi possivel criar notificacao interna de resposta da conversa.", error);
+    }
+  }
+
+  if (recipientEmail && recipientEmail.toLowerCase() !== user.email.toLowerCase()) {
+    try {
+      await sendProfessionalInquiryReplyNotification({
+        to: recipientEmail,
+        senderName: user.name,
+        professionalName: inquiry.professional.user.name,
+        inquiryId: inquiry.id,
+        body: trimmedBody
+      });
+    } catch (error) {
+      console.error("Nao foi possivel enviar e-mail de resposta da conversa.", error);
+    }
+  }
+
+  return { ok: true as const, message: toProfessionalInquiryMessageData(message, user.id) };
 }
 
 export async function getCareRequestDetailsForUser(requestId: string, userId: string) {
@@ -2127,9 +2534,10 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
   const requestCollections = await getCareRequestCollectionsForUser(userId);
   const requests = requestCollections.activeRequests;
   const dashboardRequests = [...requestCollections.activeRequests, ...requestCollections.recentRequests, ...requestCollections.archivedRequests];
-  const [notifications, unreadNotifications] = await Promise.all([
+  const [notifications, unreadNotifications, inquiries] = await Promise.all([
     getCareNotificationsForUser(userId),
-    getUnreadCareNotificationCount(userId)
+    getUnreadCareNotificationCount(userId),
+    getProfessionalInquiriesForUser(userId)
   ]);
   const scheduled = dashboardRequests.filter((request) => ["ACEITO", "AGENDADO"].includes(request.status) && !request.archivedAt).length;
   const completed = dashboardRequests.filter((request) => request.status === "CONCLUIDO").length;
@@ -2149,6 +2557,7 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     recentRequests: requestCollections.recentRequests,
     archivedRequests: requestCollections.archivedRequests,
     notifications,
+    inquiries,
     favoriteProfessionals: user.professionalFavorites.map(toDashboardFavoriteProfessional),
     professionalSettings: user.professionalProfile
       ? {

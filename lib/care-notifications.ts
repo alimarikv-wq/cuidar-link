@@ -252,6 +252,90 @@ export async function sendCareMessageNotification(input: {
   });
 }
 
+export async function sendProfessionalInquiryNotification(input: {
+  to: string;
+  professionalName: string;
+  requesterName: string;
+  requesterEmail: string | null;
+  requesterPhone: string | null;
+  inquiryId: string;
+  body: string;
+}) {
+  const url = `${appUrl()}/dashboard/mensagens/${input.inquiryId}`;
+  const subject = `Nova mensagem antes do pedido: ${input.requesterName}`;
+  const preview = input.body.length > 500 ? `${input.body.slice(0, 500)}...` : input.body;
+
+  return sendEmail({
+    to: input.to,
+    subject,
+    text: [
+      `${input.requesterName} enviou uma duvida antes de solicitar atendimento.`,
+      input.requesterEmail ? `E-mail: ${input.requesterEmail}` : "",
+      input.requesterPhone ? `Telefone: ${input.requesterPhone}` : "",
+      "",
+      preview,
+      "",
+      `Responder no painel: ${url}`
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
+        <h1 style="font-size:20px;margin:0 0 12px">Nova mensagem antes do pedido</h1>
+        <p><strong>${escapeHtml(input.requesterName)}</strong> enviou uma duvida para <strong>${escapeHtml(input.professionalName)}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:12px">
+          <tr>
+            <td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#475569;font-weight:700">E-mail</td>
+            <td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeHtml(input.requesterEmail || "Nao informado")}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#475569;font-weight:700">Telefone</td>
+            <td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeHtml(input.requesterPhone || "Nao informado")}</td>
+          </tr>
+        </table>
+        <div style="margin:16px 0;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;white-space:pre-line">${escapeHtml(preview)}</div>
+        <p style="margin:16px 0 0">
+          <a href="${url}" style="color:#047857;font-weight:700">Responder no painel</a>
+        </p>
+      </div>
+    `
+  });
+}
+
+export async function sendProfessionalInquiryReplyNotification(input: {
+  to: string;
+  senderName: string;
+  professionalName: string;
+  inquiryId: string;
+  body: string;
+}) {
+  const url = `${appUrl()}/dashboard/mensagens/${input.inquiryId}`;
+  const subject = `Resposta da conversa com ${input.professionalName}`;
+  const preview = input.body.length > 500 ? `${input.body.slice(0, 500)}...` : input.body;
+
+  return sendEmail({
+    to: input.to,
+    subject,
+    text: [
+      `${input.senderName} enviou uma resposta na conversa com ${input.professionalName}.`,
+      "",
+      preview,
+      "",
+      `Abrir conversa: ${url}`
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
+        <h1 style="font-size:20px;margin:0 0 12px">Nova resposta na conversa</h1>
+        <p><strong>${escapeHtml(input.senderName)}</strong> enviou uma resposta na conversa com <strong>${escapeHtml(input.professionalName)}</strong>.</p>
+        <div style="margin:16px 0;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;white-space:pre-line">${escapeHtml(preview)}</div>
+        <p style="margin:16px 0 0">
+          <a href="${url}" style="color:#047857;font-weight:700">Abrir conversa</a>
+        </p>
+      </div>
+    `
+  });
+}
+
 export async function sendNewCareRequestNotifications(request: CareRequestNotificationData) {
   const professionalEmail = request.professional.user.email;
   const adminEmails = parseEmails(process.env.CARE_ADMIN_EMAILS);

@@ -206,6 +206,57 @@ export type CareMessageData = {
   createdAt: string;
 };
 
+export type ProfessionalInquiryStatusCode = "ABERTA" | "RESPONDIDA" | "ARQUIVADA";
+
+export type ProfessionalInquiryMessageData = {
+  id: string;
+  senderId: string | null;
+  senderName: string;
+  body: string;
+  isOwn: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type ProfessionalInquirySummary = {
+  id: string;
+  status: ProfessionalInquiryStatusCode;
+  statusLabel: string;
+  archivedAt: string | null;
+  professionalName: string;
+  professionalRole: string;
+  requesterName: string;
+  requesterEmail: string | null;
+  requesterPhone: string | null;
+  lastMessage: string;
+  lastMessageAt: string;
+  createdAt: string;
+  unreadCount: number;
+};
+
+export type ProfessionalInquiryDetailsData = ProfessionalInquirySummary & {
+  professional: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    roleLabel: string;
+    isVerified: boolean;
+  };
+  patient: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+  };
+  messages: ProfessionalInquiryMessageData[];
+  viewer: {
+    userId: string;
+    accountType: string;
+    canActAsProfessional: boolean;
+    canActAsPatient: boolean;
+  };
+};
+
 export type CareRequestDetailsData = CareRequestRecord & {
   requesterEmail: string | null;
   supportNeedLabel: string;
@@ -425,6 +476,7 @@ export type CareDashboardData = {
   requests: CareRequestRecord[];
   recentRequests: CareRequestRecord[];
   archivedRequests: CareRequestRecord[];
+  inquiries: ProfessionalInquirySummary[];
   favoriteProfessionals: DashboardFavoriteProfessional[];
   notifications: CareNotificationData[];
   professionalSettings: ProfessionalSettingsData | null;

@@ -338,8 +338,16 @@ export function CareMatchApp() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [highlightReviews, setHighlightReviews] = useState(false);
   const [reviewsExpanded, setReviewsExpanded] = useState(false);
-  const [messageIntent, setMessageIntent] = useState(false);
   const [createdRequestId, setCreatedRequestId] = useState("");
+  const [inquiryProfessionalId, setInquiryProfessionalId] = useState("");
+  const [inquiryName, setInquiryName] = useState("");
+  const [inquiryEmail, setInquiryEmail] = useState("");
+  const [inquiryPhone, setInquiryPhone] = useState("");
+  const [inquiryBody, setInquiryBody] = useState("");
+  const [inquiryError, setInquiryError] = useState("");
+  const [inquirySent, setInquirySent] = useState(false);
+  const [inquiryPending, setInquiryPending] = useState(false);
+  const [createdInquiryId, setCreatedInquiryId] = useState("");
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
   const [favoritePendingId, setFavoritePendingId] = useState("");
   const [favoriteError, setFavoriteError] = useState("");
@@ -480,6 +488,9 @@ export function CareMatchApp() {
   const selected = useMemo(() => {
     return results.find((professional) => professional.id === selectedId) ?? results[0] ?? null;
   }, [results, selectedId]);
+  const inquiryProfessional = useMemo(() => {
+    return results.find((professional) => professional.id === inquiryProfessionalId) ?? null;
+  }, [results, inquiryProfessionalId]);
   const scheduledParts = splitScheduledFor(scheduledFor);
   const availableDurationOptions = durationOptionsFor(service);
   const currentServiceLabel = serviceOptions.find((option) => option.id === service)?.label || "Atendimento";
@@ -610,12 +621,11 @@ export function CareMatchApp() {
     }
   }
 
-  function selectProfessional(id: string, options?: { showReviews?: boolean; messageIntent?: boolean }) {
+  function selectProfessional(id: string, options?: { showReviews?: boolean }) {
     setSelectedId(id);
     setDetailOpen(true);
     setHighlightReviews(Boolean(options?.showReviews));
     setReviewsExpanded(Boolean(options?.showReviews));
-    setMessageIntent(Boolean(options?.messageIntent));
     setRequestAttempted(false);
     setRequestSent(false);
     setRequestError("");
@@ -629,12 +639,30 @@ export function CareMatchApp() {
     setDetailOpen(false);
     setHighlightReviews(false);
     setReviewsExpanded(false);
-    setMessageIntent(false);
     setRequestAttempted(false);
     setRequestError("");
     setRequestReviewOpen(false);
     setRequestRulesAccepted(false);
     setCreatedRequestId("");
+  }
+
+  function openInquiry(professionalId: string) {
+    setInquiryProfessionalId(professionalId);
+    setInquiryName(requesterName);
+    setInquiryEmail(requesterEmail);
+    setInquiryPhone(requesterPhone);
+    setInquiryBody("");
+    setInquiryError("");
+    setInquirySent(false);
+    setInquiryPending(false);
+    setCreatedInquiryId("");
+  }
+
+  function closeInquiry() {
+    setInquiryProfessionalId("");
+    setInquiryError("");
+    setInquiryPending(false);
+    setCreatedInquiryId("");
   }
 
   async function toggleFavorite(professionalId: string) {
@@ -665,6 +693,61 @@ export function CareMatchApp() {
       }
       return next;
     });
+  }
+
+  async function submitInquiry() {
+    if (!inquiryProfessional || inquiryPending || inquirySent) return;
+
+    const name = inquiryName.trim();
+    const email = inquiryEmail.trim();
+    const phone = inquiryPhone.trim();
+    const body = inquiryBody.trim();
+
+    if (name.length < 2) {
+      setInquiryError("Informe seu nome para o profissional saber com quem esta falando.");
+      return;
+    }
+
+    if (!email && !phone) {
+      setInquiryError("Informe e-mail ou telefone para o profissional conseguir responder.");
+      return;
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setInquiryError("Informe um e-mail valido.");
+      return;
+    }
+
+    if (body.length < 1) {
+      setInquiryError("Escreva sua duvida antes de enviar.");
+      return;
+    }
+
+    setInquiryError("");
+    setInquiryPending(true);
+
+    const response = await fetch("/api/professional-inquiries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        professionalId: inquiryProfessional.id,
+        requesterName: name,
+        requesterEmail: email,
+        requesterPhone: phone,
+        body
+      })
+    });
+    const data = await response.json().catch(() => ({ error: "" }));
+
+    setInquiryPending(false);
+
+    if (!response.ok) {
+      setInquiryError(data.error || "Nao foi possivel enviar a mensagem.");
+      return;
+    }
+
+    setCreatedInquiryId(data.inquiry?.id || "");
+    setInquirySent(true);
   }
 
   function validateRequestForm() {
@@ -1307,7 +1390,7 @@ export function CareMatchApp() {
                         <Button
                           type="button"
                           variant="secondary"
-                          onClick={() => selectProfessional(professional.id, { messageIntent: true })}
+                          onClick={() => openInquiry(professional.id)}
                           className="h-10 gap-2"
                         >
                           <MessageCircle aria-hidden="true" className="h-4 w-4" />
@@ -1386,16 +1469,6 @@ export function CareMatchApp() {
                       <p className="font-semibold text-slate-950">{selected.genderLabel}</p>
                     </div>
                   </div>
-
-                  {messageIntent ? (
-                    <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm leading-6 text-sky-950">
-                      <p className="font-semibold">Mensagem vinculada ao pedido</p>
-                      <p>
-                        Para proteger paciente e profissional, a conversa abre depois que voce envia um pedido para {selected.name}.
-                        Assim tudo fica registrado no atendimento.
-                      </p>
-                    </div>
-                  ) : null}
 
                   {selected.recentReviews.length > 0 ? (
                     <div
@@ -1859,6 +1932,136 @@ export function CareMatchApp() {
             ) : (
               <div className="text-sm text-slate-600">Selecione um profissional para ver detalhes.</div>
             )}
+          </aside>
+
+          <aside
+            className={
+              inquiryProfessional
+                ? "fixed inset-0 z-[2100] grid place-items-center overflow-hidden bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4"
+                : "hidden"
+            }
+            role="dialog"
+            aria-modal="true"
+            aria-label="Enviar mensagem ao profissional"
+          >
+            {inquiryProfessional ? (
+              <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+                <button
+                  type="button"
+                  onClick={closeInquiry}
+                  className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-lg bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950"
+                  aria-label="Fechar mensagem"
+                >
+                  <X aria-hidden="true" className="h-5 w-5" />
+                </button>
+
+                <div className="overflow-y-auto p-4 sm:p-5">
+                  <div className="flex items-start gap-4 pr-12">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                      {inquiryProfessional.photoUrl ? (
+                        <Image src={inquiryProfessional.photoUrl} alt={inquiryProfessional.name} fill sizes="64px" className="object-cover" />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center text-slate-400">
+                          <UserRound aria-hidden="true" className="h-7 w-7" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-emerald-700">{inquiryProfessional.roleLabel}</p>
+                      <h2 className="mt-1 text-2xl font-semibold text-slate-950">{inquiryProfessional.name}</h2>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Tire uma duvida antes de solicitar atendimento. Se virar pedido, use o botao Ver detalhes para agendar com endereco e horario.
+                      </p>
+                    </div>
+                  </div>
+
+                  {inquirySent ? (
+                    <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950" role="status" aria-live="polite">
+                      <p className="font-semibold">Mensagem enviada para {inquiryProfessional.name}.</p>
+                      <p className="mt-1">O profissional recebe esta conversa no painel e por e-mail, quando o e-mail estiver habilitado.</p>
+                      {createdInquiryId ? (
+                        <Link
+                          href={`/dashboard/mensagens/${createdInquiryId}`}
+                          className="mt-3 inline-flex h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                        >
+                          Abrir conversa no painel
+                        </Link>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="mt-5 grid gap-3">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                        Seu nome
+                        <input
+                          value={inquiryName}
+                          onChange={(event) => setInquiryName(event.target.value)}
+                          placeholder="Nome de quem esta entrando em contato"
+                          className={requestInputClass(false)}
+                        />
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                          E-mail
+                          <input
+                            value={inquiryEmail}
+                            onChange={(event) => setInquiryEmail(event.target.value)}
+                            placeholder="email@exemplo.com"
+                            className={requestInputClass(false)}
+                          />
+                        </label>
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                          Telefone
+                          <input
+                            value={inquiryPhone}
+                            onChange={(event) => setInquiryPhone(event.target.value)}
+                            placeholder="(51) 99999-0101"
+                            className={requestInputClass(false)}
+                          />
+                        </label>
+                      </div>
+                      <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                        Mensagem
+                        <textarea
+                          value={inquiryBody}
+                          onChange={(event) => setInquiryBody(event.target.value)}
+                          rows={5}
+                          maxLength={1000}
+                          placeholder="Ex.: Oi, gostaria de tirar uma duvida sobre experiencia com transferencia, disponibilidade e valores antes de solicitar atendimento."
+                          className={requestTextareaClass(false)}
+                        />
+                      </label>
+                      <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+                        Esta etapa nao agenda atendimento. Ela serve para alinhar duvidas antes de abrir um pedido formal.
+                      </p>
+                      {inquiryError ? <div className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{inquiryError}</div> : null}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-2 border-t border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5">
+                  {!inquirySent ? (
+                    <Button
+                      type="button"
+                      onClick={submitInquiry}
+                      disabled={inquiryPending}
+                      className="h-12 gap-2 bg-emerald-700 hover:bg-emerald-800"
+                    >
+                      <MessageCircle aria-hidden="true" className="h-4 w-4" />
+                      {inquiryPending ? "Enviando..." : "Enviar mensagem"}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={closeInquiry}
+                    className="h-12 gap-2"
+                  >
+                    <X aria-hidden="true" className="h-4 w-4" />
+                    Fechar
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </aside>
         </div>
       </section>
