@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import {
@@ -336,6 +337,9 @@ export function CareMatchApp() {
   const [notes, setNotes] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [highlightReviews, setHighlightReviews] = useState(false);
+  const [reviewsExpanded, setReviewsExpanded] = useState(false);
+  const [messageIntent, setMessageIntent] = useState(false);
+  const [createdRequestId, setCreatedRequestId] = useState("");
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
   const [favoritePendingId, setFavoritePendingId] = useState("");
   const [favoriteError, setFavoriteError] = useState("");
@@ -606,25 +610,31 @@ export function CareMatchApp() {
     }
   }
 
-  function selectProfessional(id: string, options?: { showReviews?: boolean }) {
+  function selectProfessional(id: string, options?: { showReviews?: boolean; messageIntent?: boolean }) {
     setSelectedId(id);
     setDetailOpen(true);
     setHighlightReviews(Boolean(options?.showReviews));
+    setReviewsExpanded(Boolean(options?.showReviews));
+    setMessageIntent(Boolean(options?.messageIntent));
     setRequestAttempted(false);
     setRequestSent(false);
     setRequestError("");
     setRequestWarning("");
     setRequestReviewOpen(false);
     setRequestRulesAccepted(false);
+    setCreatedRequestId("");
   }
 
   function closeDetails() {
     setDetailOpen(false);
     setHighlightReviews(false);
+    setReviewsExpanded(false);
+    setMessageIntent(false);
     setRequestAttempted(false);
     setRequestError("");
     setRequestReviewOpen(false);
     setRequestRulesAccepted(false);
+    setCreatedRequestId("");
   }
 
   async function toggleFavorite(professionalId: string) {
@@ -907,6 +917,7 @@ export function CareMatchApp() {
     }
 
     setRequestWarning(data.warning || "");
+    setCreatedRequestId(data.request?.id || "");
     setRequestSent(true);
     setRequestReviewOpen(false);
   }
@@ -1293,7 +1304,12 @@ export function CareMatchApp() {
                           <UserRound aria-hidden="true" className="h-4 w-4" />
                           Ver detalhes
                         </Button>
-                        <Button type="button" variant="secondary" className="h-10 gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => selectProfessional(professional.id, { messageIntent: true })}
+                          className="h-10 gap-2"
+                        >
                           <MessageCircle aria-hidden="true" className="h-4 w-4" />
                           Mensagem
                         </Button>
@@ -1371,6 +1387,16 @@ export function CareMatchApp() {
                     </div>
                   </div>
 
+                  {messageIntent ? (
+                    <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm leading-6 text-sky-950">
+                      <p className="font-semibold">Mensagem vinculada ao pedido</p>
+                      <p>
+                        Para proteger paciente e profissional, a conversa abre depois que voce envia um pedido para {selected.name}.
+                        Assim tudo fica registrado no atendimento.
+                      </p>
+                    </div>
+                  ) : null}
+
                   {selected.recentReviews.length > 0 ? (
                     <div
                       ref={reviewsSectionRef}
@@ -1379,14 +1405,30 @@ export function CareMatchApp() {
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-amber-950">Avaliacoes recentes</p>
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-amber-800">
-                          <Star aria-hidden="true" className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                          Nota {formatRatingValue(selected.rating)}
-                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-amber-950">Avaliacoes recentes</p>
+                          <p className="mt-1 text-xs font-medium text-amber-800">
+                            {formatReviewCount(selected.reviewCount)} no historico deste profissional.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-amber-800">
+                            <Star aria-hidden="true" className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                            Nota {formatRatingValue(selected.rating)}
+                          </span>
+                          {selected.recentReviews.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => setReviewsExpanded((current) => !current)}
+                              className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-xs font-semibold text-amber-900 transition hover:border-amber-400"
+                            >
+                              {reviewsExpanded ? "Ver menos" : "Ver todas"}
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="mt-3 grid gap-3">
-                        {selected.recentReviews.map((review) => (
+                      <div className="mt-3 grid max-h-56 gap-3 overflow-y-auto pr-1">
+                        {selected.recentReviews.slice(0, reviewsExpanded ? selected.recentReviews.length : 1).map((review) => (
                           <div key={review.id} className="rounded-lg bg-white/80 p-3 text-sm text-slate-700">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="font-semibold text-slate-950">{review.reviewerName}</span>
@@ -1395,7 +1437,13 @@ export function CareMatchApp() {
                                 {formatRatingValue(review.rating)}/5
                               </span>
                             </div>
-                            {review.comment ? <p className="mt-2 leading-6">{review.comment}</p> : null}
+                            {review.comment ? (
+                              <p className={`mt-2 leading-6 ${reviewsExpanded ? "" : "max-h-12 overflow-hidden"}`}>
+                                {review.comment}
+                              </p>
+                            ) : (
+                              <p className="mt-2 text-slate-500">Avaliacao sem comentario.</p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1690,6 +1738,14 @@ export function CareMatchApp() {
                       <span className="block pt-1 font-medium">
                         Nesta versao, pagamento e detalhes finais sao combinados diretamente com o profissional.
                       </span>
+                      {createdRequestId ? (
+                        <Link
+                          href={`/dashboard/atendimentos/${createdRequestId}#mensagens`}
+                          className="mt-2 inline-flex h-9 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                        >
+                          Abrir conversa do atendimento
+                        </Link>
+                      ) : null}
                     </div>
                   ) : null}
                   {requestReviewOpen && !requestSent ? (
