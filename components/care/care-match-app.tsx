@@ -55,6 +55,7 @@ const professionalTypes: Array<{ value: ProfessionalTypeFilter; label: string }>
   { value: "TODOS", label: "Todos" },
   { value: "CUIDADOR", label: "Cuidador" },
   { value: "TECNICO_ENFERMAGEM", label: "Tecnico" },
+  { value: "ENFERMEIRO", label: "Enfermeiro" },
   { value: "FISIOTERAPEUTA", label: "Fisio" }
 ];
 
@@ -122,7 +123,7 @@ const careServiceValues: CareServiceCode[] = [
   "FORTALECIMENTO",
   "OUTRO"
 ];
-const professionalTypeValues: ProfessionalTypeCode[] = ["CUIDADOR", "TECNICO_ENFERMAGEM", "FISIOTERAPEUTA"];
+const professionalTypeValues: ProfessionalTypeCode[] = ["CUIDADOR", "TECNICO_ENFERMAGEM", "ENFERMEIRO", "FISIOTERAPEUTA"];
 const genderPreferenceValues: GenderPreferenceCode[] = ["FEMININO", "MASCULINO", "QUALQUER"];
 const supportNeedValues: TransferSupportCode[] = ["MODERADO", "ALTO", "DUPLA"];
 const availabilityValues: AvailabilityFilter[] = ["qualquer", "agora", "hoje", "manha", "tarde", "noite", "fim-de-semana"];
@@ -337,7 +338,10 @@ export function CareMatchApp() {
   const [notes, setNotes] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [highlightReviews, setHighlightReviews] = useState(false);
-  const [reviewsExpanded, setReviewsExpanded] = useState(false);
+  const [reviewsProfessionalId, setReviewsProfessionalId] = useState("");
+  const [reviewsList, setReviewsList] = useState<CareProfessional["recentReviews"]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
   const [createdRequestId, setCreatedRequestId] = useState("");
   const [inquiryProfessionalId, setInquiryProfessionalId] = useState("");
   const [inquiryName, setInquiryName] = useState("");
@@ -491,6 +495,9 @@ export function CareMatchApp() {
   const inquiryProfessional = useMemo(() => {
     return results.find((professional) => professional.id === inquiryProfessionalId) ?? null;
   }, [results, inquiryProfessionalId]);
+  const reviewsProfessional = useMemo(() => {
+    return results.find((professional) => professional.id === reviewsProfessionalId) ?? null;
+  }, [results, reviewsProfessionalId]);
   const scheduledParts = splitScheduledFor(scheduledFor);
   const availableDurationOptions = durationOptionsFor(service);
   const currentServiceLabel = serviceOptions.find((option) => option.id === service)?.label || "Atendimento";
@@ -625,7 +632,6 @@ export function CareMatchApp() {
     setSelectedId(id);
     setDetailOpen(true);
     setHighlightReviews(Boolean(options?.showReviews));
-    setReviewsExpanded(Boolean(options?.showReviews));
     setRequestAttempted(false);
     setRequestSent(false);
     setRequestError("");
@@ -638,12 +644,36 @@ export function CareMatchApp() {
   function closeDetails() {
     setDetailOpen(false);
     setHighlightReviews(false);
-    setReviewsExpanded(false);
     setRequestAttempted(false);
     setRequestError("");
     setRequestReviewOpen(false);
     setRequestRulesAccepted(false);
     setCreatedRequestId("");
+  }
+
+  function openReviews(professionalId: string) {
+    setReviewsProfessionalId(professionalId);
+    setReviewsList([]);
+    setReviewsError("");
+    setReviewsLoading(true);
+
+    fetch(`/api/professionals/${professionalId}/reviews`)
+      .then(async (response) => {
+        const data = (await response.json()) as { reviews?: CareProfessional["recentReviews"]; error?: string };
+        if (!response.ok) throw new Error(data.error || "Nao foi possivel carregar avaliacoes.");
+        setReviewsList(data.reviews || []);
+      })
+      .catch((error: Error) => {
+        setReviewsError(error.message);
+      })
+      .finally(() => setReviewsLoading(false));
+  }
+
+  function closeReviews() {
+    setReviewsProfessionalId("");
+    setReviewsList([]);
+    setReviewsError("");
+    setReviewsLoading(false);
   }
 
   function openInquiry(professionalId: string) {
@@ -1300,7 +1330,7 @@ export function CareMatchApp() {
                         {professional.reviewCount > 0 ? (
                           <button
                             type="button"
-                            onClick={() => selectProfessional(professional.id, { showReviews: true })}
+                            onClick={() => openReviews(professional.id)}
                             className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-300"
                             aria-label={`Abrir avaliacoes de ${professional.name}`}
                           >
@@ -1489,19 +1519,17 @@ export function CareMatchApp() {
                             <Star aria-hidden="true" className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
                             Nota {formatRatingValue(selected.rating)}
                           </span>
-                          {selected.recentReviews.length > 1 ? (
-                            <button
-                              type="button"
-                              onClick={() => setReviewsExpanded((current) => !current)}
-                              className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-xs font-semibold text-amber-900 transition hover:border-amber-400"
-                            >
-                              {reviewsExpanded ? "Ver menos" : "Ver todas"}
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => openReviews(selected.id)}
+                            className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-xs font-semibold text-amber-900 transition hover:border-amber-400"
+                          >
+                            Ver avaliacoes
+                          </button>
                         </div>
                       </div>
-                      <div className="mt-3 grid max-h-56 gap-3 overflow-y-auto pr-1">
-                        {selected.recentReviews.slice(0, reviewsExpanded ? selected.recentReviews.length : 1).map((review) => (
+                      <div className="mt-3 grid gap-3">
+                        {selected.recentReviews.slice(0, 2).map((review) => (
                           <div key={review.id} className="rounded-lg bg-white/80 p-3 text-sm text-slate-700">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="font-semibold text-slate-950">{review.reviewerName}</span>
@@ -1511,9 +1539,7 @@ export function CareMatchApp() {
                               </span>
                             </div>
                             {review.comment ? (
-                              <p className={`mt-2 leading-6 ${reviewsExpanded ? "" : "max-h-12 overflow-hidden"}`}>
-                                {review.comment}
-                              </p>
+                              <p className="mt-2 line-clamp-2 leading-6">{review.comment}</p>
                             ) : (
                               <p className="mt-2 text-slate-500">Avaliacao sem comentario.</p>
                             )}
@@ -1932,6 +1958,110 @@ export function CareMatchApp() {
             ) : (
               <div className="text-sm text-slate-600">Selecione um profissional para ver detalhes.</div>
             )}
+          </aside>
+
+          <aside
+            className={
+              reviewsProfessional
+                ? "fixed inset-0 z-[2200] grid place-items-center overflow-hidden bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4"
+                : "hidden"
+            }
+            role="dialog"
+            aria-modal="true"
+            aria-label="Avaliacoes do profissional"
+          >
+            {reviewsProfessional ? (
+              <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+                <button
+                  type="button"
+                  onClick={closeReviews}
+                  className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-lg bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950"
+                  aria-label="Fechar avaliacoes"
+                >
+                  <X aria-hidden="true" className="h-5 w-5" />
+                </button>
+
+                <div className="overflow-y-auto p-4 sm:p-5">
+                  <div className="flex items-start gap-4 pr-12">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                      {reviewsProfessional.photoUrl ? (
+                        <Image src={reviewsProfessional.photoUrl} alt={reviewsProfessional.name} fill sizes="64px" className="object-cover" />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center text-slate-400">
+                          <UserRound aria-hidden="true" className="h-7 w-7" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-emerald-700">{reviewsProfessional.roleLabel}</p>
+                      <h2 className="mt-1 text-2xl font-semibold text-slate-950">{reviewsProfessional.name}</h2>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-sm font-semibold text-amber-800">
+                          <Star aria-hidden="true" className="h-4 w-4 fill-amber-500 text-amber-500" />
+                          {formatRatingSummary(reviewsProfessional.rating, reviewsProfessional.reviewCount)}
+                        </span>
+                        {reviewsProfessional.isVerified ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-sm font-semibold text-emerald-800">
+                            <ShieldCheck aria-hidden="true" className="h-4 w-4" />
+                            Verificado
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+                    Avaliacoes ajudam a entender pontualidade, cuidado e comunicacao. Elas nao substituem combinados diretos antes do atendimento.
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    {reviewsLoading ? (
+                      <div className="rounded-lg border border-slate-200 p-4 text-sm font-semibold text-slate-600">Carregando avaliacoes...</div>
+                    ) : null}
+                    {reviewsError ? <div className="rounded-lg bg-rose-50 p-4 text-sm font-semibold text-rose-700">{reviewsError}</div> : null}
+                    {!reviewsLoading && !reviewsError && reviewsList.length === 0 ? (
+                      <div className="rounded-lg border border-slate-200 p-4 text-sm text-slate-600">Nenhuma avaliacao publicada ainda.</div>
+                    ) : null}
+                    {reviewsList.map((review) => (
+                      <article key={review.id} className="rounded-lg border border-amber-100 bg-amber-50 p-4 text-sm text-slate-700">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-950">{review.reviewerName}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {new Date(review.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                            </p>
+                          </div>
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 font-semibold text-amber-800">
+                            <Star aria-hidden="true" className="h-4 w-4 fill-amber-500 text-amber-500" />
+                            {formatRatingValue(review.rating)}/5
+                          </span>
+                        </div>
+                        <p className="mt-3 leading-6">{review.comment || "Avaliacao sem comentario."}</p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-2 border-t border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const professionalId = reviewsProfessional.id;
+                      closeReviews();
+                      selectProfessional(professionalId);
+                    }}
+                    className="h-12 gap-2 bg-slate-950 hover:bg-slate-800"
+                  >
+                    <UserRound aria-hidden="true" className="h-4 w-4" />
+                    Ver detalhes
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={closeReviews} className="h-12 gap-2">
+                    <X aria-hidden="true" className="h-4 w-4" />
+                    Fechar
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </aside>
 
           <aside

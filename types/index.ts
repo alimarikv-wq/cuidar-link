@@ -94,7 +94,7 @@ export type CareServiceCode =
   | "FORTALECIMENTO"
   | "OUTRO";
 
-export type ProfessionalTypeCode = "CUIDADOR" | "TECNICO_ENFERMAGEM" | "FISIOTERAPEUTA";
+export type ProfessionalTypeCode = "CUIDADOR" | "TECNICO_ENFERMAGEM" | "ENFERMEIRO" | "FISIOTERAPEUTA";
 export type GenderCode = "FEMININO" | "MASCULINO" | "OUTRO";
 export type GenderPreferenceCode = "FEMININO" | "MASCULINO" | "QUALQUER";
 export type TransferSupportCode = "MODERADO" | "ALTO" | "DUPLA";
@@ -143,6 +143,8 @@ export type CareProfessional = {
     createdAt: string;
   }>;
 };
+
+export type ProfessionalReviewData = CareProfessional["recentReviews"][number];
 
 export type CareSearchResponse = {
   results: CareProfessional[];

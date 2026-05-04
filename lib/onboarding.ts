@@ -54,7 +54,7 @@ function servicesForType(type: ProfessionalType) {
     return [CareService.FISIOTERAPIA, CareService.AVALIACAO, CareService.FORTALECIMENTO, CareService.TRANSFERENCIA];
   }
 
-  if (type === ProfessionalType.TECNICO_ENFERMAGEM) {
+  if (type === ProfessionalType.TECNICO_ENFERMAGEM || type === ProfessionalType.ENFERMEIRO) {
     return [CareService.BANHO, CareService.TRANSFERENCIA, CareService.MEDICACAO, CareService.CURATIVOS, CareService.SINAIS_VITAIS];
   }
 

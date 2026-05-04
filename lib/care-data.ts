@@ -49,6 +49,7 @@ import {
   ProfessionalInquiryDetailsData,
   ProfessionalInquiryMessageData,
   ProfessionalInquirySummary,
+  ProfessionalReviewData,
   CareRequestDetailsData,
   CareRequestRecord,
   DashboardFavoriteProfessional,
@@ -82,6 +83,7 @@ const supportWeight: Record<TransferSupportLevel, number> = {
 const professionalTypeLabel: Record<ProfessionalType, string> = {
   CUIDADOR: "Cuidador",
   TECNICO_ENFERMAGEM: "Tecnico de enfermagem",
+  ENFERMEIRO: "Enfermeiro",
   FISIOTERAPEUTA: "Fisioterapeuta"
 };
 
@@ -425,7 +427,7 @@ function requiredDocumentRulesFor(type: ProfessionalType): Array<{ type: Documen
     }
   ];
 
-  if (type === ProfessionalType.TECNICO_ENFERMAGEM) {
+  if (type === ProfessionalType.TECNICO_ENFERMAGEM || type === ProfessionalType.ENFERMEIRO) {
     return [...base, { type: "COREN", label: "COREN", matches: [DocumentType.COREN] }];
   }
 
@@ -923,6 +925,46 @@ function toCareProfessional(professional: ProfessionalWithRelations, params: Car
       createdAt: review.createdAt.toISOString()
     }))
   };
+}
+
+function toProfessionalReviewData(review: {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: Date;
+  patientProfile: { user: { name: string } } | null;
+}): ProfessionalReviewData {
+  return {
+    id: review.id,
+    rating: review.rating,
+    comment: review.comment,
+    reviewerName: review.patientProfile?.user.name || "Paciente",
+    createdAt: review.createdAt.toISOString()
+  };
+}
+
+export async function getProfessionalReviews(professionalId: string) {
+  const professional = await prisma.professionalProfile.findUnique({
+    where: { id: professionalId },
+    select: { id: true }
+  });
+
+  if (!professional) return null;
+
+  const reviews = await prisma.careReview.findMany({
+    where: { professionalId },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: {
+      patientProfile: {
+        include: {
+          user: true
+        }
+      }
+    }
+  });
+
+  return reviews.map(toProfessionalReviewData);
 }
 
 export async function searchCareProfessionals(params: CareSearchParams) {

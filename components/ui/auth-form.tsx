@@ -402,6 +402,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 <select value={professionalType} onChange={(event) => setProfessionalType(event.target.value)} className={fieldClass}>
                   <option value="CUIDADOR">Cuidador</option>
                   <option value="TECNICO_ENFERMAGEM">Tecnico de enfermagem</option>
+                  <option value="ENFERMEIRO">Enfermeiro</option>
                   <option value="FISIOTERAPEUTA">Fisioterapeuta</option>
                 </select>
                 <select value={gender} onChange={(event) => setGender(event.target.value)} className={fieldClass}>

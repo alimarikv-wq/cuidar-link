@@ -58,6 +58,7 @@ enum GenderPreference {
 enum ProfessionalType {
   CUIDADOR
   TECNICO_ENFERMAGEM
+  ENFERMEIRO
   FISIOTERAPEUTA
 }
 
