@@ -165,6 +165,12 @@ export type CareRequestRecord = {
   serviceLabel: string;
   durationHours: number;
   scheduledFor: string | null;
+  scheduledEndAt: string | null;
+  completionAvailableAt: string | null;
+  completedAt: string | null;
+  completedById: string | null;
+  canCompleteNow: boolean;
+  completionGateLabel: string | null;
   createdAt: string;
   updatedAt: string;
   requesterName: string;
@@ -188,6 +194,16 @@ export type CareRequestRecord = {
   professionalName: string;
   professionalRole: string;
   neighborhood: string;
+};
+
+export type CareMessageData = {
+  id: string;
+  senderId: string;
+  senderName: string;
+  body: string;
+  isOwn: boolean;
+  readAt: string | null;
+  createdAt: string;
 };
 
 export type CareRequestDetailsData = CareRequestRecord & {
@@ -224,7 +240,9 @@ export type CareRequestDetailsData = CareRequestRecord & {
     comment: string | null;
     createdAt: string;
   } | null;
+  messages: CareMessageData[];
   viewer: {
+    userId: string;
     accountType: string;
     canActAsProfessional: boolean;
     canCancelAsPatient: boolean;

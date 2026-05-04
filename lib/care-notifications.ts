@@ -218,6 +218,40 @@ export async function sendEmailConfigurationTest(primaryRecipient: string) {
   });
 }
 
+export async function sendCareMessageNotification(input: {
+  to: string;
+  senderName: string;
+  requestId: string;
+  serviceLabel: string;
+  body: string;
+}) {
+  const url = `${appUrl()}/dashboard/atendimentos/${input.requestId}#mensagens`;
+  const subject = `Nova mensagem no atendimento: ${input.serviceLabel}`;
+  const preview = input.body.length > 500 ? `${input.body.slice(0, 500)}...` : input.body;
+
+  return sendEmail({
+    to: input.to,
+    subject,
+    text: [
+      `${input.senderName} enviou uma mensagem sobre o atendimento de ${input.serviceLabel}.`,
+      "",
+      preview,
+      "",
+      `Responder: ${url}`
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
+        <h1 style="font-size:20px;margin:0 0 12px">Nova mensagem no atendimento</h1>
+        <p><strong>${escapeHtml(input.senderName)}</strong> enviou uma mensagem sobre o atendimento de <strong>${escapeHtml(input.serviceLabel)}</strong>.</p>
+        <div style="margin:16px 0;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;white-space:pre-line">${escapeHtml(preview)}</div>
+        <p style="margin:16px 0 0">
+          <a href="${url}" style="color:#047857;font-weight:700">Abrir conversa</a>
+        </p>
+      </div>
+    `
+  });
+}
+
 export async function sendNewCareRequestNotifications(request: CareRequestNotificationData) {
   const professionalEmail = request.professional.user.email;
   const adminEmails = parseEmails(process.env.CARE_ADMIN_EMAILS);

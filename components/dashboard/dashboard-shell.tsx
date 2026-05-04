@@ -16,6 +16,7 @@ import {
   Globe2,
   Heart,
   MapPin,
+  MessageSquareText,
   Plane,
   Save,
   ShieldCheck,
@@ -44,6 +45,7 @@ type StatusAction = {
   label: string;
   status: RequestStatus;
   variant: "primary" | "secondary" | "danger";
+  disabledReason?: string | null;
 };
 type RequestView = "active" | "completed" | "canceled" | "archived";
 type HistoryRange = "30" | "90" | "all" | "custom";
@@ -213,7 +215,9 @@ function filterRequestsByHistoryRange(
   });
 }
 
-function getRequestActions(status: string, accountType: string): StatusAction[] {
+function getRequestActions(request: CareRequestRecord, accountType: string): StatusAction[] {
+  const status = request.status;
+
   if (accountType === "PROFESSIONAL") {
     if (status === "ENVIADO") {
       return [
@@ -232,7 +236,12 @@ function getRequestActions(status: string, accountType: string): StatusAction[] 
 
     if (status === "AGENDADO") {
       return [
-        { label: "Concluir", status: "CONCLUIDO", variant: "primary" },
+        {
+          label: "Concluir",
+          status: "CONCLUIDO",
+          variant: "primary",
+          disabledReason: request.canCompleteNow ? null : request.completionGateLabel || "Conclusao ainda nao liberada."
+        },
         { label: "Cancelar", status: "CANCELADO", variant: "danger" }
       ];
     }
@@ -1726,6 +1735,13 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 >
                   Ver detalhes
                 </Link>
+                <Link
+                  href={`/dashboard/atendimentos/${request.id}#mensagens`}
+                  className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 md:justify-self-end"
+                >
+                  <MessageSquareText aria-hidden="true" className="h-3.5 w-3.5" />
+                  Mensagens
+                </Link>
                 {request.archivedAt ? (
                   <div className="flex flex-wrap gap-2 md:justify-end">
                     <button
@@ -1758,14 +1774,20 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                     {isPending && updatingId === request.id ? "Arquivando..." : "Arquivar"}
                   </button>
                 ) : null}
-                {getRequestActions(request.status, dashboard.summary.accountType).length > 0 ? (
+                {request.status === "AGENDADO" && isProfessional && request.completionGateLabel ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold leading-5 text-amber-900 md:text-left">
+                    {request.completionGateLabel}
+                  </p>
+                ) : null}
+                {getRequestActions(request, dashboard.summary.accountType).length > 0 ? (
                   <div className="flex flex-wrap gap-2 md:justify-end">
-                    {getRequestActions(request.status, dashboard.summary.accountType).map((action) => (
+                    {getRequestActions(request, dashboard.summary.accountType).map((action) => (
                       <button
                         key={action.status}
                         type="button"
                         onClick={() => updateStatus(request.id, action.status)}
-                        disabled={isPending && updatingId === request.id}
+                        disabled={(isPending && updatingId === request.id) || Boolean(action.disabledReason)}
+                        title={action.disabledReason || undefined}
                         className={`inline-flex h-9 items-center justify-center gap-1 rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${buttonStyles[action.variant]}`}
                       >
                         {action.status === "CANCELADO" ? <X aria-hidden="true" className="h-3.5 w-3.5" /> : <Check aria-hidden="true" className="h-3.5 w-3.5" />}

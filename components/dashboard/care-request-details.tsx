@@ -13,8 +13,10 @@ import {
   Home,
   Mail,
   MapPin,
+  MessageSquareText,
   Phone,
   Plane,
+  Send,
   ShieldCheck,
   Star,
   Trash2,
@@ -29,6 +31,7 @@ type StatusAction = {
   label: string;
   status: RequestStatus;
   variant: "primary" | "secondary" | "danger";
+  disabledReason?: string | null;
 };
 
 const statusStyles: Record<RequestStatus, string> = {
@@ -86,7 +89,12 @@ function getRequestActions(request: CareRequestDetailsData): StatusAction[] {
 
     if (request.status === "AGENDADO") {
       return [
-        { label: "Concluir", status: "CONCLUIDO", variant: "primary" },
+        {
+          label: "Concluir",
+          status: "CONCLUIDO",
+          variant: "primary",
+          disabledReason: request.canCompleteNow ? null : request.completionGateLabel || "Conclusao ainda nao liberada."
+        },
         { label: "Cancelar", status: "CANCELADO", variant: "danger" }
       ];
     }
@@ -107,7 +115,11 @@ function guidanceFor(request: CareRequestDetailsData) {
   if (request.viewer.canActAsProfessional) {
     if (request.status === "ENVIADO") return "Confira os dados do paciente e confirme se voce consegue atender neste horario e endereco.";
     if (request.status === "ACEITO") return "Pedido aceito. Use Agendar quando o horario estiver confirmado com o paciente.";
-    if (request.status === "AGENDADO") return "Atendimento agendado. Apos realizar o cuidado, marque como concluido.";
+    if (request.status === "AGENDADO") {
+      return request.canCompleteNow
+        ? "Atendimento agendado. Se o cuidado ja foi realizado, marque como concluido."
+        : `Atendimento agendado. ${request.completionGateLabel || "A conclusao sera liberada depois do horario final."}`;
+    }
   }
 
   if (request.status === "ENVIADO") return "Pedido enviado. Aguarde a resposta do profissional antes de considerar o atendimento confirmado.";
@@ -237,6 +249,107 @@ function StatusTimeline({ request }: { request: CareRequestDetailsData }) {
             date={step.date}
           />
         ))}
+      </div>
+    </article>
+  );
+}
+
+function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
+  const [isPending, startTransition] = useTransition();
+  const [messages, setMessages] = useState(request.messages);
+  const [body, setBody] = useState("");
+  const [error, setError] = useState("");
+
+  function sendMessage() {
+    const trimmed = body.trim();
+    if (!trimmed) {
+      setError("Escreva uma mensagem antes de enviar.");
+      return;
+    }
+
+    setError("");
+
+    startTransition(async () => {
+      const response = await fetch(`/api/care-requests/${request.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: trimmed })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel enviar a mensagem.");
+        return;
+      }
+
+      setMessages((current) => [...current, data.message]);
+      setBody("");
+    });
+  }
+
+  return (
+    <article id="mensagens" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Mensagens</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Conversa do atendimento</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            Use este espaco para combinar horario, endereco, acesso ao local, pagamento direto e cuidados de seguranca.
+          </p>
+        </div>
+        <MessageSquareText aria-hidden="true" className="h-6 w-6 text-emerald-700" />
+      </div>
+
+      <div className="mt-5 grid max-h-[420px] gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
+        {messages.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            Nenhuma mensagem ainda. Envie a primeira para alinhar os combinados antes do atendimento.
+          </div>
+        ) : null}
+
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`max-w-[88%] rounded-lg border p-3 text-sm leading-6 shadow-sm ${
+              message.isOwn
+                ? "justify-self-end border-emerald-200 bg-emerald-50 text-emerald-950"
+                : "justify-self-start border-slate-200 bg-white text-slate-800"
+            }`}
+          >
+            <div className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+              <span>{message.isOwn ? "Voce" : message.senderName}</span>
+              <span>{formatBrasiliaDateTime(message.createdAt)}</span>
+            </div>
+            <p className="whitespace-pre-line">{message.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <label className="grid gap-2 text-sm font-semibold text-slate-800">
+          Nova mensagem
+          <textarea
+            value={body}
+            onChange={(event) => {
+              setBody(event.target.value);
+              setError("");
+            }}
+            rows={4}
+            maxLength={1000}
+            placeholder="Ex.: Oi, podemos confirmar o horario e combinar detalhes de chegada?"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+          />
+        </label>
+        {error ? <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
+        <button
+          type="button"
+          onClick={sendMessage}
+          disabled={isPending || body.trim().length === 0}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-fit"
+        >
+          <Send aria-hidden="true" className="h-4 w-4" />
+          {isPending ? "Enviando..." : "Enviar mensagem"}
+        </button>
       </div>
     </article>
   );
@@ -410,6 +523,8 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
 
       <StatusTimeline request={request} />
 
+      <CareMessagesPanel request={request} />
+
       {request.status === "CONCLUIDO" ? (
         <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -498,6 +613,11 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <InfoRow label="Data e hora" value={request.scheduledFor ? formatBrasiliaDateTime(request.scheduledFor) : "A combinar"} />
               <InfoRow label="Duracao" value={formatDurationHours(request.durationHours)} />
+              <InfoRow label="Fim previsto" value={request.scheduledEndAt ? formatBrasiliaDateTime(request.scheduledEndAt) : "A combinar"} />
+              <InfoRow
+                label="Conclusao liberada"
+                value={request.completionAvailableAt ? formatBrasiliaDateTime(request.completionAvailableAt) : "Apos agendamento"}
+              />
               <InfoRow label="Apoio solicitado" value={request.supportNeedLabel} />
               <InfoRow label="Preferencia no cuidado" value={request.preferredGenderLabel} />
               <InfoRow label="Pagamento" value={request.paymentAgreementLabel} />
@@ -566,13 +686,20 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                   key={action.status}
                   type="button"
                   onClick={() => updateStatus(action.status)}
-                  disabled={isPending}
+                  disabled={isPending || Boolean(action.disabledReason)}
+                  title={action.disabledReason || undefined}
                   className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${actionStyles[action.variant]}`}
                 >
                   {action.status === "CANCELADO" ? <X aria-hidden="true" className="h-4 w-4" /> : <Check aria-hidden="true" className="h-4 w-4" />}
                   {isPending && updatingStatus === action.status ? "Salvando..." : action.label}
                 </button>
               ))}
+
+              {request.status === "AGENDADO" && request.viewer.canActAsProfessional && request.completionGateLabel ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                  {request.completionGateLabel}
+                </div>
+              ) : null}
 
               {canArchive ? (
                 <button

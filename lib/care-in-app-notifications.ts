@@ -129,6 +129,17 @@ export async function notifyCareRequestCanceledForProfessional(request: RequestN
   });
 }
 
+export async function notifyCareMessageReceived(userId: string, requestId: string, senderName: string) {
+  await createCareNotification({
+    userId,
+    careRequestId: requestId,
+    type: "REQUEST_MESSAGE",
+    title: "Nova mensagem no atendimento",
+    body: `${senderName} enviou uma mensagem sobre o atendimento.`,
+    actionUrl: `/dashboard/atendimentos/${requestId}#mensagens`
+  });
+}
+
 export async function notifyProfessionalReview(userId: string, requestId: string, requesterName: string, rating: number) {
   await createCareNotification({
     userId,

@@ -15,18 +15,19 @@ import {
 import { AppHealthChecks, getAppHealthChecks } from "@/lib/app-health";
 import { CARE_REQUEST_PAYMENT_AGREEMENT, CARE_REQUEST_PAYMENT_LABEL, CARE_REQUEST_RULES_VERSION } from "@/lib/care-request-disclosures";
 import { maskCpf } from "@/lib/cpf";
-import { sendCareRequestStatusNotification, sendNewCareRequestNotifications } from "@/lib/care-notifications";
+import { sendCareMessageNotification, sendCareRequestStatusNotification, sendNewCareRequestNotifications } from "@/lib/care-notifications";
 import {
   getCareNotificationsForUser,
   getUnreadCareNotificationCount,
   notifyCareRequestCanceledForProfessional,
+  notifyCareMessageReceived,
   notifyCareRequestStatusForPatient,
   notifyNewCareRequest,
   notifyProfessionalDocumentReview,
   notifyProfessionalReview,
   notifyProfessionalVerificationReview
 } from "@/lib/care-in-app-notifications";
-import { BRAZIL_TIME_ZONE, parseBrasiliaDateTime } from "@/lib/date-time";
+import { BRAZIL_TIME_ZONE, formatBrasiliaDateTime, parseBrasiliaDateTime } from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
 import {
@@ -35,6 +36,7 @@ import {
   AdminDocumentReviewData,
   CareAdminOverview,
   CareDashboardData,
+  CareMessageData,
   CareProfessional,
   CareRequestDetailsData,
   CareRequestRecord,
@@ -136,6 +138,8 @@ const professionalVerificationStatusLabel: Record<ProfessionalVerificationStatus
   APROVADO: "Aprovado",
   REPROVADO: "Reprovado"
 };
+
+const completionGraceMinutes = 1;
 
 function toReadinessChecks(checks: AppHealthChecks): CareAdminOverview["readinessChecks"] {
   return [
@@ -606,6 +610,55 @@ function requestEnd(start: Date, durationHours: number | Prisma.Decimal) {
   return new Date(start.getTime() + Number(durationHours) * 60 * 60 * 1000);
 }
 
+function completionAvailableAt(start: Date, durationHours: number | Prisma.Decimal) {
+  return new Date(requestEnd(start, durationHours).getTime() + completionGraceMinutes * 60 * 1000);
+}
+
+function scheduleTimestamps(scheduledFor: Date | null, durationHours: number | Prisma.Decimal) {
+  if (!scheduledFor) {
+    return {
+      scheduledEndAt: null,
+      completionAvailableAt: null
+    };
+  }
+
+  return {
+    scheduledEndAt: requestEnd(scheduledFor, durationHours),
+    completionAvailableAt: completionAvailableAt(scheduledFor, durationHours)
+  };
+}
+
+function requestCompletionAvailableAt(request: {
+  scheduledFor: Date | null;
+  scheduledEndAt?: Date | null;
+  completionAvailableAt?: Date | null;
+  durationHours: number | Prisma.Decimal;
+}) {
+  if (request.completionAvailableAt) return request.completionAvailableAt;
+  if (!request.scheduledFor) return null;
+  return completionAvailableAt(request.scheduledFor, request.durationHours);
+}
+
+function canCompleteRequestNow(request: {
+  scheduledFor: Date | null;
+  completionAvailableAt?: Date | null;
+  durationHours: number | Prisma.Decimal;
+}) {
+  const availableAt = requestCompletionAvailableAt(request);
+  return Boolean(availableAt && Date.now() >= availableAt.getTime());
+}
+
+function completionGateLabelFor(request: {
+  scheduledFor: Date | null;
+  completionAvailableAt?: Date | null;
+  durationHours: number | Prisma.Decimal;
+}) {
+  const availableAt = requestCompletionAvailableAt(request);
+  if (!availableAt) return "Informe data e horario para liberar conclusao.";
+  if (Date.now() >= availableAt.getTime()) return null;
+  return `Conclusao liberada a partir de ${formatBrasiliaDateTime(availableAt)}.`;
+}
+
 function rangesOverlap(startA: Date, endA: Date, startB: Date, endB: Date) {
   return startA < endB && endA > startB;
 }
@@ -911,6 +964,7 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
   let requesterEmail = input.requesterEmail;
   const durationHours = input.durationHours ?? 2;
   const scheduledFor = input.scheduledFor ? parseBrasiliaDateTime(input.scheduledFor) : null;
+  const schedule = scheduleTimestamps(scheduledFor, durationHours);
 
   if (!input.rulesAccepted) {
     return { ok: false as const, status: 400, error: "Leia e aceite as regras do atendimento para enviar o pedido." };
@@ -968,6 +1022,8 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       supportNeed: input.supportNeed,
       preferredGender: input.preferredGender,
       scheduledFor,
+      scheduledEndAt: schedule.scheduledEndAt,
+      completionAvailableAt: schedule.completionAvailableAt,
       durationHours,
       addressLine: input.addressLine,
       addressNumber: input.addressNumber,
@@ -1025,6 +1081,16 @@ function toRequestRecord(
     serviceLabel: serviceLabel[request.service],
     durationHours: Number(request.durationHours),
     scheduledFor: request.scheduledFor ? request.scheduledFor.toISOString() : null,
+    scheduledEndAt: request.scheduledEndAt
+      ? request.scheduledEndAt.toISOString()
+      : request.scheduledFor
+        ? requestEnd(request.scheduledFor, request.durationHours).toISOString()
+        : null,
+    completionAvailableAt: requestCompletionAvailableAt(request)?.toISOString() || null,
+    completedAt: request.completedAt ? request.completedAt.toISOString() : null,
+    completedById: request.completedById,
+    canCompleteNow: canCompleteRequestNow(request),
+    completionGateLabel: completionGateLabelFor(request),
     createdAt: request.createdAt.toISOString(),
     updatedAt: request.updatedAt.toISOString(),
     requesterName: request.requesterName,
@@ -1065,6 +1131,11 @@ function toRequestDetailsData(
         };
       };
       review: true;
+      messages: {
+        include: {
+          sender: true;
+        };
+      };
     };
   }>,
   viewer: CareRequestDetailsData["viewer"]
@@ -1109,7 +1180,23 @@ function toRequestDetailsData(
           createdAt: request.review.createdAt.toISOString()
         }
       : null,
+    messages: request.messages.map((message) => toCareMessageData(message, viewer.userId)),
     viewer
+  };
+}
+
+function toCareMessageData(
+  message: Prisma.CareMessageGetPayload<{ include: { sender: true } }>,
+  viewerUserId: string
+): CareMessageData {
+  return {
+    id: message.id,
+    senderId: message.senderId,
+    senderName: message.sender.name,
+    body: message.body,
+    isOwn: message.senderId === viewerUserId,
+    readAt: message.readAt ? message.readAt.toISOString() : null,
+    createdAt: message.createdAt.toISOString()
   };
 }
 
@@ -1137,7 +1224,11 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
           user: true
         }
       },
-      review: true
+      review: true,
+      messages: {
+        include: { sender: true },
+        orderBy: { createdAt: "asc" }
+      }
     }
   });
 
@@ -1162,15 +1253,133 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
     return { ok: false as const, status: 404, error: "Atendimento nao encontrado no seu historico." };
   }
 
+  await prisma.careMessage.updateMany({
+    where: {
+      careRequestId: request.id,
+      senderId: { not: user.id },
+      readAt: null
+    },
+    data: { readAt: new Date() }
+  });
+
   return {
     ok: true as const,
     request: toRequestDetailsData(request, {
+      userId: user.id,
       accountType: user.accountType,
       canActAsProfessional,
       canCancelAsPatient,
       canReview
     })
   };
+}
+
+export async function createCareRequestMessageForUser(requestId: string, userId: string, body: string) {
+  const trimmedBody = body.trim();
+
+  if (trimmedBody.length < 1) {
+    return { ok: false as const, status: 400, error: "Escreva uma mensagem antes de enviar." };
+  }
+
+  if (trimmedBody.length > 1000) {
+    return { ok: false as const, status: 400, error: "Mensagem muito longa. Use ate 1000 caracteres." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const request = await prisma.careRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      professional: {
+        include: { user: true }
+      },
+      patientProfile: {
+        include: { user: true }
+      }
+    }
+  });
+
+  if (!request) return { ok: false as const, status: 404, error: "Atendimento nao encontrado." };
+
+  const canActAsProfessional = user.professionalProfile?.id === request.professionalId;
+  const canActAsPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
+  const canViewByEmail = Boolean(request.requesterEmail && request.requesterEmail.toLowerCase() === user.email.toLowerCase());
+  const canMessage = user.role === UserRole.ADMIN || canActAsProfessional || canActAsPatient || canViewByEmail;
+
+  if (!canMessage) {
+    return { ok: false as const, status: 403, error: "Voce nao tem permissao para enviar mensagem neste atendimento." };
+  }
+
+  const viewerDeletedAt = canActAsProfessional ? request.professionalDeletedAt : request.patientDeletedAt;
+  if (user.role !== UserRole.ADMIN && viewerDeletedAt) {
+    return { ok: false as const, status: 404, error: "Atendimento nao encontrado no seu historico." };
+  }
+
+  const recipientUser =
+    canActAsProfessional || (user.role === UserRole.ADMIN && !canActAsPatient && !canViewByEmail)
+      ? request.patientProfile?.user ||
+        (request.requesterEmail
+          ? await prisma.user.findUnique({
+              where: { email: request.requesterEmail }
+            })
+          : null)
+      : request.professional.user;
+  const recipientEmail =
+    canActAsProfessional || (user.role === UserRole.ADMIN && !canActAsPatient && !canViewByEmail)
+      ? request.requesterEmail || request.patientProfile?.user.email || null
+      : request.professional.user.email;
+
+  const message = await prisma.$transaction(async (tx) => {
+    await tx.careMessage.updateMany({
+      where: {
+        careRequestId: request.id,
+        senderId: { not: user.id },
+        readAt: null
+      },
+      data: { readAt: new Date() }
+    });
+
+    return tx.careMessage.create({
+      data: {
+        careRequestId: request.id,
+        senderId: user.id,
+        body: trimmedBody
+      },
+      include: { sender: true }
+    });
+  });
+
+  if (recipientUser && recipientUser.id !== user.id) {
+    try {
+      await notifyCareMessageReceived(recipientUser.id, request.id, user.name);
+    } catch (error) {
+      console.error("Nao foi possivel criar notificacao interna de mensagem.", error);
+    }
+  }
+
+  if (recipientEmail && recipientEmail.toLowerCase() !== user.email.toLowerCase()) {
+    try {
+      await sendCareMessageNotification({
+        to: recipientEmail,
+        senderName: user.name,
+        requestId: request.id,
+        serviceLabel: serviceLabel[request.service],
+        body: trimmedBody
+      });
+    } catch (error) {
+      console.error("Nao foi possivel enviar e-mail de mensagem do atendimento.", error);
+    }
+  }
+
+  return { ok: true as const, message: toCareMessageData(message, user.id) };
 }
 
 export async function createCareRequestReview(requestId: string, userId: string, input: CreateCareReviewInput) {
@@ -1361,9 +1570,43 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
     return { ok: false as const, status: 400, error: "Mudanca de status nao permitida para esta solicitacao." };
   }
 
+  const updateData: Prisma.CareRequestUpdateInput = { status: nextStatus };
+
+  if (nextStatus === CareRequestStatus.AGENDADO && request.scheduledFor) {
+    const schedule = scheduleTimestamps(request.scheduledFor, request.durationHours);
+    updateData.scheduledEndAt = schedule.scheduledEndAt;
+    updateData.completionAvailableAt = schedule.completionAvailableAt;
+  }
+
+  if (nextStatus === CareRequestStatus.CONCLUIDO) {
+    const availableAt = requestCompletionAvailableAt(request);
+
+    if (!request.scheduledFor || !availableAt) {
+      return {
+        ok: false as const,
+        status: 409,
+        error: "Defina data e horario do atendimento antes de marcar como concluido."
+      };
+    }
+
+    if (Date.now() < availableAt.getTime()) {
+      return {
+        ok: false as const,
+        status: 409,
+        error: `Concluir fica liberado a partir de ${formatBrasiliaDateTime(availableAt)}.`
+      };
+    }
+
+    const schedule = scheduleTimestamps(request.scheduledFor, request.durationHours);
+    updateData.scheduledEndAt = request.scheduledEndAt || schedule.scheduledEndAt;
+    updateData.completionAvailableAt = request.completionAvailableAt || schedule.completionAvailableAt;
+    updateData.completedAt = new Date();
+    updateData.completedById = user.id;
+  }
+
   const updatedRequest = await prisma.careRequest.update({
     where: { id: requestId },
-    data: { status: nextStatus },
+    data: updateData,
     include: {
       professional: {
         include: { user: true }
