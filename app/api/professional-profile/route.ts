@@ -5,7 +5,7 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { updateProfessionalProfileForUser } from "@/lib/care-data";
 
 const timeSchema = z.string().regex(/^\d{2}:\d{2}$/);
-const optionalText = (schema: z.ZodString = z.string()) =>
+const optionalText = (schema: z.ZodTypeAny = z.string()) =>
   z.preprocess((value) => (value === null ? "" : value), schema.optional().or(z.literal("")));
 
 function profileValidationMessage(error: z.ZodError) {
@@ -13,6 +13,7 @@ function profileValidationMessage(error: z.ZodError) {
   const field = issue?.path.join(".");
   const fieldLabels: Record<string, string> = {
     phone: "telefone",
+    whatsappPhone: "WhatsApp publico",
     neighborhood: "bairro",
     addressLine: "endereco",
     addressNumber: "numero",
@@ -37,8 +38,19 @@ function profileValidationMessage(error: z.ZodError) {
   return label ? `Revise o campo ${label}.` : "Revise os dados do perfil.";
 }
 
+function isValidPublicWhatsApp(value: string) {
+  const digits = value.replace(/\D/g, "").replace(/^0+/, "");
+  return !digits || digits.length === 10 || digits.length === 11 || (digits.startsWith("55") && (digits.length === 12 || digits.length === 13));
+}
+
 const updateSchema = z.object({
   phone: optionalText(),
+  whatsappPhone: optionalText(
+    z
+      .string()
+      .max(20, "Informe um WhatsApp valido ou deixe em branco.")
+      .refine(isValidPublicWhatsApp, "Informe um WhatsApp com DDD, ou deixe em branco.")
+  ),
   neighborhood: z.string().min(2),
   addressLine: optionalText(),
   addressNumber: optionalText(),
@@ -88,6 +100,7 @@ export async function PATCH(request: NextRequest) {
   const result = await updateProfessionalProfileForUser(session.userId, {
     ...parsed.data,
     phone: parsed.data.phone || undefined,
+    whatsappPhone: parsed.data.whatsappPhone || undefined,
     addressLine: parsed.data.addressLine || undefined,
     addressNumber: parsed.data.addressNumber || undefined,
     addressComplement: parsed.data.addressComplement || undefined,

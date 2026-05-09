@@ -377,6 +377,7 @@ type CreateCareReviewInput = {
 
 type UpdateProfessionalProfileInput = {
   phone?: string;
+  whatsappPhone?: string | null;
   neighborhood: string;
   addressLine?: string;
   addressNumber?: string;
@@ -414,6 +415,19 @@ type CreateProfessionalDocumentInput = {
 
 function coordinatesFor(neighborhood: string) {
   return neighborhoodCoordinates[neighborhood] ?? { latitude: defaultCenter.latitude, longitude: defaultCenter.longitude };
+}
+
+function normalizeBrazilianWhatsApp(value?: string | null) {
+  const digits = (value || "").replace(/\D/g, "").replace(/^0+/, "");
+  if (!digits) return "";
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return digits;
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  return "";
+}
+
+function buildWhatsAppUrl(value?: string | null) {
+  const normalized = normalizeBrazilianWhatsApp(value);
+  return normalized ? `https://wa.me/${normalized}` : null;
 }
 
 function requiredDocumentRulesFor(type: ProfessionalType): Array<{ type: DocumentTypeCode; label: string; matches: DocumentType[] }> {
@@ -899,6 +913,7 @@ function toCareProfessional(professional: ProfessionalWithRelations, params: Car
     longitude: Number(professional.longitude),
     distanceKm: Number(distance.toFixed(1)),
     photoUrl: professional.photoUrl,
+    whatsappUrl: buildWhatsAppUrl(professional.whatsappPhone),
     rating: Number(professional.rating),
     reviewCount: professional.reviewCount,
     priceLabel: price,
@@ -2204,6 +2219,7 @@ export async function updateProfessionalProfileForUser(userId: string, input: Up
       where: { id: user.professionalProfile.id },
       data: {
         phone: input.phone || null,
+        whatsappPhone: normalizeBrazilianWhatsApp(input.whatsappPhone) || null,
         neighborhood: input.neighborhood,
         addressLine: input.addressLine || null,
         addressNumber: input.addressNumber || null,
@@ -2607,6 +2623,7 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
           gender: user.professionalProfile.gender,
           age: user.professionalProfile.age,
           phone: user.professionalProfile.phone,
+          whatsappPhone: user.professionalProfile.whatsappPhone,
           cpf: user.professionalProfile.cpf,
           professionalRegistrationNumber: user.professionalProfile.professionalRegistrationNumber,
           professionalRegistrationUf: user.professionalProfile.professionalRegistrationUf,

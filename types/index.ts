@@ -117,6 +117,7 @@ export type CareProfessional = {
   longitude: number;
   distanceKm: number;
   photoUrl: string | null;
+  whatsappUrl: string | null;
   rating: number;
   reviewCount: number;
   priceLabel: string;
@@ -431,6 +432,7 @@ export type ProfessionalSettingsData = {
   gender: GenderCode;
   age: number;
   phone: string | null;
+  whatsappPhone: string | null;
   cpf: string | null;
   professionalRegistrationNumber: string | null;
   professionalRegistrationUf: string | null;

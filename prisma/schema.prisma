@@ -190,6 +190,7 @@ model ProfessionalProfile {
   gender                         Gender
   age                            Int
   phone                          String?
+  whatsappPhone                  String?
   city                           String                         @default("Porto Alegre")
   neighborhood                   String
   addressLine                    String?

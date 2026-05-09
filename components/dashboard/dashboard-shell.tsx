@@ -463,6 +463,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
       const payload = {
         ...form,
         phone: form.phone || "",
+        whatsappPhone: form.whatsappPhone || "",
         addressLine: form.addressLine || "",
         addressNumber: form.addressNumber || "",
         addressComplement: form.addressComplement || "",
@@ -520,6 +521,18 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
               onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
               className={fieldClass}
             />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            WhatsApp publico
+            <input
+              value={form.whatsappPhone || ""}
+              onChange={(event) => setForm((current) => ({ ...current, whatsappPhone: event.target.value }))}
+              placeholder="(51) 99999-0101"
+              className={fieldClass}
+            />
+            <span className="text-xs font-medium text-slate-500">
+              Preencha somente se quiser exibir o botao WhatsApp na busca publica.
+            </span>
           </label>
           <CepAddressFields
             className="sm:col-span-2"

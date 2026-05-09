@@ -1426,6 +1426,17 @@ export function CareMatchApp() {
                           <MessageCircle aria-hidden="true" className="h-4 w-4" />
                           Mensagem
                         </Button>
+                        {professional.whatsappUrl ? (
+                          <a
+                            href={professional.whatsappUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                          >
+                            <MessageCircle aria-hidden="true" className="h-4 w-4" />
+                            WhatsApp
+                          </a>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1550,6 +1561,17 @@ export function CareMatchApp() {
                   ) : null}
 
                   <div className="mt-4 space-y-3">
+                    {selected.whatsappUrl ? (
+                      <a
+                        href={selected.whatsappUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      >
+                        <MessageCircle aria-hidden="true" className="h-4 w-4" />
+                        Falar no WhatsApp
+                      </a>
+                    ) : null}
                     {selected.credentials.map((credential) => (
                       <div key={credential} className="flex items-center gap-2 text-sm text-slate-700">
                         <ShieldCheck aria-hidden="true" className="h-4 w-4 text-emerald-700" />
