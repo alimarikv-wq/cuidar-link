@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarClock, Check, CheckCircle2, ExternalLink, ListChecks, Mail, MailCheck, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, CheckCircle2, CreditCard, ExternalLink, ListChecks, Mail, MailCheck, X } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AdminDocumentReviewData,
@@ -408,6 +408,7 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
     { label: "Usuarios", value: String(overview.users) },
     { label: "Pacientes", value: String(overview.patients) },
     { label: "Profissionais", value: String(overview.professionals) },
+    { label: "Premium", value: String(overview.premiumUsers) },
     { label: "Verificados", value: String(overview.verifiedProfessionals) },
     { label: "Pedidos abertos", value: String(overview.openRequests) },
     { label: "Docs pendentes", value: String(overview.pendingDocuments) }
@@ -434,7 +435,7 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
 
   return (
     <section className="surface space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-7">
         {summaryCards.map((card) => (
           <article key={card.label} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">{card.label}</p>
@@ -481,6 +482,33 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
               </div>
             );
           })}
+        </div>
+      </article>
+
+      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Comercial</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Planos e assinatura</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Visao inicial para acompanhar quem esta no gratuito ou premium. A cobranca online ainda nao esta ativa.
+            </p>
+          </div>
+          <CreditCard aria-hidden="true" className="h-6 w-6 text-emerald-700" />
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {overview.subscriptionMix.map((plan) => (
+            <div key={plan.tier} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-slate-950">{plan.label}</p>
+                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                  {plan.tier}
+                </span>
+              </div>
+              <p className="mt-3 text-3xl font-semibold text-slate-950">{plan.count}</p>
+              <p className="mt-1 text-sm text-slate-600">usuario(s)</p>
+            </div>
+          ))}
         </div>
       </article>
 
@@ -629,6 +657,7 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
                   <p className="text-sm font-semibold text-emerald-700">{professional.professionalTypeLabel}</p>
                   <h4 className="mt-1 text-lg font-semibold text-slate-950">{professional.name}</h4>
                   <p className="mt-1 text-sm text-slate-600">{professional.email}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase text-slate-500">Plano {professional.subscriptionTierLabel}</p>
                   <p className="mt-1 text-sm text-slate-600">
                     {professional.neighborhood}, {professional.city}
                   </p>

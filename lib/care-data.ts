@@ -9,6 +9,7 @@ import {
   ProfessionalInquiryStatus,
   ProfessionalType,
   ProfessionalVerificationStatus,
+  SubscriptionTier,
   TransferSupportLevel,
   UserRole,
   VerificationStatus
@@ -38,6 +39,7 @@ import {
 import { BRAZIL_TIME_ZONE, formatBrasiliaDateTime, parseBrasiliaDateTime } from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
+import { getSubscriptionPlan, subscriptionPlanLabels } from "@/lib/subscription-plans";
 import {
   AvailabilityFilter,
   AvailabilitySlotData,
@@ -54,6 +56,7 @@ import {
   CareRequestRecord,
   DashboardFavoriteProfessional,
   DocumentTypeCode,
+  SubscriptionTierCode,
   VerificationStatusCode,
   ProfessionalDocumentData
 } from "@/types";
@@ -2599,6 +2602,7 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
   ]);
   const scheduled = dashboardRequests.filter((request) => ["ACEITO", "AGENDADO"].includes(request.status) && !request.archivedAt).length;
   const completed = dashboardRequests.filter((request) => request.status === "CONCLUIDO").length;
+  const subscriptionPlan = getSubscriptionPlan(user.subscriptionTier);
 
   return {
     summary: {
@@ -2610,6 +2614,16 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
       verifiedDocuments: user.professionalProfile?.documents.filter((document) => document.status === "VERIFICADO").length ?? 0,
       favoriteProfessionals: user.professionalFavorites.length,
       unreadNotifications
+    },
+    subscription: {
+      tier: subscriptionPlan.tier,
+      label: subscriptionPlan.name,
+      statusLabel: subscriptionPlan.statusLabel,
+      priceLabel: subscriptionPlan.priceLabel,
+      description: subscriptionPlan.dashboardDescription,
+      features: subscriptionPlan.dashboardFeatures,
+      ctaLabel: subscriptionPlan.ctaLabel,
+      ctaHref: subscriptionPlan.ctaHref
     },
     requests,
     recentRequests: requestCollections.recentRequests,
@@ -2676,6 +2690,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     users,
     patients,
     professionals,
+    premiumUsers,
     verifiedProfessionals,
     openRequests,
     completedRequests,
@@ -2685,6 +2700,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     unverifiedActiveProfessionals,
     professionalsWithoutAvailability,
     activeProfessionalsMissingPhoto,
+    subscriptionMix,
     professionalsByType,
     requestsByStatus,
     professionalDirectory,
@@ -2696,6 +2712,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.user.count(),
       prisma.user.count({ where: { accountType: AccountType.PATIENT } }),
       prisma.professionalProfile.count(),
+      prisma.user.count({ where: { subscriptionTier: SubscriptionTier.PREMIUM } }),
       prisma.professionalProfile.count({ where: { isVerified: true } }),
       prisma.careRequest.count({ where: { status: { in: [CareRequestStatus.ENVIADO, CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO] } } }),
       prisma.careRequest.count({ where: { status: CareRequestStatus.CONCLUIDO } }),
@@ -2705,6 +2722,10 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.professionalProfile.count({ where: { isActive: true, isVerified: false } }),
       prisma.professionalProfile.count({ where: { isActive: true, availability: { none: {} } } }),
       prisma.professionalProfile.count({ where: { isActive: true, photoUrl: null } }),
+      prisma.user.groupBy({
+        by: ["subscriptionTier"],
+        _count: { _all: true }
+      }),
       prisma.professionalProfile.groupBy({
         by: ["professionalType"],
         _count: { _all: true }
@@ -2751,10 +2772,16 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     users,
     patients,
     professionals,
+    premiumUsers,
     verifiedProfessionals,
     openRequests,
     completedRequests,
     pendingDocuments,
+    subscriptionMix: (["FREE", "PREMIUM"] as SubscriptionTierCode[]).map((tier) => ({
+      tier,
+      label: subscriptionPlanLabels[tier],
+      count: subscriptionMix.find((item) => item.subscriptionTier === tier)?._count._all ?? 0
+    })),
     professionalsByType: professionalsByType.map((item) => ({
       label: professionalTypeLabel[item.professionalType],
       count: item._count._all
@@ -2793,6 +2820,8 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
         name: professional.user.name,
         email: professional.user.email,
         phone: professional.phone,
+        subscriptionTier: professional.user.subscriptionTier as SubscriptionTierCode,
+        subscriptionTierLabel: subscriptionPlanLabels[professional.user.subscriptionTier as SubscriptionTierCode],
         professionalTypeLabel: professionalTypeLabel[professional.professionalType],
         verificationStatusLabel: professionalVerificationStatusLabel[professional.verificationStatus],
         isVerified: professional.isVerified,

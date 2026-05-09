@@ -102,6 +102,7 @@ export type DocumentTypeCode = "RG" | "CNH" | "CPF" | "COMPROVANTE_RESIDENCIA" |
 export type VerificationStatusCode = "PENDENTE" | "VERIFICADO" | "RECUSADO";
 export type ProfessionalVerificationStatusCode = "PENDENTE" | "EM_ANALISE" | "APROVADO" | "REPROVADO";
 export type AvailabilityFilter = "qualquer" | "agora" | "hoje" | "manha" | "tarde" | "noite" | "fim-de-semana";
+export type SubscriptionTierCode = "FREE" | "PREMIUM";
 
 export type CareProfessional = {
   id: string;
@@ -411,6 +412,8 @@ export type AdminProfessionalSummary = {
   name: string;
   email: string;
   phone: string | null;
+  subscriptionTier: SubscriptionTierCode;
+  subscriptionTierLabel: string;
   professionalTypeLabel: string;
   verificationStatusLabel: string;
   isVerified: boolean;
@@ -477,6 +480,16 @@ export type CareDashboardData = {
     favoriteProfessionals: number;
     unreadNotifications: number;
   };
+  subscription: {
+    tier: SubscriptionTierCode;
+    label: string;
+    statusLabel: string;
+    priceLabel: string;
+    description: string;
+    features: string[];
+    ctaLabel: string;
+    ctaHref: string;
+  };
   requests: CareRequestRecord[];
   recentRequests: CareRequestRecord[];
   archivedRequests: CareRequestRecord[];
@@ -498,10 +511,12 @@ export type CareAdminOverview = {
   users: number;
   patients: number;
   professionals: number;
+  premiumUsers: number;
   verifiedProfessionals: number;
   openRequests: number;
   completedRequests: number;
   pendingDocuments: number;
+  subscriptionMix: Array<{ tier: SubscriptionTierCode; label: string; count: number }>;
   professionalsByType: Array<{ label: string; count: number }>;
   requestsByStatus: Array<{ label: string; count: number }>;
   readinessChecks: AdminReadinessCheck[];

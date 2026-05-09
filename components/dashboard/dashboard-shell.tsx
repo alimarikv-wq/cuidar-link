@@ -11,6 +11,7 @@ import {
   Check,
   CheckCheck,
   ClipboardList,
+  CreditCard,
   FileBadge,
   FileUp,
   Globe2,
@@ -1372,6 +1373,47 @@ function ProfessionalInquiriesPanel({
   );
 }
 
+function SubscriptionStatusPanel({ dashboard }: { dashboard: CareDashboardData }) {
+  const isPremium = dashboard.subscription.tier === "PREMIUM";
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Plano</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Assinatura da plataforma</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{dashboard.subscription.description}</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <p className="font-semibold text-slate-950">{dashboard.subscription.label}</p>
+          <p className="mt-1 text-slate-600">{dashboard.subscription.priceLabel}</p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <ul className="grid gap-2 text-sm text-slate-700 sm:grid-cols-3">
+          {dashboard.subscription.features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+        <Link
+          href={dashboard.subscription.ctaHref}
+          className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${
+            isPremium
+              ? "bg-emerald-700 text-white hover:bg-emerald-800"
+              : "border border-slate-300 bg-white text-slate-800 hover:border-emerald-500"
+          }`}
+        >
+          <CreditCard aria-hidden="true" className="h-4 w-4" />
+          {dashboard.subscription.ctaLabel}
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -1700,6 +1742,8 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       </div>
 
       <ProfilePhotoForm dashboard={dashboard} />
+
+      <SubscriptionStatusPanel dashboard={dashboard} />
 
       <NotificationsPanel
         dashboard={dashboard}
