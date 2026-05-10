@@ -496,9 +496,44 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
           </div>
           <CreditCard aria-hidden="true" className="h-6 w-6 text-emerald-700" />
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-500">Por plano</p>
+            <div className="mt-3 grid gap-2">
+              {overview.subscriptionMix.map((plan) => (
+                <div key={plan.tier} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
+                  <span className="font-semibold text-slate-800">{plan.label}</span>
+                  <span className="text-lg font-semibold text-slate-950">{plan.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-500">Por status</p>
+            <div className="mt-3 grid gap-2">
+              {overview.subscriptionStatusMix.map((status) => (
+                <div key={status.status} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
+                  <span className="font-semibold text-slate-800">{status.label}</span>
+                  <span className="text-lg font-semibold text-slate-950">{status.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-500">Cobranca</p>
+            <div className="mt-3 grid gap-2">
+              {overview.billingProviderMix.map((provider) => (
+                <div key={provider.provider} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
+                  <span className="font-semibold text-slate-800">{provider.label}</span>
+                  <span className="text-lg font-semibold text-slate-950">{provider.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {overview.subscriptionMix.map((plan) => (
-            <div key={plan.tier} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div key={plan.tier} className="rounded-lg border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-semibold text-slate-950">{plan.label}</p>
                 <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
@@ -657,7 +692,9 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
                   <p className="text-sm font-semibold text-emerald-700">{professional.professionalTypeLabel}</p>
                   <h4 className="mt-1 text-lg font-semibold text-slate-950">{professional.name}</h4>
                   <p className="mt-1 text-sm text-slate-600">{professional.email}</p>
-                  <p className="mt-1 text-xs font-semibold uppercase text-slate-500">Plano {professional.subscriptionTierLabel}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase text-slate-500">
+                    Plano {professional.subscriptionTierLabel} - {professional.subscriptionStatusLabel} - {professional.subscriptionProviderLabel}
+                  </p>
                   <p className="mt-1 text-sm text-slate-600">
                     {professional.neighborhood}, {professional.city}
                   </p>

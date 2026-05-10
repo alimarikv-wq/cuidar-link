@@ -1,4 +1,6 @@
 export type SubscriptionTierCode = "FREE" | "PREMIUM";
+export type SubscriptionStatusCode = "ATIVO" | "TRIAL" | "CANCELADO" | "VENCIDO";
+export type BillingProviderCode = "MANUAL" | "STRIPE" | "MERCADO_PAGO";
 
 export type SubscriptionPlan = {
   tier: SubscriptionTierCode;
@@ -67,11 +69,39 @@ export const subscriptionPlanLabels: Record<SubscriptionTierCode, string> = {
   PREMIUM: "Premium"
 };
 
+export const subscriptionStatusLabels: Record<SubscriptionStatusCode, string> = {
+  ATIVO: "Ativo",
+  TRIAL: "Teste",
+  CANCELADO: "Cancelado",
+  VENCIDO: "Vencido"
+};
+
+export const billingProviderLabels: Record<BillingProviderCode, string> = {
+  MANUAL: "Manual / sem cobranca online",
+  STRIPE: "Stripe",
+  MERCADO_PAGO: "Mercado Pago"
+};
+
 export function normalizeSubscriptionTier(tier: string | null | undefined): SubscriptionTierCode {
   return tier === "PREMIUM" ? "PREMIUM" : "FREE";
+}
+
+export function normalizeSubscriptionStatus(status: string | null | undefined): SubscriptionStatusCode {
+  if (status === "TRIAL" || status === "CANCELADO" || status === "VENCIDO") return status;
+  return "ATIVO";
+}
+
+export function normalizeBillingProvider(provider: string | null | undefined): BillingProviderCode {
+  if (provider === "STRIPE" || provider === "MERCADO_PAGO") return provider;
+  return "MANUAL";
 }
 
 export function getSubscriptionPlan(tier: string | null | undefined): SubscriptionPlan {
   const normalizedTier = normalizeSubscriptionTier(tier);
   return subscriptionPlans.find((plan) => plan.tier === normalizedTier) || subscriptionPlans[0];
+}
+
+export function isSubscriptionUsable(status: string | null | undefined) {
+  const normalizedStatus = normalizeSubscriptionStatus(status);
+  return normalizedStatus === "ATIVO" || normalizedStatus === "TRIAL";
 }

@@ -13,6 +13,19 @@ enum SubscriptionTier {
   PREMIUM
 }
 
+enum SubscriptionStatus {
+  ATIVO
+  TRIAL
+  CANCELADO
+  VENCIDO
+}
+
+enum BillingProvider {
+  MANUAL
+  STRIPE
+  MERCADO_PAGO
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -122,26 +135,36 @@ enum ProfessionalInquiryStatus {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  name                  String
-  email                 String                 @unique
-  passwordHash          String
-  role                  UserRole               @default(USER)
-  accountType           AccountType            @default(PATIENT)
-  subscriptionTier      SubscriptionTier       @default(FREE)
-  monthlySearches       Int                    @default(0)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  favorites             Favorite[]
-  professionalFavorites ProfessionalFavorite[]
-  careNotifications     CareNotification[]
-  careMessages          CareMessage[]
-  inquiryMessages       ProfessionalInquiryMessage[]
-  passwordResetTokens   PasswordResetToken[]
-  alerts                Alert[]
-  patientProfile        PatientProfile?
-  professionalProfile   ProfessionalProfile?
-  oauthAccounts         OAuthAccount[]
+  id                      String                       @id @default(cuid())
+  name                    String
+  email                   String                       @unique
+  passwordHash            String
+  role                    UserRole                     @default(USER)
+  accountType             AccountType                  @default(PATIENT)
+  subscriptionTier        SubscriptionTier             @default(FREE)
+  subscriptionStatus      SubscriptionStatus           @default(ATIVO)
+  subscriptionProvider    BillingProvider              @default(MANUAL)
+  subscriptionStartedAt   DateTime                     @default(now())
+  subscriptionTrialEndsAt DateTime?
+  subscriptionRenewsAt    DateTime?
+  subscriptionCanceledAt  DateTime?
+  billingCustomerId       String?                      @unique
+  billingSubscriptionId   String?                      @unique
+  monthlySearches         Int                          @default(0)
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  favorites               Favorite[]
+  professionalFavorites   ProfessionalFavorite[]
+  careNotifications       CareNotification[]
+  careMessages            CareMessage[]
+  inquiryMessages         ProfessionalInquiryMessage[]
+  passwordResetTokens     PasswordResetToken[]
+  alerts                  Alert[]
+  patientProfile          PatientProfile?
+  professionalProfile     ProfessionalProfile?
+  oauthAccounts           OAuthAccount[]
+
+  @@index([subscriptionTier, subscriptionStatus])
 }
 
 model OAuthAccount {

@@ -9,6 +9,7 @@ import {
   ProfessionalInquiryStatus,
   ProfessionalType,
   ProfessionalVerificationStatus,
+  SubscriptionStatus,
   SubscriptionTier,
   TransferSupportLevel,
   UserRole,
@@ -39,7 +40,14 @@ import {
 import { BRAZIL_TIME_ZONE, formatBrasiliaDateTime, parseBrasiliaDateTime } from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
 import { verifyProfessionalRegistration } from "@/lib/professional-registration-verifier";
-import { getSubscriptionPlan, subscriptionPlanLabels } from "@/lib/subscription-plans";
+import {
+  billingProviderLabels,
+  getSubscriptionPlan,
+  normalizeBillingProvider,
+  normalizeSubscriptionStatus,
+  subscriptionPlanLabels,
+  subscriptionStatusLabels
+} from "@/lib/subscription-plans";
 import {
   AvailabilityFilter,
   AvailabilitySlotData,
@@ -55,7 +63,9 @@ import {
   CareRequestDetailsData,
   CareRequestRecord,
   DashboardFavoriteProfessional,
+  BillingProviderCode,
   DocumentTypeCode,
+  SubscriptionStatusCode,
   SubscriptionTierCode,
   VerificationStatusCode,
   ProfessionalDocumentData
@@ -2603,6 +2613,8 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
   const scheduled = dashboardRequests.filter((request) => ["ACEITO", "AGENDADO"].includes(request.status) && !request.archivedAt).length;
   const completed = dashboardRequests.filter((request) => request.status === "CONCLUIDO").length;
   const subscriptionPlan = getSubscriptionPlan(user.subscriptionTier);
+  const subscriptionStatus = normalizeSubscriptionStatus(user.subscriptionStatus);
+  const subscriptionProvider = normalizeBillingProvider(user.subscriptionProvider);
 
   return {
     summary: {
@@ -2617,13 +2629,20 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     },
     subscription: {
       tier: subscriptionPlan.tier,
+      status: subscriptionStatus,
+      provider: subscriptionProvider,
       label: subscriptionPlan.name,
-      statusLabel: subscriptionPlan.statusLabel,
+      statusLabel: subscriptionStatusLabels[subscriptionStatus],
+      providerLabel: billingProviderLabels[subscriptionProvider],
       priceLabel: subscriptionPlan.priceLabel,
       description: subscriptionPlan.dashboardDescription,
       features: subscriptionPlan.dashboardFeatures,
       ctaLabel: subscriptionPlan.ctaLabel,
-      ctaHref: subscriptionPlan.ctaHref
+      ctaHref: subscriptionPlan.ctaHref,
+      startedAt: user.subscriptionStartedAt ? user.subscriptionStartedAt.toISOString() : null,
+      trialEndsAt: user.subscriptionTrialEndsAt ? user.subscriptionTrialEndsAt.toISOString() : null,
+      renewsAt: user.subscriptionRenewsAt ? user.subscriptionRenewsAt.toISOString() : null,
+      canceledAt: user.subscriptionCanceledAt ? user.subscriptionCanceledAt.toISOString() : null
     },
     requests,
     recentRequests: requestCollections.recentRequests,
@@ -2701,6 +2720,8 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     professionalsWithoutAvailability,
     activeProfessionalsMissingPhoto,
     subscriptionMix,
+    subscriptionStatusMix,
+    billingProviderMix,
     professionalsByType,
     requestsByStatus,
     professionalDirectory,
@@ -2712,7 +2733,12 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.user.count(),
       prisma.user.count({ where: { accountType: AccountType.PATIENT } }),
       prisma.professionalProfile.count(),
-      prisma.user.count({ where: { subscriptionTier: SubscriptionTier.PREMIUM } }),
+      prisma.user.count({
+        where: {
+          subscriptionTier: SubscriptionTier.PREMIUM,
+          subscriptionStatus: { in: [SubscriptionStatus.ATIVO, SubscriptionStatus.TRIAL] }
+        }
+      }),
       prisma.professionalProfile.count({ where: { isVerified: true } }),
       prisma.careRequest.count({ where: { status: { in: [CareRequestStatus.ENVIADO, CareRequestStatus.ACEITO, CareRequestStatus.AGENDADO] } } }),
       prisma.careRequest.count({ where: { status: CareRequestStatus.CONCLUIDO } }),
@@ -2724,6 +2750,14 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.professionalProfile.count({ where: { isActive: true, photoUrl: null } }),
       prisma.user.groupBy({
         by: ["subscriptionTier"],
+        _count: { _all: true }
+      }),
+      prisma.user.groupBy({
+        by: ["subscriptionStatus"],
+        _count: { _all: true }
+      }),
+      prisma.user.groupBy({
+        by: ["subscriptionProvider"],
         _count: { _all: true }
       }),
       prisma.professionalProfile.groupBy({
@@ -2782,6 +2816,16 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       label: subscriptionPlanLabels[tier],
       count: subscriptionMix.find((item) => item.subscriptionTier === tier)?._count._all ?? 0
     })),
+    subscriptionStatusMix: (["ATIVO", "TRIAL", "CANCELADO", "VENCIDO"] as SubscriptionStatusCode[]).map((status) => ({
+      status,
+      label: subscriptionStatusLabels[status],
+      count: subscriptionStatusMix.find((item) => item.subscriptionStatus === status)?._count._all ?? 0
+    })),
+    billingProviderMix: (["MANUAL", "STRIPE", "MERCADO_PAGO"] as BillingProviderCode[]).map((provider) => ({
+      provider,
+      label: billingProviderLabels[provider],
+      count: billingProviderMix.find((item) => item.subscriptionProvider === provider)?._count._all ?? 0
+    })),
     professionalsByType: professionalsByType.map((item) => ({
       label: professionalTypeLabel[item.professionalType],
       count: item._count._all
@@ -2822,6 +2866,9 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
         phone: professional.phone,
         subscriptionTier: professional.user.subscriptionTier as SubscriptionTierCode,
         subscriptionTierLabel: subscriptionPlanLabels[professional.user.subscriptionTier as SubscriptionTierCode],
+        subscriptionStatus: professional.user.subscriptionStatus as SubscriptionStatusCode,
+        subscriptionStatusLabel: subscriptionStatusLabels[professional.user.subscriptionStatus as SubscriptionStatusCode],
+        subscriptionProviderLabel: billingProviderLabels[professional.user.subscriptionProvider as BillingProviderCode],
         professionalTypeLabel: professionalTypeLabel[professional.professionalType],
         verificationStatusLabel: professionalVerificationStatusLabel[professional.verificationStatus],
         isVerified: professional.isVerified,

@@ -1,4 +1,4 @@
-import { CabinClass, Program, SubscriptionTier } from "@prisma/client";
+import { CabinClass, Program, SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getRedisClient } from "@/lib/redis";
 import { formatDateShort, formatProgram, getDateWindow } from "@/lib/utils";
@@ -93,8 +93,8 @@ export async function searchAwardFlights(params: SearchParams): Promise<SearchRe
   return results;
 }
 
-export function canSearch(tier: SubscriptionTier, monthlySearches: number) {
-  if (tier === "PREMIUM") return true;
+export function canSearch(tier: SubscriptionTier, monthlySearches: number, status: SubscriptionStatus = SubscriptionStatus.ATIVO) {
+  if (tier === "PREMIUM" && (status === SubscriptionStatus.ATIVO || status === SubscriptionStatus.TRIAL)) return true;
   return monthlySearches < FREE_SEARCH_LIMIT;
 }
 

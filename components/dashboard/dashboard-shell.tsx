@@ -1375,6 +1375,18 @@ function ProfessionalInquiriesPanel({
 
 function SubscriptionStatusPanel({ dashboard }: { dashboard: CareDashboardData }) {
   const isPremium = dashboard.subscription.tier === "PREMIUM";
+  const statusStyle =
+    dashboard.subscription.status === "ATIVO" || dashboard.subscription.status === "TRIAL"
+      ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
+      : dashboard.subscription.status === "CANCELADO"
+        ? "bg-amber-50 text-amber-900 ring-amber-100"
+        : "bg-rose-50 text-rose-800 ring-rose-100";
+  const billingDates = [
+    dashboard.subscription.startedAt ? { label: "Inicio", value: formatBrasiliaDateTime(dashboard.subscription.startedAt) } : null,
+    dashboard.subscription.trialEndsAt ? { label: "Teste ate", value: formatBrasiliaDateTime(dashboard.subscription.trialEndsAt) } : null,
+    dashboard.subscription.renewsAt ? { label: "Renova em", value: formatBrasiliaDateTime(dashboard.subscription.renewsAt) } : null,
+    dashboard.subscription.canceledAt ? { label: "Cancelado em", value: formatBrasiliaDateTime(dashboard.subscription.canceledAt) } : null
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
 
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -1385,8 +1397,14 @@ function SubscriptionStatusPanel({ dashboard }: { dashboard: CareDashboardData }
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{dashboard.subscription.description}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-          <p className="font-semibold text-slate-950">{dashboard.subscription.label}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-slate-950">{dashboard.subscription.label}</p>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusStyle}`}>
+              {dashboard.subscription.statusLabel}
+            </span>
+          </div>
           <p className="mt-1 text-slate-600">{dashboard.subscription.priceLabel}</p>
+          <p className="mt-1 text-xs text-slate-500">{dashboard.subscription.providerLabel}</p>
         </div>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
@@ -1410,6 +1428,16 @@ function SubscriptionStatusPanel({ dashboard }: { dashboard: CareDashboardData }
           {dashboard.subscription.ctaLabel}
         </Link>
       </div>
+      {billingDates.length > 0 ? (
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {billingDates.map((item) => (
+            <div key={item.label} className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">{item.label}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-950">{item.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }

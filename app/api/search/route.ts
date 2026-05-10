@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   if (session) {
     const user = await prisma.user.findUnique({ where: { id: session.userId } });
-    if (user && !canSearch(user.subscriptionTier, user.monthlySearches)) {
+    if (user && !canSearch(user.subscriptionTier, user.monthlySearches, user.subscriptionStatus)) {
       return NextResponse.json({ error: "Limite mensal do plano gratuito atingido." }, { status: 403 });
     }
 

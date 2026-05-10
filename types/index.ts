@@ -103,6 +103,8 @@ export type VerificationStatusCode = "PENDENTE" | "VERIFICADO" | "RECUSADO";
 export type ProfessionalVerificationStatusCode = "PENDENTE" | "EM_ANALISE" | "APROVADO" | "REPROVADO";
 export type AvailabilityFilter = "qualquer" | "agora" | "hoje" | "manha" | "tarde" | "noite" | "fim-de-semana";
 export type SubscriptionTierCode = "FREE" | "PREMIUM";
+export type SubscriptionStatusCode = "ATIVO" | "TRIAL" | "CANCELADO" | "VENCIDO";
+export type BillingProviderCode = "MANUAL" | "STRIPE" | "MERCADO_PAGO";
 
 export type CareProfessional = {
   id: string;
@@ -414,6 +416,9 @@ export type AdminProfessionalSummary = {
   phone: string | null;
   subscriptionTier: SubscriptionTierCode;
   subscriptionTierLabel: string;
+  subscriptionStatus: SubscriptionStatusCode;
+  subscriptionStatusLabel: string;
+  subscriptionProviderLabel: string;
   professionalTypeLabel: string;
   verificationStatusLabel: string;
   isVerified: boolean;
@@ -482,13 +487,20 @@ export type CareDashboardData = {
   };
   subscription: {
     tier: SubscriptionTierCode;
+    status: SubscriptionStatusCode;
+    provider: BillingProviderCode;
     label: string;
     statusLabel: string;
+    providerLabel: string;
     priceLabel: string;
     description: string;
     features: string[];
     ctaLabel: string;
     ctaHref: string;
+    startedAt: string | null;
+    trialEndsAt: string | null;
+    renewsAt: string | null;
+    canceledAt: string | null;
   };
   requests: CareRequestRecord[];
   recentRequests: CareRequestRecord[];
@@ -517,6 +529,8 @@ export type CareAdminOverview = {
   completedRequests: number;
   pendingDocuments: number;
   subscriptionMix: Array<{ tier: SubscriptionTierCode; label: string; count: number }>;
+  subscriptionStatusMix: Array<{ status: SubscriptionStatusCode; label: string; count: number }>;
+  billingProviderMix: Array<{ provider: BillingProviderCode; label: string; count: number }>;
   professionalsByType: Array<{ label: string; count: number }>;
   requestsByStatus: Array<{ label: string; count: number }>;
   readinessChecks: AdminReadinessCheck[];
