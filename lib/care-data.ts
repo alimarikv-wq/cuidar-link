@@ -52,6 +52,7 @@ import {
   AvailabilityFilter,
   AvailabilitySlotData,
   AdminDocumentReviewData,
+  AdminSubscriptionUser,
   CareAdminOverview,
   CareDashboardData,
   CareMessageData,
@@ -169,6 +170,11 @@ const professionalInquiryStatusLabel: Record<ProfessionalInquiryStatus, string> 
   ABERTA: "Aberta",
   RESPONDIDA: "Respondida",
   ARQUIVADA: "Arquivada"
+};
+
+const accountTypeLabel: Record<AccountType, string> = {
+  PATIENT: "Paciente",
+  PROFESSIONAL: "Profissional"
 };
 
 const completionGraceMinutes = 1;
@@ -2722,6 +2728,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
     subscriptionMix,
     subscriptionStatusMix,
     billingProviderMix,
+    subscriptionUsers,
     professionalsByType,
     requestsByStatus,
     professionalDirectory,
@@ -2759,6 +2766,14 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       prisma.user.groupBy({
         by: ["subscriptionProvider"],
         _count: { _all: true }
+      }),
+      prisma.user.findMany({
+        include: {
+          patientProfile: { select: { neighborhood: true } },
+          professionalProfile: { select: { professionalType: true, neighborhood: true } }
+        },
+        orderBy: [{ subscriptionTier: "desc" }, { updatedAt: "desc" }],
+        take: 80
       }),
       prisma.professionalProfile.groupBy({
         by: ["professionalType"],
@@ -2825,6 +2840,28 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
       provider,
       label: billingProviderLabels[provider],
       count: billingProviderMix.find((item) => item.subscriptionProvider === provider)?._count._all ?? 0
+    })),
+    subscriptionUsers: subscriptionUsers.map((user): AdminSubscriptionUser => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      accountTypeLabel: accountTypeLabel[user.accountType],
+      profileLabel: user.professionalProfile
+        ? professionalTypeLabel[user.professionalProfile.professionalType]
+        : user.patientProfile
+          ? "Paciente"
+          : null,
+      subscriptionTier: user.subscriptionTier as SubscriptionTierCode,
+      subscriptionTierLabel: subscriptionPlanLabels[user.subscriptionTier as SubscriptionTierCode],
+      subscriptionStatus: user.subscriptionStatus as SubscriptionStatusCode,
+      subscriptionStatusLabel: subscriptionStatusLabels[user.subscriptionStatus as SubscriptionStatusCode],
+      subscriptionProvider: user.subscriptionProvider as BillingProviderCode,
+      subscriptionProviderLabel: billingProviderLabels[user.subscriptionProvider as BillingProviderCode],
+      subscriptionStartedAt: user.subscriptionStartedAt ? user.subscriptionStartedAt.toISOString() : null,
+      subscriptionTrialEndsAt: user.subscriptionTrialEndsAt ? user.subscriptionTrialEndsAt.toISOString() : null,
+      subscriptionRenewsAt: user.subscriptionRenewsAt ? user.subscriptionRenewsAt.toISOString() : null,
+      subscriptionCanceledAt: user.subscriptionCanceledAt ? user.subscriptionCanceledAt.toISOString() : null,
+      updatedAt: user.updatedAt.toISOString()
     })),
     professionalsByType: professionalsByType.map((item) => ({
       label: professionalTypeLabel[item.professionalType],

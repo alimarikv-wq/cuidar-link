@@ -8,9 +8,13 @@ import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis
 import {
   AdminDocumentReviewData,
   AdminProfessionalSummary,
+  AdminSubscriptionUser,
+  BillingProviderCode,
   CareAdminOverview,
   DocumentTypeCode,
   ProfessionalVerificationStatusCode,
+  SubscriptionStatusCode,
+  SubscriptionTierCode,
   VerificationStatusCode
 } from "@/types";
 
@@ -25,6 +29,24 @@ const documentOptions: Array<{ value: DocumentTypeCode; label: string }> = [
   { value: "CREFITO", label: "CREFITO" },
   { value: "CERTIFICADO", label: "Certificado" },
   { value: "REFERENCIA", label: "Referencia" }
+];
+
+const subscriptionTierOptions: Array<{ value: SubscriptionTierCode; label: string }> = [
+  { value: "FREE", label: "Gratuito" },
+  { value: "PREMIUM", label: "Premium" }
+];
+
+const subscriptionStatusOptions: Array<{ value: SubscriptionStatusCode; label: string }> = [
+  { value: "ATIVO", label: "Ativo" },
+  { value: "TRIAL", label: "Teste" },
+  { value: "CANCELADO", label: "Cancelado" },
+  { value: "VENCIDO", label: "Vencido" }
+];
+
+const billingProviderOptions: Array<{ value: BillingProviderCode; label: string }> = [
+  { value: "MANUAL", label: "Manual" },
+  { value: "STRIPE", label: "Stripe" },
+  { value: "MERCADO_PAGO", label: "Mercado Pago" }
 ];
 
 const documentStatusStyles: Record<string, string> = {
@@ -135,6 +157,11 @@ function formatAdminDate(value: string | null) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function dateInputValue(value: string | null) {
+  if (!value) return "";
+  return value.slice(0, 10);
 }
 
 function professionalNextSteps(professional: AdminProfessionalSummary) {
@@ -375,6 +402,137 @@ function AdminDocumentCard({ document }: { document: AdminDocumentReviewData }) 
   );
 }
 
+function AdminSubscriptionCard({ user }: { user: AdminSubscriptionUser }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [tier, setTier] = useState<SubscriptionTierCode>(user.subscriptionTier);
+  const [status, setStatus] = useState<SubscriptionStatusCode>(user.subscriptionStatus);
+  const [provider, setProvider] = useState<BillingProviderCode>(user.subscriptionProvider);
+  const [trialEndsAt, setTrialEndsAt] = useState(dateInputValue(user.subscriptionTrialEndsAt));
+  const [renewsAt, setRenewsAt] = useState(dateInputValue(user.subscriptionRenewsAt));
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  function saveSubscription() {
+    setMessage("");
+    setError("");
+
+    startTransition(async () => {
+      const response = await fetch(`/api/admin/users/${user.id}/subscription`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier, status, provider, trialEndsAt, renewsAt })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel atualizar a assinatura.");
+        return;
+      }
+
+      setMessage("Assinatura atualizada.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">{user.accountTypeLabel}</p>
+          <h4 className="mt-1 text-lg font-semibold text-slate-950">{user.name}</h4>
+          <p className="mt-1 text-sm text-slate-600">{user.email}</p>
+          {user.profileLabel ? <p className="mt-1 text-sm text-slate-500">{user.profileLabel}</p> : null}
+        </div>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+          {user.subscriptionTierLabel} / {user.subscriptionStatusLabel}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Plano
+          <select
+            value={tier}
+            onChange={(event) => setTier(event.target.value as SubscriptionTierCode)}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          >
+            {subscriptionTierOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Status
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value as SubscriptionStatusCode)}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          >
+            {subscriptionStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Cobranca
+          <select
+            value={provider}
+            onChange={(event) => setProvider(event.target.value as BillingProviderCode)}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          >
+            {billingProviderOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Teste ate
+          <input
+            type="date"
+            value={trialEndsAt}
+            onChange={(event) => setTrialEndsAt(event.target.value)}
+            className="h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Renova em
+          <input
+            type="date"
+            value={renewsAt}
+            onChange={(event) => setRenewsAt(event.target.value)}
+            className="h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={saveSubscription}
+          disabled={isPending}
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
+        >
+          {isPending ? "Salvando..." : "Salvar"}
+        </button>
+      </div>
+
+      <div className="mt-3 grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
+        <p>Inicio: {formatAdminDate(user.subscriptionStartedAt)}</p>
+        <p>Cancelado: {formatAdminDate(user.subscriptionCanceledAt)}</p>
+      </div>
+      {message ? <p className="mt-3 rounded-lg bg-emerald-50 p-2 text-sm font-semibold text-emerald-800">{message}</p> : null}
+      {error ? <p className="mt-3 rounded-lg bg-rose-50 p-2 text-sm font-semibold text-rose-700">{error}</p> : null}
+    </article>
+  );
+}
+
 export function AdminShell({ overview }: { overview: CareAdminOverview }) {
   const [statusFilter, setStatusFilter] = useState("ABERTOS");
   const [typeFilter, setTypeFilter] = useState("TODOS");
@@ -544,6 +702,22 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
               <p className="mt-1 text-sm text-slate-600">usuario(s)</p>
             </div>
           ))}
+        </div>
+        <div className="mt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-emerald-700">Controle manual</p>
+              <h4 className="mt-1 text-lg font-semibold text-slate-950">Usuarios e planos</h4>
+            </div>
+            <span className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+              {overview.subscriptionUsers.length} usuario(s)
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3 xl:grid-cols-2">
+            {overview.subscriptionUsers.map((user) => (
+              <AdminSubscriptionCard key={user.id} user={user} />
+            ))}
+          </div>
         </div>
       </article>
 

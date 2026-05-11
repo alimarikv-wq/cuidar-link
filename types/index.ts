@@ -435,6 +435,25 @@ export type AdminProfessionalSummary = {
   issues: string[];
 };
 
+export type AdminSubscriptionUser = {
+  id: string;
+  name: string;
+  email: string;
+  accountTypeLabel: string;
+  profileLabel: string | null;
+  subscriptionTier: SubscriptionTierCode;
+  subscriptionTierLabel: string;
+  subscriptionStatus: SubscriptionStatusCode;
+  subscriptionStatusLabel: string;
+  subscriptionProvider: BillingProviderCode;
+  subscriptionProviderLabel: string;
+  subscriptionStartedAt: string | null;
+  subscriptionTrialEndsAt: string | null;
+  subscriptionRenewsAt: string | null;
+  subscriptionCanceledAt: string | null;
+  updatedAt: string;
+};
+
 export type ProfessionalSettingsData = {
   professionalType: ProfessionalTypeCode;
   gender: GenderCode;
@@ -536,6 +555,7 @@ export type CareAdminOverview = {
   readinessChecks: AdminReadinessCheck[];
   recentCareRequests: AdminCareRequestSummary[];
   operationalAlerts: AdminOperationalAlert[];
+  subscriptionUsers: AdminSubscriptionUser[];
   professionalDirectory: AdminProfessionalSummary[];
   documentsForReview: AdminDocumentReviewData[];
   auditLogs: Array<{
