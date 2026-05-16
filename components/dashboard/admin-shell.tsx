@@ -138,6 +138,57 @@ const launchTestSteps = [
   }
 ];
 
+const qaScenarios = [
+  {
+    area: "Paciente",
+    scenario: "Busca e detalhes",
+    steps: "Entrar como paciente, usar filtro, abrir detalhes, favoritar e iniciar uma mensagem antes do pedido.",
+    expected: "Lista carrega, mapa aparece, favorito grava e conversa aparece no painel."
+  },
+  {
+    area: "Paciente",
+    scenario: "Solicitacao completa",
+    steps: "Escolher profissional verificado, preencher data, horario, duracao, CEP, endereco e aceite das regras.",
+    expected: "Pedido fica enviado, profissional recebe notificacao e paciente ve o pedido no painel."
+  },
+  {
+    area: "Profissional",
+    scenario: "Agenda e resposta",
+    steps: "Entrar como profissional, conferir agenda, aceitar/agendar pedido e responder mensagem.",
+    expected: "Status atualiza para paciente, mensagem fica na conversa e horario ocupado nao duplica."
+  },
+  {
+    area: "Profissional",
+    scenario: "Documentos e selo",
+    steps: "Enviar CPF, RG/CNH, comprovante e registro profissional quando aplicavel.",
+    expected: "Documentos aparecem no admin, status individual muda e selo so aparece quando aprovado."
+  },
+  {
+    area: "Admin",
+    scenario: "Revisao operacional",
+    steps: "Abrir admin, filtrar documentos, aprovar/recusar, revisar profissionais sem foto, sem agenda ou sem selo.",
+    expected: "Auditoria registra a acao e os alertas operacionais reduzem quando o cadastro fica completo."
+  },
+  {
+    area: "Assinatura",
+    scenario: "Bloqueio de plano",
+    steps: "Marcar paciente como cancelado ou vencido no admin e tentar novo pedido, favorito e mensagem.",
+    expected: "Sistema bloqueia novas acoes com aviso claro, sem afetar profissional ou admin."
+  },
+  {
+    area: "Historico",
+    scenario: "Conclusao e avaliacao",
+    steps: "Concluir atendimento apos horario permitido, avaliar profissional, arquivar e consultar historico.",
+    expected: "Avaliacao soma na busca, pedido sai dos ativos e pode ser localizado no historico."
+  },
+  {
+    area: "Producao",
+    scenario: "Saude publica",
+    steps: "Rodar npm run smoke:prod depois de deploy ou antes de enviar o link para alguem testar.",
+    expected: "Paginas publicas, robots, sitemap e /api/health respondem sem erro."
+  }
+];
+
 const professionalFilters = [
   { value: "PENDENCIAS", label: "Com pendencias" },
   { value: "SEM_SELO", label: "Sem selo" },
@@ -743,6 +794,54 @@ export function AdminShell({ overview }: { overview: CareAdminOverview }) {
               >
                 {step.action}
               </Link>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+          Antes de chamar usuarios externos, rode tambem <span className="font-semibold">npm run smoke:prod</span>. Esse comando valida
+          producao, SEO basico e dependencias principais sem depender de clique manual.
+        </div>
+      </article>
+
+      <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">QA manual</p>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-950">Cenarios criticos para testar</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Use esta matriz quando for testar como paciente, profissional e admin. O objetivo e validar comportamento real, nao so tela abrindo.
+            </p>
+          </div>
+          <Link
+            href="https://cuidar-link.vercel.app"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-emerald-500"
+          >
+            Abrir producao
+            <ExternalLink aria-hidden="true" className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="mt-5 overflow-hidden rounded-lg border border-slate-200">
+          <div className="grid grid-cols-[120px_minmax(0,1fr)] bg-slate-50 text-xs font-semibold uppercase text-slate-500 md:grid-cols-[140px_180px_minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="border-b border-slate-200 p-3">Area</div>
+            <div className="hidden border-b border-slate-200 p-3 md:block">Cenario</div>
+            <div className="border-b border-slate-200 p-3">Como testar</div>
+            <div className="hidden border-b border-slate-200 p-3 md:block">Resultado esperado</div>
+          </div>
+          {qaScenarios.map((item) => (
+            <div
+              key={`${item.area}-${item.scenario}`}
+              className="grid grid-cols-[120px_minmax(0,1fr)] border-b border-slate-200 last:border-b-0 md:grid-cols-[140px_180px_minmax(0,1fr)_minmax(0,1fr)]"
+            >
+              <div className="p-3 text-sm font-semibold text-emerald-700">{item.area}</div>
+              <div className="hidden p-3 text-sm font-semibold text-slate-950 md:block">{item.scenario}</div>
+              <div className="p-3 text-sm leading-6 text-slate-700">
+                <span className="block font-semibold text-slate-950 md:hidden">{item.scenario}</span>
+                {item.steps}
+                <span className="mt-2 block text-slate-500 md:hidden">Esperado: {item.expected}</span>
+              </div>
+              <div className="hidden p-3 text-sm leading-6 text-slate-700 md:block">{item.expected}</div>
             </div>
           ))}
         </div>
