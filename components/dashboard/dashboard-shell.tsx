@@ -30,6 +30,7 @@ import {
 import { CepAddressFields, type CepAddressValue } from "@/components/ui/cep-address-fields";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import { formatBrasiliaDateTime } from "@/lib/date-time";
+import { inactiveSubscriptionCareAccessMessage, isSubscriptionUsable } from "@/lib/subscription-plans";
 import {
   AvailabilitySlotData,
   CareDashboardData,
@@ -1375,6 +1376,7 @@ function ProfessionalInquiriesPanel({
 
 function SubscriptionStatusPanel({ dashboard }: { dashboard: CareDashboardData }) {
   const isPremium = dashboard.subscription.tier === "PREMIUM";
+  const hasMarketplaceAccess = dashboard.summary.accountType === "PROFESSIONAL" || isSubscriptionUsable(dashboard.subscription.status);
   const statusStyle =
     dashboard.subscription.status === "ATIVO" || dashboard.subscription.status === "TRIAL"
       ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
@@ -1428,6 +1430,11 @@ function SubscriptionStatusPanel({ dashboard }: { dashboard: CareDashboardData }
           {dashboard.subscription.ctaLabel}
         </Link>
       </div>
+      {!hasMarketplaceAccess ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-950">
+          {inactiveSubscriptionCareAccessMessage}
+        </div>
+      ) : null}
       {billingDates.length > 0 ? (
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {billingDates.map((item) => (

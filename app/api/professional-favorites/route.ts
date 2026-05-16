@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
+import { getCareMarketplaceAccessForUser } from "@/lib/care-marketplace-access";
 import { prisma } from "@/lib/prisma";
 
 const favoriteSchema = z.object({
@@ -26,6 +27,11 @@ export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: "Entre para salvar favoritos." }, { status: 401 });
+  }
+
+  const access = await getCareMarketplaceAccessForUser(session.userId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const body = await request.json();

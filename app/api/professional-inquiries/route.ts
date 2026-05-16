@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
+import { getCareMarketplaceAccessForUser } from "@/lib/care-marketplace-access";
 import { createProfessionalInquiryForUser } from "@/lib/care-data";
 
 const inquirySchema = z.object({
@@ -18,6 +19,13 @@ export async function POST(request: NextRequest) {
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message || "Revise os dados da mensagem." }, { status: 400 });
+  }
+
+  if (session) {
+    const access = await getCareMarketplaceAccessForUser(session.userId);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
   }
 
   const result = await createProfessionalInquiryForUser(parsed.data, session?.userId);

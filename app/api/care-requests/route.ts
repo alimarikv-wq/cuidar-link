@@ -2,6 +2,7 @@ import { CareService, GenderPreference, TransferSupportLevel } from "@prisma/cli
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
+import { getCareMarketplaceAccessForUser } from "@/lib/care-marketplace-access";
 import { createCareRequest, getCareRequestsForUser } from "@/lib/care-data";
 import { shouldUseDemoFallback } from "@/lib/care-demo-data";
 
@@ -56,6 +57,12 @@ export async function POST(request: NextRequest) {
   }
 
   const session = await getSessionFromRequest(request);
+  if (session) {
+    const access = await getCareMarketplaceAccessForUser(session.userId);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+  }
 
   try {
     const result = await createCareRequest(

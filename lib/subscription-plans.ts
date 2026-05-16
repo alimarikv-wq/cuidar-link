@@ -82,6 +82,9 @@ export const billingProviderLabels: Record<BillingProviderCode, string> = {
   MERCADO_PAGO: "Mercado Pago"
 };
 
+export const inactiveSubscriptionCareAccessMessage =
+  "Seu acesso para novos pedidos esta pausado. Entre em contato com o suporte ou regularize o plano no painel para continuar.";
+
 export function normalizeSubscriptionTier(tier: string | null | undefined): SubscriptionTierCode {
   return tier === "PREMIUM" ? "PREMIUM" : "FREE";
 }
@@ -104,4 +107,15 @@ export function getSubscriptionPlan(tier: string | null | undefined): Subscripti
 export function isSubscriptionUsable(status: string | null | undefined) {
   const normalizedStatus = normalizeSubscriptionStatus(status);
   return normalizedStatus === "ATIVO" || normalizedStatus === "TRIAL";
+}
+
+export function canUseCareMarketplace(user: {
+  role?: string | null;
+  accountType?: string | null;
+  subscriptionStatus?: string | null;
+} | null | undefined) {
+  if (!user) return true;
+  if (user.role === "ADMIN") return true;
+  if (user.accountType === "PROFESSIONAL") return true;
+  return isSubscriptionUsable(user.subscriptionStatus);
 }
