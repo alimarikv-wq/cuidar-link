@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, MessageSquareText, Phone, Send, ShieldCheck, UserRound } from "lucide-react";
 import { formatBrasiliaDateTime } from "@/lib/date-time";
@@ -20,6 +20,32 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
   const [messages, setMessages] = useState(inquiry.messages);
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshMessages() {
+      if (document.visibilityState === "hidden") return;
+
+      try {
+        const response = await fetch(`/api/professional-inquiries/${inquiry.id}/messages`, { cache: "no-store" });
+        const data = await response.json();
+
+        if (!cancelled && response.ok && Array.isArray(data.messages)) {
+          setMessages(data.messages);
+        }
+      } catch {
+        // A conversa continua funcional mesmo se uma consulta de atualizacao falhar.
+      }
+    }
+
+    refreshMessages();
+    const interval = window.setInterval(refreshMessages, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [inquiry.id]);
 
   function sendMessage() {
     const trimmed = body.trim();

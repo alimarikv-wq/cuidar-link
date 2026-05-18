@@ -418,6 +418,22 @@ type UpdateProfessionalProfileInput = {
   availability: AvailabilitySlotData[];
 };
 
+type UpdatePatientProfileInput = {
+  name: string;
+  phone?: string;
+  neighborhood: string;
+  addressLine?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  postalCode?: string;
+  city?: string;
+  state?: string;
+  approximateWeightKg?: number | null;
+  preferredGender: GenderPreference;
+  transferNeed: TransferSupportLevel;
+  mobilityNotes?: string | null;
+};
+
 type CreateProfessionalDocumentInput = {
   type: DocumentType;
   cpf?: string;
@@ -2282,6 +2298,64 @@ export async function updateProfessionalProfileForUser(userId: string, input: Up
   return { ok: true as const };
 }
 
+export async function updatePatientProfileForUser(userId: string, input: UpdatePatientProfileInput) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { patientProfile: true }
+  });
+
+  if (!user || user.accountType !== AccountType.PATIENT) {
+    return { ok: false as const, status: 403, error: "Perfil de paciente nao encontrado." };
+  }
+
+  const coordinates = coordinatesFor(input.neighborhood);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      name: input.name,
+      patientProfile: {
+        upsert: {
+          create: {
+            phone: input.phone || null,
+            neighborhood: input.neighborhood,
+            addressLine: input.addressLine || null,
+            addressNumber: input.addressNumber || null,
+            addressComplement: input.addressComplement || null,
+            postalCode: input.postalCode || null,
+            city: input.city || defaultCenter.city,
+            state: input.state || null,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            approximateWeightKg: input.approximateWeightKg || null,
+            preferredGender: input.preferredGender,
+            transferNeed: input.transferNeed,
+            mobilityNotes: input.mobilityNotes || null
+          },
+          update: {
+            phone: input.phone || null,
+            neighborhood: input.neighborhood,
+            addressLine: input.addressLine || null,
+            addressNumber: input.addressNumber || null,
+            addressComplement: input.addressComplement || null,
+            postalCode: input.postalCode || null,
+            city: input.city || defaultCenter.city,
+            state: input.state || null,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            approximateWeightKg: input.approximateWeightKg || null,
+            preferredGender: input.preferredGender,
+            transferNeed: input.transferNeed,
+            mobilityNotes: input.mobilityNotes || null
+          }
+        }
+      }
+    }
+  });
+
+  return { ok: true as const };
+}
+
 export async function createProfessionalDocumentForUser(userId: string, input: CreateProfessionalDocumentInput) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -2656,6 +2730,23 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     notifications,
     inquiries,
     favoriteProfessionals: user.professionalFavorites.map(toDashboardFavoriteProfessional),
+    patientSettings: user.patientProfile
+      ? {
+          name: user.name,
+          phone: user.patientProfile.phone,
+          neighborhood: user.patientProfile.neighborhood,
+          addressLine: user.patientProfile.addressLine,
+          addressNumber: user.patientProfile.addressNumber,
+          addressComplement: user.patientProfile.addressComplement,
+          postalCode: user.patientProfile.postalCode,
+          city: user.patientProfile.city,
+          state: user.patientProfile.state,
+          approximateWeightKg: user.patientProfile.approximateWeightKg,
+          preferredGender: user.patientProfile.preferredGender,
+          transferNeed: user.patientProfile.transferNeed,
+          mobilityNotes: user.patientProfile.mobilityNotes
+        }
+      : null,
     professionalSettings: user.professionalProfile
       ? {
           professionalType: user.professionalProfile.professionalType,

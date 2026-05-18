@@ -38,6 +38,8 @@ import {
   CareServiceCode,
   DashboardFavoriteProfessional,
   DocumentTypeCode,
+  GenderPreferenceCode,
+  PatientSettingsData,
   ProfessionalInquirySummary,
   ProfessionalSettingsData,
   TransferSupportCode
@@ -73,6 +75,12 @@ const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
   { value: "MODERADO", label: "Sem preferencia de porte fisico" },
   { value: "ALTO", label: "Porte fisico forte" },
   { value: "DUPLA", label: "Duas pessoas" }
+];
+
+const genderPreferenceOptions: Array<{ value: GenderPreferenceCode; label: string }> = [
+  { value: "QUALQUER", label: "Qualquer" },
+  { value: "FEMININO", label: "Mulher" },
+  { value: "MASCULINO", label: "Homem" }
 ];
 
 const documentOptions: Array<{ value: DocumentTypeCode; label: string }> = [
@@ -401,6 +409,171 @@ function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
           {isPending ? "Enviando..." : "Salvar foto"}
         </button>
       </div>
+    </article>
+  );
+}
+
+function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [form, setForm] = useState(settings);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  function updateAddress(nextAddress: CepAddressValue) {
+    setForm((current) => ({
+      ...current,
+      postalCode: nextAddress.postalCode,
+      addressLine: nextAddress.addressLine,
+      addressNumber: nextAddress.addressNumber,
+      addressComplement: nextAddress.addressComplement,
+      neighborhood: nextAddress.neighborhood,
+      city: nextAddress.city,
+      state: nextAddress.state
+    }));
+  }
+
+  function saveProfile() {
+    setMessage("");
+    setError("");
+
+    startTransition(async () => {
+      const response = await fetch("/api/patient-profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          phone: form.phone || "",
+          addressLine: form.addressLine || "",
+          addressNumber: form.addressNumber || "",
+          addressComplement: form.addressComplement || "",
+          postalCode: form.postalCode || "",
+          city: form.city || "",
+          state: form.state || "",
+          approximateWeightKg: form.approximateWeightKg || null,
+          mobilityNotes: form.mobilityNotes || ""
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Nao foi possivel salvar seus dados.");
+        return;
+      }
+
+      setMessage("Dados do paciente salvos.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <article id="dados-paciente" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Perfil do paciente</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Dados de contato e atendimento</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Complete esses dados uma vez para a plataforma preencher pedidos, mensagens e enderecos com menos retrabalho.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={saveProfile}
+          disabled={isPending}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:bg-emerald-500"
+        >
+          <Save aria-hidden="true" className="h-4 w-4" />
+          {isPending ? "Salvando..." : "Salvar dados"}
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Nome
+          <input
+            value={form.name}
+            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+            className={fieldClass}
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Telefone
+          <input
+            value={form.phone || ""}
+            onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+            placeholder="(51) 99999-0101"
+            className={fieldClass}
+          />
+        </label>
+
+        <CepAddressFields
+          className="lg:col-span-2"
+          value={{
+            postalCode: form.postalCode || "",
+            addressLine: form.addressLine || "",
+            addressNumber: form.addressNumber || "",
+            addressComplement: form.addressComplement || "",
+            neighborhood: form.neighborhood,
+            city: form.city || "Porto Alegre",
+            state: form.state || "RS"
+          }}
+          onChange={updateAddress}
+        />
+
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Preferencia no cuidado intimo
+          <select
+            value={form.preferredGender}
+            onChange={(event) => setForm((current) => ({ ...current, preferredGender: event.target.value as GenderPreferenceCode }))}
+            className={fieldClass}
+          >
+            {genderPreferenceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Porte fisico desejado
+          <select
+            value={form.transferNeed}
+            onChange={(event) => setForm((current) => ({ ...current, transferNeed: event.target.value as TransferSupportCode }))}
+            className={fieldClass}
+          >
+            {supportOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          Peso aproximado, se quiser informar
+          <input
+            type="number"
+            min={1}
+            max={400}
+            value={form.approximateWeightKg ?? ""}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, approximateWeightKg: event.target.value ? Number(event.target.value) : null }))
+            }
+            className={fieldClass}
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-slate-700 lg:col-span-2">
+          Observacoes de mobilidade e seguranca
+          <textarea
+            value={form.mobilityNotes || ""}
+            onChange={(event) => setForm((current) => ({ ...current, mobilityNotes: event.target.value }))}
+            placeholder="Ex.: uso cadeira de rodas, preciso de apoio para transferencia, banho ou deslocamento."
+            className="min-h-24 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+          />
+        </label>
+      </div>
+
+      {message ? <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{message}</p> : null}
+      {error ? <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
     </article>
   );
 }
@@ -1777,6 +1950,8 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       </div>
 
       <ProfilePhotoForm dashboard={dashboard} />
+
+      {!isProfessional && dashboard.patientSettings ? <PatientProfileForm settings={dashboard.patientSettings} /> : null}
 
       <SubscriptionStatusPanel dashboard={dashboard} />
 

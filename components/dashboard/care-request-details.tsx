@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -259,6 +259,32 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
   const [messages, setMessages] = useState(request.messages);
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshMessages() {
+      if (document.visibilityState === "hidden") return;
+
+      try {
+        const response = await fetch(`/api/care-requests/${request.id}/messages`, { cache: "no-store" });
+        const data = await response.json();
+
+        if (!cancelled && response.ok && Array.isArray(data.messages)) {
+          setMessages(data.messages);
+        }
+      } catch {
+        // A conversa continua funcional mesmo se uma consulta de atualizacao falhar.
+      }
+    }
+
+    refreshMessages();
+    const interval = window.setInterval(refreshMessages, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [request.id]);
 
   function sendMessage() {
     const trimmed = body.trim();

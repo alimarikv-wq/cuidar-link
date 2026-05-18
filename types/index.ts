@@ -493,6 +493,22 @@ export type ProfessionalSettingsData = {
   }>;
 };
 
+export type PatientSettingsData = {
+  name: string;
+  phone: string | null;
+  neighborhood: string;
+  addressLine: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  postalCode: string | null;
+  city: string;
+  state: string | null;
+  approximateWeightKg: number | null;
+  preferredGender: GenderPreferenceCode;
+  transferNeed: TransferSupportCode;
+  mobilityNotes: string | null;
+};
+
 export type CareDashboardData = {
   summary: {
     accountType: string;
@@ -527,6 +543,7 @@ export type CareDashboardData = {
   inquiries: ProfessionalInquirySummary[];
   favoriteProfessionals: DashboardFavoriteProfessional[];
   notifications: CareNotificationData[];
+  patientSettings: PatientSettingsData | null;
   professionalSettings: ProfessionalSettingsData | null;
   profile: {
     name: string;
