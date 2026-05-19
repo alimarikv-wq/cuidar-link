@@ -7,6 +7,16 @@ import { updateProfessionalProfileForUser } from "@/lib/care-data";
 const timeSchema = z.string().regex(/^\d{2}:\d{2}$/);
 const optionalText = (schema: z.ZodTypeAny = z.string()) =>
   z.preprocess((value) => (value === null ? "" : value), schema.optional().or(z.literal("")));
+const phoneSchema = z
+  .string()
+  .trim()
+  .max(30, "Telefone muito longo.")
+  .refine((value) => value.replace(/\D/g, "").length >= 10, "Informe telefone com DDD.");
+const cepSchema = z
+  .string()
+  .trim()
+  .max(12, "CEP muito longo.")
+  .refine((value) => value.replace(/\D/g, "").length === 8, "Informe um CEP válido.");
 
 function profileValidationMessage(error: z.ZodError) {
   const issue = error.issues[0];
@@ -45,20 +55,20 @@ function isValidPublicWhatsApp(value: string) {
 }
 
 const updateSchema = z.object({
-  phone: optionalText(),
+  phone: phoneSchema,
   whatsappPhone: optionalText(
     z
       .string()
       .max(20, "Informe um WhatsApp valido ou deixe em branco.")
       .refine(isValidPublicWhatsApp, "Informe um WhatsApp com DDD, ou deixe em branco.")
   ),
-  neighborhood: z.string().min(2),
-  addressLine: optionalText(),
-  addressNumber: optionalText(),
+  neighborhood: z.string().trim().min(2, "Informe o bairro."),
+  addressLine: z.string().trim().min(2, "Informe o endereço.").max(160, "Endereço muito longo."),
+  addressNumber: z.string().trim().min(1, "Informe o número.").max(20, "Número muito longo."),
   addressComplement: optionalText(),
-  postalCode: optionalText(),
-  city: optionalText(z.string().min(2, "Informe a cidade ou deixe em branco.")),
-  state: optionalText(z.string().min(2, "Informe a UF com 2 letras.").max(2, "Informe a UF com 2 letras.")),
+  postalCode: cepSchema,
+  city: z.string().trim().min(2, "Informe a cidade."),
+  state: z.string().trim().min(2, "Informe a UF com 2 letras.").max(2, "Informe a UF com 2 letras."),
   serviceRadiusKm: z.coerce.number().int().min(1, "Informe um raio de atendimento entre 1 e 50 km.").max(50, "Informe um raio de atendimento entre 1 e 50 km."),
   hourlyRate: z.coerce.number().min(1, "Informe o valor por hora.").max(1000, "O valor por hora está acima do limite aceito."),
   sessionRate: z.coerce.number().min(1, "Informe o valor por sessão ou deixe em branco.").max(5000, "O valor por sessão está acima do limite aceito.").nullable().optional(),
@@ -79,6 +89,7 @@ const updateSchema = z.object({
         endTime: timeSchema
       })
     )
+    .min(1, "Informe pelo menos um horário na agenda semanal.")
     .max(14)
 });
 

@@ -458,6 +458,23 @@ export type AdminSubscriptionUser = {
   updatedAt: string;
 };
 
+export type ProfileCompletionItem = {
+  key: string;
+  label: string;
+  detail: string;
+  href: string;
+  complete: boolean;
+  priority: "required" | "recommended";
+};
+
+export type ProfileCompletionData = {
+  percent: number;
+  complete: boolean;
+  missingCount: number;
+  requiredMissingCount: number;
+  items: ProfileCompletionItem[];
+};
+
 export type ProfessionalSettingsData = {
   professionalType: ProfessionalTypeCode;
   gender: GenderCode;
@@ -548,6 +565,7 @@ export type CareDashboardData = {
   inquiries: ProfessionalInquirySummary[];
   favoriteProfessionals: DashboardFavoriteProfessional[];
   notifications: CareNotificationData[];
+  profileCompletion: ProfileCompletionData;
   patientSettings: PatientSettingsData | null;
   professionalSettings: ProfessionalSettingsData | null;
   profile: {

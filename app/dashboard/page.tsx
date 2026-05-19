@@ -12,7 +12,7 @@ export default async function DashboardPage() {
       <section className="surface rounded-lg border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
         <h1 className="text-4xl font-semibold text-slate-950">Seu painel de cuidado</h1>
         <p className="mt-4 max-w-2xl text-base text-slate-600">
-          Entre para ver solicitacoes, agenda, perfil e documentos em uma visao unica.
+          Entre para ver solicitações, agenda, perfil e documentos em uma visão única.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/login" className={buttonStyles()}>

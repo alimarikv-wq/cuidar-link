@@ -66,6 +66,7 @@ import {
   DashboardFavoriteProfessional,
   BillingProviderCode,
   DocumentTypeCode,
+  ProfileCompletionData,
   SubscriptionStatusCode,
   SubscriptionTierCode,
   VerificationStatusCode,
@@ -553,6 +554,177 @@ function requiredDocumentStatus(
       status
     };
   });
+}
+
+type DashboardCompletionUser = Prisma.UserGetPayload<{
+  include: {
+    patientProfile: true;
+    professionalProfile: {
+      include: {
+        documents: true;
+        availability: true;
+      };
+    };
+  };
+}>;
+
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
+function hasValidPhone(value: string | null | undefined) {
+  return value ? value.replace(/\D/g, "").length >= 10 : false;
+}
+
+function hasValidCep(value: string | null | undefined) {
+  return value ? value.replace(/\D/g, "").length === 8 : false;
+}
+
+function hasCompleteAddress(profile: {
+  postalCode?: string | null;
+  addressLine?: string | null;
+  addressNumber?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+}) {
+  return (
+    hasValidCep(profile.postalCode) &&
+    hasText(profile.addressLine) &&
+    hasText(profile.addressNumber) &&
+    hasText(profile.neighborhood) &&
+    hasText(profile.city) &&
+    profile.state?.trim().length === 2
+  );
+}
+
+function calculateProfileCompletion(items: ProfileCompletionData["items"]): ProfileCompletionData {
+  const completed = items.filter((item) => item.complete).length;
+  const percent = items.length > 0 ? Math.round((completed / items.length) * 100) : 100;
+  const missingCount = items.filter((item) => !item.complete).length;
+  const requiredMissingCount = items.filter((item) => item.priority === "required" && !item.complete).length;
+
+  return {
+    percent,
+    complete: requiredMissingCount === 0,
+    missingCount,
+    requiredMissingCount,
+    items
+  };
+}
+
+function buildProfileCompletion(
+  user: DashboardCompletionUser,
+  requiredDocuments: Array<{ type: DocumentTypeCode; label: string; status: VerificationStatusCode | "FALTANDO" }>
+): ProfileCompletionData {
+  if (user.accountType === AccountType.PROFESSIONAL) {
+    const profile = user.professionalProfile;
+    const docsComplete = requiredDocuments.length > 0 && requiredDocuments.every((document) => document.status === "VERIFICADO");
+
+    return calculateProfileCompletion([
+      {
+        key: "professional-phone",
+        label: "Telefone profissional",
+        detail: "Usado em pedidos, mensagens e contato seguro.",
+        href: "#perfil-profissional",
+        complete: hasValidPhone(profile?.phone),
+        priority: "required"
+      },
+      {
+        key: "professional-address",
+        label: "CEP e endereço base",
+        detail: "Ajuda a calcular proximidade e raio de atendimento.",
+        href: "#perfil-profissional",
+        complete: profile ? hasCompleteAddress(profile) : false,
+        priority: "required"
+      },
+      {
+        key: "professional-services",
+        label: "Serviços atendidos",
+        detail: "Define em quais buscas seu perfil aparece.",
+        href: "#perfil-profissional",
+        complete: Boolean(profile?.services.length),
+        priority: "required"
+      },
+      {
+        key: "professional-schedule",
+        label: "Agenda semanal",
+        detail: "Informe ao menos um dia e horário disponível.",
+        href: "#perfil-profissional",
+        complete: Boolean(profile?.availability.length),
+        priority: "required"
+      },
+      {
+        key: "professional-care",
+        label: "Experiência e apoio em mobilidade",
+        detail: "Mostra ao paciente como você ajuda no cuidado.",
+        href: "#perfil-profissional",
+        complete: hasText(profile?.bio) && hasText(profile?.mobilitySupport),
+        priority: "required"
+      },
+      {
+        key: "professional-documents",
+        label: "Documentos obrigatórios",
+        detail: "Libera o selo verificado na busca.",
+        href: "#documentos",
+        complete: docsComplete,
+        priority: "required"
+      },
+      {
+        key: "professional-photo",
+        label: "Foto do perfil",
+        detail: "Recomendado para aumentar confiança antes do atendimento.",
+        href: "#foto-perfil",
+        complete: hasText(profile?.photoUrl),
+        priority: "recommended"
+      }
+    ]);
+  }
+
+  const profile = user.patientProfile;
+
+  return calculateProfileCompletion([
+    {
+      key: "patient-name",
+      label: "Nome do paciente",
+      detail: "Aparece nos pedidos enviados aos profissionais.",
+      href: "#dados-paciente",
+      complete: hasText(user.name),
+      priority: "required"
+    },
+    {
+      key: "patient-phone",
+      label: "Telefone com DDD",
+      detail: "Essencial para combinar chegada e ajustes do atendimento.",
+      href: "#dados-paciente",
+      complete: hasValidPhone(profile?.phone),
+      priority: "required"
+    },
+    {
+      key: "patient-address",
+      label: "CEP, endereço e número",
+      detail: "Preenche automaticamente os pedidos e reduz erro de deslocamento.",
+      href: "#dados-paciente",
+      complete: profile ? hasCompleteAddress(profile) : false,
+      priority: "required"
+    },
+    {
+      key: "patient-preferences",
+      label: "Preferências de cuidado",
+      detail: "Ajuda a busca a respeitar porte físico e cuidado íntimo.",
+      href: "#dados-paciente",
+      complete: Boolean(profile?.preferredGender && profile?.transferNeed),
+      priority: "required"
+    },
+    {
+      key: "patient-photo",
+      label: "Foto do perfil",
+      detail: "Opcional, mas ajuda profissionais a reconhecerem quem está solicitando.",
+      href: "#foto-perfil",
+      complete: hasText(profile?.photoUrl),
+      priority: "recommended"
+    }
+  ]);
 }
 
 async function refreshProfessionalVerification(professionalId: string) {
@@ -2749,6 +2921,10 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
   const subscriptionPlan = getSubscriptionPlan(user.subscriptionTier);
   const subscriptionStatus = normalizeSubscriptionStatus(user.subscriptionStatus);
   const subscriptionProvider = normalizeBillingProvider(user.subscriptionProvider);
+  const professionalRequiredDocuments = user.professionalProfile
+    ? requiredDocumentStatus(user.professionalProfile.professionalType, user.professionalProfile.documents)
+    : [];
+  const profileCompletion = buildProfileCompletion(user, professionalRequiredDocuments);
 
   return {
     summary: {
@@ -2784,21 +2960,22 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     notifications,
     inquiries,
     favoriteProfessionals: user.professionalFavorites.map(toDashboardFavoriteProfessional),
-    patientSettings: user.patientProfile
+    profileCompletion,
+    patientSettings: user.accountType === AccountType.PATIENT
       ? {
           name: user.name,
-          phone: user.patientProfile.phone,
-          neighborhood: user.patientProfile.neighborhood,
-          addressLine: user.patientProfile.addressLine,
-          addressNumber: user.patientProfile.addressNumber,
-          addressComplement: user.patientProfile.addressComplement,
-          postalCode: user.patientProfile.postalCode,
-          city: user.patientProfile.city,
-          state: user.patientProfile.state,
-          approximateWeightKg: user.patientProfile.approximateWeightKg,
-          preferredGender: user.patientProfile.preferredGender,
-          transferNeed: user.patientProfile.transferNeed,
-          mobilityNotes: user.patientProfile.mobilityNotes
+          phone: user.patientProfile?.phone || null,
+          neighborhood: user.patientProfile?.neighborhood || defaultCenter.neighborhood,
+          addressLine: user.patientProfile?.addressLine || null,
+          addressNumber: user.patientProfile?.addressNumber || null,
+          addressComplement: user.patientProfile?.addressComplement || null,
+          postalCode: user.patientProfile?.postalCode || null,
+          city: user.patientProfile?.city || defaultCenter.city,
+          state: user.patientProfile?.state || "RS",
+          approximateWeightKg: user.patientProfile?.approximateWeightKg || null,
+          preferredGender: user.patientProfile?.preferredGender || GenderPreference.QUALQUER,
+          transferNeed: user.patientProfile?.transferNeed || TransferSupportLevel.MODERADO,
+          mobilityNotes: user.patientProfile?.mobilityNotes || null
         }
       : null,
     professionalSettings: user.professionalProfile
@@ -2841,7 +3018,7 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
           documents: user.professionalProfile.documents
             .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
             .map(toProfessionalDocumentData),
-          requiredDocuments: requiredDocumentStatus(user.professionalProfile.professionalType, user.professionalProfile.documents)
+          requiredDocuments: professionalRequiredDocuments
         }
       : null,
     profile: {

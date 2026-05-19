@@ -29,7 +29,7 @@ const fieldClass =
   "h-10 w-full min-w-0 rounded-lg border bg-white px-3 text-sm text-slate-950 outline-none transition";
 
 function requiredMark(required?: boolean) {
-  return required ? <span className="text-rose-600" aria-label="obrigatorio">*</span> : null;
+  return required ? <span className="text-rose-600" aria-label="obrigatório">*</span> : null;
 }
 
 function inputClass(invalid?: boolean) {
@@ -64,7 +64,7 @@ export function CepAddressFields({ value, onChange, className = "", requiredFiel
     setMessage("");
 
     if (cepDigits.length !== 8) {
-      setMessage("Digite um CEP com 8 numeros.");
+      setMessage("Digite um CEP com 8 números.");
       return;
     }
 
@@ -75,7 +75,7 @@ export function CepAddressFields({ value, onChange, className = "", requiredFiel
       const data = (await response.json()) as CepLookupResponse;
 
       if (!response.ok) {
-        setMessage(data.error || "Nao foi possivel buscar o CEP.");
+        setMessage(data.error || "Não foi possível buscar o CEP.");
         return;
       }
 
@@ -88,9 +88,9 @@ export function CepAddressFields({ value, onChange, className = "", requiredFiel
         city: data.city || value.city,
         state: data.state || value.state
       });
-      setMessage("Endereco encontrado. Confira numero e complemento.");
+      setMessage("Endereço encontrado. Confira número e complemento.");
     } catch {
-      setMessage("Nao foi possivel buscar o CEP agora.");
+      setMessage("Não foi possível buscar o CEP agora.");
     } finally {
       setIsSearching(false);
     }
@@ -123,17 +123,17 @@ export function CepAddressFields({ value, onChange, className = "", requiredFiel
 
       <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          <span>Endereco {requiredMark(requiredFields.addressLine)}</span>
+          <span>Endereço {requiredMark(requiredFields.addressLine)}</span>
           <input
             value={value.addressLine}
             onChange={(event) => update("addressLine", event.target.value)}
-            placeholder="Rua, avenida ou referencia"
+            placeholder="Rua, avenida ou referência"
             aria-invalid={invalidFields.addressLine ? "true" : undefined}
             className={inputClass(invalidFields.addressLine)}
           />
         </label>
         <label className="grid min-w-0 gap-1 text-sm font-semibold text-slate-700">
-          <span>Numero {requiredMark(requiredFields.addressNumber)}</span>
+          <span>Número {requiredMark(requiredFields.addressNumber)}</span>
           <input
             value={value.addressNumber}
             onChange={(event) => update("addressNumber", event.target.value)}
@@ -149,7 +149,7 @@ export function CepAddressFields({ value, onChange, className = "", requiredFiel
         <input
           value={value.addressComplement}
           onChange={(event) => update("addressComplement", event.target.value)}
-          placeholder="Apto, bloco, andar ou ponto de referencia"
+          placeholder="Apto, bloco, andar ou ponto de referência"
           aria-invalid={invalidFields.addressComplement ? "true" : undefined}
           className={inputClass(invalidFields.addressComplement)}
         />
@@ -189,7 +189,7 @@ export function CepAddressFields({ value, onChange, className = "", requiredFiel
       </div>
 
       {message ? (
-        <p className={`rounded-lg px-3 py-2 text-sm ${message.startsWith("Endereco") ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
+        <p className={`rounded-lg px-3 py-2 text-sm ${message.startsWith("Endereço") ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
           {message}
         </p>
       ) : null}

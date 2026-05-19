@@ -41,6 +41,7 @@ import {
   DocumentTypeCode,
   GenderPreferenceCode,
   PatientSettingsData,
+  ProfileCompletionData,
   ProfessionalInquirySummary,
   ProfessionalSettingsData,
   TransferSupportCode
@@ -133,8 +134,118 @@ const weekdayOptions = [
 
 const fieldClass =
   "h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+const invalidFieldClass =
+  "h-10 w-full min-w-0 rounded-lg border border-rose-400 bg-rose-50/40 px-3 text-sm text-slate-950 outline-none transition focus:border-rose-600 focus:ring-2 focus:ring-rose-100";
 const allowedProfilePhotoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxProfilePhotoSizeBytes = 3 * 1024 * 1024;
+
+function inputClass(invalid?: boolean) {
+  return invalid ? invalidFieldClass : fieldClass;
+}
+
+function requiredMark() {
+  return <span className="text-rose-600" aria-label="obrigatório">*</span>;
+}
+
+function onlyDigits(value: string | null | undefined) {
+  return (value || "").replace(/\D/g, "");
+}
+
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
+function hasValidPhone(value: string | null | undefined) {
+  return onlyDigits(value).length >= 10;
+}
+
+function hasValidCep(value: string | null | undefined) {
+  return onlyDigits(value).length === 8;
+}
+
+const addressRequiredFields: Partial<Record<keyof CepAddressValue, boolean>> = {
+  postalCode: true,
+  addressLine: true,
+  addressNumber: true,
+  neighborhood: true,
+  city: true,
+  state: true
+};
+
+const patientRequiredLabels: Record<string, string> = {
+  name: "nome",
+  phone: "telefone com DDD",
+  postalCode: "CEP",
+  addressLine: "endereço",
+  addressNumber: "número",
+  neighborhood: "bairro",
+  city: "cidade",
+  state: "UF"
+};
+
+const professionalRequiredLabels: Record<string, string> = {
+  phone: "telefone",
+  postalCode: "CEP",
+  addressLine: "endereço",
+  addressNumber: "número",
+  neighborhood: "bairro",
+  city: "cidade",
+  state: "UF",
+  serviceRadiusKm: "raio de atendimento",
+  hourlyRate: "valor de referência por hora",
+  services: "serviços",
+  availability: "agenda semanal",
+  bio: "experiência",
+  mobilitySupport: "apoio em mobilidade"
+};
+
+function addressInvalidFields(missingFields: Set<string>, attempted: boolean): Partial<Record<keyof CepAddressValue, boolean>> {
+  if (!attempted) return {};
+  return {
+    postalCode: missingFields.has("postalCode"),
+    addressLine: missingFields.has("addressLine"),
+    addressNumber: missingFields.has("addressNumber"),
+    neighborhood: missingFields.has("neighborhood"),
+    city: missingFields.has("city"),
+    state: missingFields.has("state")
+  };
+}
+
+function formatMissingMessage(missingFields: Set<string>, labels: Record<string, string>) {
+  const missing = Array.from(missingFields).map((field) => labels[field]).filter(Boolean);
+  return missing.length ? `Complete antes de salvar: ${missing.join(", ")}.` : "";
+}
+
+function getPatientMissingFields(form: PatientSettingsData) {
+  const missing = new Set<string>();
+  if (!hasText(form.name)) missing.add("name");
+  if (!hasValidPhone(form.phone)) missing.add("phone");
+  if (!hasValidCep(form.postalCode)) missing.add("postalCode");
+  if (!hasText(form.addressLine)) missing.add("addressLine");
+  if (!hasText(form.addressNumber)) missing.add("addressNumber");
+  if (!hasText(form.neighborhood)) missing.add("neighborhood");
+  if (!hasText(form.city)) missing.add("city");
+  if (form.state?.trim().length !== 2) missing.add("state");
+  return missing;
+}
+
+function getProfessionalMissingFields(form: ProfessionalSettingsData) {
+  const missing = new Set<string>();
+  if (!hasValidPhone(form.phone)) missing.add("phone");
+  if (!hasValidCep(form.postalCode)) missing.add("postalCode");
+  if (!hasText(form.addressLine)) missing.add("addressLine");
+  if (!hasText(form.addressNumber)) missing.add("addressNumber");
+  if (!hasText(form.neighborhood)) missing.add("neighborhood");
+  if (!hasText(form.city)) missing.add("city");
+  if (form.state?.trim().length !== 2) missing.add("state");
+  if (!Number.isFinite(Number(form.serviceRadiusKm)) || Number(form.serviceRadiusKm) < 1) missing.add("serviceRadiusKm");
+  if (!Number.isFinite(Number(form.hourlyRate)) || Number(form.hourlyRate) < 1) missing.add("hourlyRate");
+  if (form.services.length === 0) missing.add("services");
+  if (form.availability.length === 0) missing.add("availability");
+  if (!hasText(form.bio)) missing.add("bio");
+  if (!hasText(form.mobilitySupport)) missing.add("mobilitySupport");
+  return missing;
+}
 
 const statusStyles: Record<RequestStatus, string> = {
   RASCUNHO: "bg-slate-100 text-slate-700",
@@ -203,7 +314,7 @@ function formatFileSize(bytes: number) {
 
 function validateProfilePhotoFile(file: File) {
   if (!allowedProfilePhotoTypes.has(file.type)) return "Envie uma foto JPG, JPEG, PNG ou WEBP.";
-  if (file.size > maxProfilePhotoSizeBytes) return "Envie uma foto de ate 3 MB.";
+  if (file.size > maxProfilePhotoSizeBytes) return "Envie uma foto de até 3 MB.";
   return "";
 }
 
@@ -272,6 +383,86 @@ function getRequestActions(request: CareRequestRecord, accountType: string): Sta
   }
 
   return [];
+}
+
+function ProfileCompletionPanel({ completion, isProfessional }: { completion: ProfileCompletionData; isProfessional: boolean }) {
+  const missingRequiredItems = completion.items.filter((item) => item.priority === "required" && !item.complete);
+  const recommendedItems = completion.items.filter((item) => item.priority === "recommended");
+
+  return (
+    <article
+      id="cadastro"
+      className={`scroll-mt-24 rounded-lg border p-5 shadow-sm ${
+        completion.complete ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
+          <p className={`text-sm font-semibold ${completion.complete ? "text-emerald-800" : "text-amber-900"}`}>
+            Cadastro
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">
+            {completion.complete ? "Cadastro pronto para usar" : "Complete seu cadastro para evitar retrabalho"}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            {completion.complete
+              ? isProfessional
+                ? "Seu perfil tem os dados essenciais para aparecer com segurança na busca e receber pedidos."
+                : "Seu perfil tem os dados essenciais para preencher pedidos e conversar com profissionais."
+              : "Quando esses dados ficam salvos aqui, os pedidos já saem com telefone, endereço e preferências corretas."}
+          </p>
+        </div>
+        <div className="min-w-[140px] rounded-lg border border-white/70 bg-white p-3 text-center shadow-sm">
+          <p className="text-3xl font-semibold text-slate-950">{completion.percent}%</p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {completion.requiredMissingCount === 0 ? "essencial ok" : `${completion.requiredMissingCount} pendência(s)`}
+          </p>
+        </div>
+      </div>
+
+      {missingRequiredItems.length > 0 ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {missingRequiredItems.map((item) => (
+            <a
+              key={item.key}
+              href={item.href}
+              className="rounded-lg border border-amber-200 bg-white p-3 text-sm transition hover:border-amber-400 hover:shadow-sm"
+            >
+              <span className="inline-flex items-center gap-2 font-semibold text-amber-950">
+                <X aria-hidden="true" className="h-4 w-4 text-amber-700" />
+                {item.label}
+              </span>
+              <span className="mt-1 block leading-5 text-slate-600">{item.detail}</span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-white p-3 text-sm font-semibold text-emerald-800">
+          <Check aria-hidden="true" className="mr-2 inline h-4 w-4" />
+          Dados obrigatórios completos.
+        </div>
+      )}
+
+      {recommendedItems.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+          {recommendedItems.map((item) => (
+            <a
+              key={item.key}
+              href={item.href}
+              className={`rounded-lg border px-3 py-2 ${
+                item.complete
+                  ? "border-emerald-200 bg-white text-emerald-800"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300"
+              }`}
+            >
+              {item.complete ? "Recomendado feito: " : "Recomendado: "}
+              {item.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
 }
 
 function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
@@ -358,7 +549,7 @@ function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
   }
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <article id="foto-perfil" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="grid gap-4 md:grid-cols-[96px_1fr_auto] md:items-center">
         <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-lg bg-slate-100 text-slate-400">
           {previewUrl ? (
@@ -370,9 +561,9 @@ function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
         </div>
         <div>
           <p className="text-sm font-semibold text-emerald-700">Foto do perfil</p>
-          <h2 className="mt-1 text-xl font-semibold text-slate-950">Aumente a confianca no atendimento</h2>
+          <h2 className="mt-1 text-xl font-semibold text-slate-950">Aumente a confiança no atendimento</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Envie uma foto clara. Profissionais aparecem com essa imagem na busca; pacientes usam no proprio painel.
+            Envie uma foto clara. Profissionais aparecem com essa imagem na busca; pacientes usam no próprio painel.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
@@ -420,6 +611,9 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
   const [form, setForm] = useState(settings);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [attemptedSave, setAttemptedSave] = useState(false);
+  const missingFields = getPatientMissingFields(form);
+  const showInvalids = attemptedSave && missingFields.size > 0;
 
   function updateAddress(nextAddress: CepAddressValue) {
     setForm((current) => ({
@@ -435,8 +629,15 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
   }
 
   function saveProfile() {
+    setAttemptedSave(true);
     setMessage("");
     setError("");
+
+    const nextMissingFields = getPatientMissingFields(form);
+    if (nextMissingFields.size > 0) {
+      setError(formatMissingMessage(nextMissingFields, patientRequiredLabels));
+      return;
+    }
 
     startTransition(async () => {
       const response = await fetch("/api/patient-profile", {
@@ -490,20 +691,22 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
-          Nome
+          <span>Nome {requiredMark()}</span>
           <input
             value={form.name}
             onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-            className={fieldClass}
+            aria-invalid={showInvalids && missingFields.has("name") ? "true" : undefined}
+            className={inputClass(showInvalids && missingFields.has("name"))}
           />
         </label>
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
-          Telefone
+          <span>Telefone com DDD {requiredMark()}</span>
           <input
             value={form.phone || ""}
             onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
             placeholder="(51) 99999-0101"
-            className={fieldClass}
+            aria-invalid={showInvalids && missingFields.has("phone") ? "true" : undefined}
+            className={inputClass(showInvalids && missingFields.has("phone"))}
           />
         </label>
 
@@ -519,6 +722,8 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
             state: form.state || "RS"
           }}
           onChange={updateAddress}
+          requiredFields={addressRequiredFields}
+          invalidFields={addressInvalidFields(missingFields, showInvalids)}
         />
 
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
@@ -585,6 +790,9 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
   const [form, setForm] = useState(settings);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [attemptedSave, setAttemptedSave] = useState(false);
+  const missingFields = getProfessionalMissingFields(form);
+  const showInvalids = attemptedSave && missingFields.size > 0;
 
   function toggleService(service: CareServiceCode) {
     setForm((current) => {
@@ -632,8 +840,15 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
   }
 
   function saveProfile() {
+    setAttemptedSave(true);
     setMessage("");
     setError("");
+
+    const nextMissingFields = getProfessionalMissingFields(form);
+    if (nextMissingFields.size > 0) {
+      setError(formatMissingMessage(nextMissingFields, professionalRequiredLabels));
+      return;
+    }
 
     startTransition(async () => {
       const payload = {
@@ -667,7 +882,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
   }
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <article id="perfil-profissional" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700">Perfil profissional</p>
@@ -691,11 +906,12 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <div className="grid min-w-0 gap-4 sm:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Telefone
+            <span>Telefone com DDD {requiredMark()}</span>
             <input
               value={form.phone || ""}
               onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-              className={fieldClass}
+              aria-invalid={showInvalids && missingFields.has("phone") ? "true" : undefined}
+              className={inputClass(showInvalids && missingFields.has("phone"))}
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
@@ -707,7 +923,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
               className={fieldClass}
             />
             <span className="text-xs font-medium text-slate-500">
-              Preencha somente se quiser exibir o botao WhatsApp na busca publica.
+              Preencha somente se quiser exibir o botão WhatsApp na busca pública.
             </span>
           </label>
           <CepAddressFields
@@ -722,15 +938,18 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
               state: form.state || "RS"
             }}
             onChange={updateAddress}
+            requiredFields={addressRequiredFields}
+            invalidFields={addressInvalidFields(missingFields, showInvalids)}
           />
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Valor de referência por hora
+            <span>Valor de referência por hora {requiredMark()}</span>
             <input
               type="number"
               min={1}
               value={form.hourlyRate}
               onChange={(event) => setForm((current) => ({ ...current, hourlyRate: Number(event.target.value) }))}
-              className={fieldClass}
+              aria-invalid={showInvalids && missingFields.has("hourlyRate") ? "true" : undefined}
+              className={inputClass(showInvalids && missingFields.has("hourlyRate"))}
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
@@ -746,14 +965,15 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Raio de atendimento
+            <span>Raio de atendimento {requiredMark()}</span>
             <input
               type="number"
               min={1}
               max={50}
               value={form.serviceRadiusKm}
               onChange={(event) => setForm((current) => ({ ...current, serviceRadiusKm: Number(event.target.value) }))}
-              className={fieldClass}
+              aria-invalid={showInvalids && missingFields.has("serviceRadiusKm") ? "true" : undefined}
+              className={inputClass(showInvalids && missingFields.has("serviceRadiusKm"))}
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
@@ -774,7 +994,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
 
         <div className="grid min-w-0 gap-4">
           <div>
-            <p className="text-sm font-semibold text-slate-700">Serviços</p>
+            <p className="text-sm font-semibold text-slate-700">Serviços {requiredMark()}</p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {serviceOptions.map((service) => {
                 const active = form.services.includes(service.value);
@@ -794,6 +1014,11 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
                 );
               })}
             </div>
+            {showInvalids && missingFields.has("services") ? (
+              <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+                Selecione pelo menos um serviço.
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -872,7 +1097,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-slate-700">Agenda semanal</p>
+            <p className="text-sm font-semibold text-slate-700">Agenda semanal {requiredMark()}</p>
             <div className="mt-2 grid gap-2">
               {weekdayOptions.map((weekday) => {
                 const slot = findSlot(weekday.value);
@@ -905,24 +1130,39 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
                 );
               })}
             </div>
+            {showInvalids && missingFields.has("availability") ? (
+              <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+                Marque pelo menos um dia e horário disponível.
+              </p>
+            ) : null}
           </div>
         </div>
 
         <label className="grid gap-1 text-sm font-semibold text-slate-700 lg:col-span-2">
-          Experiencia
+          <span>Experiência {requiredMark()}</span>
           <textarea
             value={form.bio}
             onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))}
-            className="min-h-24 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            aria-invalid={showInvalids && missingFields.has("bio") ? "true" : undefined}
+            className={`min-h-24 rounded-lg border px-3 py-2 text-sm text-slate-950 outline-none transition ${
+              showInvalids && missingFields.has("bio")
+                ? "border-rose-400 bg-rose-50/40 focus:border-rose-600 focus:ring-2 focus:ring-rose-100"
+                : "border-slate-300 bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            }`}
           />
         </label>
 
         <label className="grid gap-1 text-sm font-semibold text-slate-700 lg:col-span-2">
-          Apoio em mobilidade
+          <span>Apoio em mobilidade {requiredMark()}</span>
           <textarea
             value={form.mobilitySupport}
             onChange={(event) => setForm((current) => ({ ...current, mobilitySupport: event.target.value }))}
-            className="min-h-24 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            aria-invalid={showInvalids && missingFields.has("mobilitySupport") ? "true" : undefined}
+            className={`min-h-24 rounded-lg border px-3 py-2 text-sm text-slate-950 outline-none transition ${
+              showInvalids && missingFields.has("mobilitySupport")
+                ? "border-rose-400 bg-rose-50/40 focus:border-rose-600 focus:ring-2 focus:ring-rose-100"
+                : "border-slate-300 bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            }`}
           />
         </label>
       </div>
@@ -1972,6 +2212,8 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
           );
         })}
       </div>
+
+      <ProfileCompletionPanel completion={dashboard.profileCompletion} isProfessional={isProfessional} />
 
       <ProfilePhotoForm dashboard={dashboard} />
 
