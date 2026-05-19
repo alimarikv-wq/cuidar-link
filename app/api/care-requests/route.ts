@@ -27,6 +27,7 @@ const createSchema = z.object({
   longitude: z.coerce.number().optional(),
   notes: z.string().max(1000).optional().or(z.literal("")),
   travelRequested: z.boolean().optional(),
+  fixedContractRequested: z.boolean().optional(),
   travelDestination: z.string().max(160).optional().or(z.literal("")),
   isInternationalTravel: z.boolean().optional(),
   needsUsVisa: z.boolean().optional(),
@@ -108,10 +109,10 @@ export async function POST(request: NextRequest) {
           status: "ENVIADO",
           professionalName: "Profissional selecionado"
         },
-        warning: "Banco indisponivel. Solicitacao simulada em modo demonstracao."
+        warning: "Banco indisponível. Solicitação simulada em modo demonstração."
       });
     }
 
-    return NextResponse.json({ error: "Nao foi possivel enviar a solicitacao." }, { status: 500 });
+    return NextResponse.json({ error: "Não foi possível enviar a solicitação." }, { status: 500 });
   }
 }

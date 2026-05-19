@@ -10,7 +10,7 @@ function ContactRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-950">{value || "Nao informado"}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-950">{value || "Não informado"}</p>
     </div>
   );
 }
@@ -35,7 +35,7 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
           setMessages(data.messages);
         }
       } catch {
-        // A conversa continua funcional mesmo se uma consulta de atualizacao falhar.
+        // A conversa continua funcional mesmo se uma consulta de atualização falhar.
       }
     }
 
@@ -65,7 +65,7 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel enviar a mensagem.");
+        setError(data.error || "Não foi possível enviar a mensagem.");
         return;
       }
 
@@ -81,7 +81,7 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
           <p className="text-sm font-semibold text-emerald-700">Conversa inicial</p>
           <h2 className="mt-1 text-2xl font-semibold text-slate-950">Mensagem antes do pedido</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Use esta conversa para tirar duvidas. Quando os combinados estiverem claros, o paciente pode solicitar o atendimento completo.
+            Use esta conversa para tirar dúvidas. Quando os combinados estiverem claros, o paciente pode solicitar o atendimento completo.
           </p>
         </div>
         <MessageSquareText aria-hidden="true" className="h-6 w-6 text-emerald-700" />
@@ -98,7 +98,7 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
             }`}
           >
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-              <span>{message.isOwn ? "Voce" : message.senderName}</span>
+              <span>{message.isOwn ? "Você" : message.senderName}</span>
               <span>{formatBrasiliaDateTime(message.createdAt)}</span>
             </div>
             <p className="whitespace-pre-line">{message.body}</p>
@@ -154,6 +154,11 @@ export function ProfessionalInquiryDetails({ inquiry }: { inquiry: ProfessionalI
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Conversa com {inquiry.professional.name} antes de abrir um pedido de atendimento.
             </p>
+            {inquiry.fixedContractRequested ? (
+              <p className="mt-2 inline-flex rounded-lg bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800">
+                Interesse em rotina fixa/contrato fixo
+              </p>
+            ) : null}
             <p className="mt-2 text-xs font-semibold text-slate-500">Criada em {formatBrasiliaDateTime(inquiry.createdAt)}</p>
           </div>
           <span className="rounded-lg bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800">

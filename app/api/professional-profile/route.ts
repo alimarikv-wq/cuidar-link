@@ -13,21 +13,22 @@ function profileValidationMessage(error: z.ZodError) {
   const field = issue?.path.join(".");
   const fieldLabels: Record<string, string> = {
     phone: "telefone",
-    whatsappPhone: "WhatsApp publico",
+    whatsappPhone: "WhatsApp público",
     neighborhood: "bairro",
-    addressLine: "endereco",
-    addressNumber: "numero",
+    addressLine: "endereço",
+    addressNumber: "número",
     postalCode: "CEP",
     city: "cidade",
     state: "UF",
     serviceRadiusKm: "raio de atendimento",
     hourlyRate: "valor por hora",
-    sessionRate: "valor por sessao",
-    bio: "experiencia",
+    sessionRate: "valor por sessão",
+    bio: "experiência",
     mobilitySupport: "apoio em mobilidade",
     supportLevel: "capacidade",
-    travelNotes: "observacoes de viagem",
-    services: "servicos",
+    travelNotes: "observações de viagem",
+    acceptsFixedContract: "contrato fixo",
+    services: "serviços",
     availability: "agenda semanal"
   };
 
@@ -59,16 +60,17 @@ const updateSchema = z.object({
   city: optionalText(z.string().min(2, "Informe a cidade ou deixe em branco.")),
   state: optionalText(z.string().min(2, "Informe a UF com 2 letras.").max(2, "Informe a UF com 2 letras.")),
   serviceRadiusKm: z.coerce.number().int().min(1, "Informe um raio de atendimento entre 1 e 50 km.").max(50, "Informe um raio de atendimento entre 1 e 50 km."),
-  hourlyRate: z.coerce.number().min(1, "Informe o valor por hora.").max(1000, "O valor por hora esta acima do limite aceito."),
-  sessionRate: z.coerce.number().min(1, "Informe o valor por sessao ou deixe em branco.").max(5000, "O valor por sessao esta acima do limite aceito.").nullable().optional(),
-  bio: z.string().min(3, "Informe sua experiencia profissional.").max(600, "A experiencia deve ter no maximo 600 caracteres."),
-  mobilitySupport: z.string().min(10, "Descreva como voce apoia mobilidade e transferencia.").max(600, "O apoio em mobilidade deve ter no maximo 600 caracteres."),
+  hourlyRate: z.coerce.number().min(1, "Informe o valor por hora.").max(1000, "O valor por hora está acima do limite aceito."),
+  sessionRate: z.coerce.number().min(1, "Informe o valor por sessão ou deixe em branco.").max(5000, "O valor por sessão está acima do limite aceito.").nullable().optional(),
+  bio: z.string().min(3, "Informe sua experiência profissional.").max(600, "A experiência deve ter no máximo 600 caracteres."),
+  mobilitySupport: z.string().min(10, "Descreva como você apoia mobilidade e transferência.").max(600, "O apoio em mobilidade deve ter no máximo 600 caracteres."),
   supportLevel: z.nativeEnum(TransferSupportLevel),
   acceptsTravel: z.boolean().default(false),
+  acceptsFixedContract: z.boolean().default(false),
   hasPassport: z.boolean().default(false),
   hasUsVisa: z.boolean().default(false),
-  travelNotes: optionalText(z.string().max(500, "As observacoes de viagem devem ter no maximo 500 caracteres.")),
-  services: z.array(z.nativeEnum(CareService)).min(1, "Selecione pelo menos um servico."),
+  travelNotes: optionalText(z.string().max(500, "As observações de viagem devem ter no máximo 500 caracteres.")),
+  services: z.array(z.nativeEnum(CareService)).min(1, "Selecione pelo menos um serviço."),
   availability: z
     .array(
       z.object({
@@ -94,7 +96,7 @@ export async function PATCH(request: NextRequest) {
 
   const invalidSlot = parsed.data.availability.find((slot) => slot.startTime >= slot.endTime);
   if (invalidSlot) {
-    return NextResponse.json({ error: "O horario inicial precisa ser menor que o horario final." }, { status: 400 });
+    return NextResponse.json({ error: "O horário inicial precisa ser menor que o horário final." }, { status: 400 });
   }
 
   const result = await updateProfessionalProfileForUser(session.userId, {

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Archive,
   Bell,
+  BriefcaseBusiness,
   CalendarCheck,
   Camera,
   Check,
@@ -57,14 +58,14 @@ type HistoryRange = "30" | "90" | "all" | "custom";
 
 const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
   { value: "BANHO", label: "Banho" },
-  { value: "TRANSFERENCIA", label: "Transferencia" },
-  { value: "MEDICACAO", label: "Medicacao" },
+  { value: "TRANSFERENCIA", label: "Transferência" },
+  { value: "MEDICACAO", label: "Medicação" },
   { value: "CURATIVOS", label: "Curativos" },
   { value: "FISIOTERAPIA", label: "Fisioterapia" },
   { value: "COMPANHIA", label: "Companhia" },
-  { value: "REFEICAO", label: "Refeicao" },
+  { value: "REFEICAO", label: "Refeição" },
   { value: "SINAIS_VITAIS", label: "Sinais vitais" },
-  { value: "AVALIACAO", label: "Avaliacao" },
+  { value: "AVALIACAO", label: "Avaliação" },
   { value: "FORTALECIMENTO", label: "Fortalecimento" },
   { value: "OUTRO", label: "Outro" }
 ];
@@ -72,8 +73,8 @@ const serviceOptions: Array<{ value: CareServiceCode; label: string }> = [
 const publicSearchServiceCodes = new Set<CareServiceCode>(["BANHO", "TRANSFERENCIA", "MEDICACAO", "FISIOTERAPIA"]);
 
 const supportOptions: Array<{ value: TransferSupportCode; label: string }> = [
-  { value: "MODERADO", label: "Sem preferencia de porte fisico" },
-  { value: "ALTO", label: "Porte fisico forte" },
+  { value: "MODERADO", label: "Sem preferência de porte físico" },
+  { value: "ALTO", label: "Porte físico forte" },
   { value: "DUPLA", label: "Duas pessoas" }
 ];
 
@@ -114,7 +115,7 @@ function professionalRegistrationError(type: DocumentTypeCode, value: string) {
 
   const digits = cleanRegistrationNumber(value);
   if (digits.length < 4 || digits.length > 12) {
-    return `${type} deve ter de 4 a 12 numeros.`;
+    return `${type} deve ter de 4 a 12 números.`;
   }
 
   return "";
@@ -257,7 +258,7 @@ function getRequestActions(request: CareRequestRecord, accountType: string): Sta
           label: "Concluir",
           status: "CONCLUIDO",
           variant: "primary",
-          disabledReason: request.canCompleteNow ? null : request.completionGateLabel || "Conclusao ainda nao liberada."
+          disabledReason: request.canCompleteNow ? null : request.completionGateLabel || "Conclusão ainda não liberada."
         },
         { label: "Cancelar", status: "CANCELADO", variant: "danger" }
       ];
@@ -342,7 +343,7 @@ function ProfilePhotoForm({ dashboard }: { dashboard: CareDashboardData }) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel enviar a foto.");
+        setError(data.error || "Não foi possível enviar a foto.");
         return;
       }
 
@@ -457,7 +458,7 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel salvar seus dados.");
+        setError(data.error || "Não foi possível salvar seus dados.");
         return;
       }
 
@@ -473,7 +474,7 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
           <p className="text-sm font-semibold text-emerald-700">Perfil do paciente</p>
           <h2 className="mt-1 text-2xl font-semibold text-slate-950">Dados de contato e atendimento</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Complete esses dados uma vez para a plataforma preencher pedidos, mensagens e enderecos com menos retrabalho.
+            Complete esses dados uma vez para a plataforma preencher pedidos, mensagens e endereços com menos retrabalho.
           </p>
         </div>
         <button
@@ -521,7 +522,7 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
         />
 
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
-          Preferencia no cuidado intimo
+          Preferência no cuidado íntimo
           <select
             value={form.preferredGender}
             onChange={(event) => setForm((current) => ({ ...current, preferredGender: event.target.value as GenderPreferenceCode }))}
@@ -535,7 +536,7 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
           </select>
         </label>
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
-          Porte fisico desejado
+          Porte físico desejado
           <select
             value={form.transferNeed}
             onChange={(event) => setForm((current) => ({ ...current, transferNeed: event.target.value as TransferSupportCode }))}
@@ -562,11 +563,11 @@ function PatientProfileForm({ settings }: { settings: PatientSettingsData }) {
           />
         </label>
         <label className="grid gap-1 text-sm font-semibold text-slate-700 lg:col-span-2">
-          Observacoes de mobilidade e seguranca
+          Observações de mobilidade e segurança
           <textarea
             value={form.mobilityNotes || ""}
             onChange={(event) => setForm((current) => ({ ...current, mobilityNotes: event.target.value }))}
-            placeholder="Ex.: uso cadeira de rodas, preciso de apoio para transferencia, banho ou deslocamento."
+            placeholder="Ex.: uso cadeira de rodas, preciso de apoio para transferência, banho ou deslocamento."
             className="min-h-24 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
           />
         </label>
@@ -656,7 +657,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel salvar o perfil.");
+        setError(data.error || "Não foi possível salvar o perfil.");
         return;
       }
 
@@ -670,10 +671,10 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700">Perfil profissional</p>
-          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Servicos, agenda e valores internos</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Serviços, agenda e valores internos</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Os valores abaixo ajudam na sua organizacao, mas nao aparecem como preco publico na busca. Para pacientes, o atendimento fica
-            como sob consulta e deve ser combinado antes da confirmacao.
+            Os valores abaixo ajudam na sua organização, mas não aparecem como preço público na busca. Para pacientes, o atendimento fica
+            como sob consulta e deve ser combinado antes da confirmação.
           </p>
         </div>
         <button
@@ -698,7 +699,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            WhatsApp publico
+            WhatsApp público
             <input
               value={form.whatsappPhone || ""}
               onChange={(event) => setForm((current) => ({ ...current, whatsappPhone: event.target.value }))}
@@ -723,7 +724,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
             onChange={updateAddress}
           />
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Valor de referencia por hora
+            Valor de referência por hora
             <input
               type="number"
               min={1}
@@ -733,7 +734,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Valor de referencia por sessao
+            Valor de referência por sessão
             <input
               type="number"
               min={1}
@@ -773,7 +774,7 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
 
         <div className="grid min-w-0 gap-4">
           <div>
-            <p className="text-sm font-semibold text-slate-700">Servicos</p>
+            <p className="text-sm font-semibold text-slate-700">Serviços</p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {serviceOptions.map((service) => {
                 const active = form.services.includes(service.value);
@@ -851,6 +852,23 @@ function ProfessionalProfileForm({ settings }: { settings: ProfessionalSettingsD
                 />
               </div>
             ) : null}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+              <input
+                type="checkbox"
+                checked={form.acceptsFixedContract}
+                onChange={(event) => setForm((current) => ({ ...current, acceptsFixedContract: event.target.checked }))}
+                className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700"
+              />
+              <span>
+                Tenho disponibilidade para rotina fixa
+                <span className="block pt-1 text-sm font-normal leading-5 text-slate-600">
+                  Use para pacientes que buscam escala recorrente, cuidador fixo, técnico fixo ou contratação CLT.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div>
@@ -992,12 +1010,12 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
     }
 
     if (selectedCouncilDocument && registrationUf.trim().length !== 2) {
-      setError("Informe numero e UF do registro profissional.");
+      setError("Informe número e UF do registro profissional.");
       return;
     }
 
     if (!consentAccepted) {
-      setError("Autorize o uso dos dados para validacao cadastral.");
+      setError("Autorize o uso dos dados para validação cadastral.");
       return;
     }
 
@@ -1020,7 +1038,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
         const data = await response.json();
 
         if (!response.ok) {
-          setError(`${document.requirement.label}: ${data.error || "Nao foi possivel enviar o documento."}`);
+          setError(`${document.requirement.label}: ${data.error || "Não foi possível enviar o documento."}`);
           router.refresh();
           return;
         }
@@ -1028,8 +1046,8 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
 
       setMessage(
         selectedDocuments.length === 1
-          ? "Documento enviado e em analise. Voce sera notificado quando a validacao for concluida."
-          : "Documentos enviados e em analise. Voce sera notificado quando a validacao for concluida."
+          ? "Documento enviado e em análise. Você será notificado quando a validação for concluída."
+          : "Documentos enviados e em análise. Você será notificado quando a validação for concluída."
       );
       setExpiresAt("");
       setDocumentFiles({});
@@ -1070,7 +1088,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
 
           <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-5 text-blue-900">
             Envie um arquivo por tipo para manter CPF, RG ou CNH, comprovante e registro profissional corretamente identificados.
-            O numero do registro aparece somente para COREN ou CREFITO.
+            O número do registro aparece somente para COREN ou CREFITO.
           </div>
 
           <div className="mt-4 grid gap-3">
@@ -1088,7 +1106,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
             {needsCouncilData ? (
               <>
                 <label className="grid gap-1 text-sm font-semibold text-slate-700">
-                  Numero do {councilRequirement?.type}
+                  Número do {councilRequirement?.type}
                   <input
                     value={documentNumber}
                     onChange={(event) => setDocumentNumber(cleanRegistrationNumber(event.target.value))}
@@ -1096,7 +1114,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                     inputMode="numeric"
                     className={fieldClass}
                   />
-                  <span className="text-xs font-medium text-slate-500">Use apenas numeros, de 4 a 12 digitos.</span>
+                  <span className="text-xs font-medium text-slate-500">Use apenas números, de 4 a 12 dígitos.</span>
                 </label>
                 <label className="grid gap-1 text-sm font-semibold text-slate-700">
                   UF do registro
@@ -1181,7 +1199,7 @@ function ProfessionalDocumentsForm({ settings }: { settings: ProfessionalSetting
                 className="mt-1 h-4 w-4 rounded border-slate-300 accent-emerald-700"
               />
               <span>
-                Autorizo o uso dos meus dados e documentos exclusivamente para fins de validacao profissional e cadastral na plataforma.
+                Autorizo o uso dos meus dados e documentos exclusivamente para fins de validação profissional e cadastral na plataforma.
               </span>
             </label>
             <button
@@ -1261,15 +1279,15 @@ function NotificationsPanel({
     <article id="notificacoes" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-emerald-700">Notificacoes</p>
-          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Atualizacoes importantes</h2>
+          <p className="text-sm font-semibold text-emerald-700">Notificações</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Atualizações importantes</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Novas ficam destacadas em verde. As lidas ficam brancas e podem ser arquivadas para limpar o painel.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-            {dashboard.summary.unreadNotifications} nao lidas
+            {dashboard.summary.unreadNotifications} não lidas
           </span>
           <button
             type="button"
@@ -1297,7 +1315,7 @@ function NotificationsPanel({
       <div className="mt-5 grid gap-3">
         {dashboard.notifications.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            Nenhuma notificacao ainda. Quando houver novidades de atendimento ou verificacao, elas aparecem aqui.
+            Nenhuma notificação ainda. Quando houver novidades de atendimento ou verificação, elas aparecem aqui.
           </div>
         ) : null}
 
@@ -1391,7 +1409,7 @@ function PatientFavoritesPanel({
       <div className="mt-5 grid gap-3">
         {dashboard.favoriteProfessionals.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            Nenhum profissional salvo ainda. Use o coracao na busca para montar sua lista de referencia.
+            Nenhum profissional salvo ainda. Use o coração na busca para montar sua lista de referência.
           </div>
         ) : null}
 
@@ -1434,7 +1452,7 @@ function PatientFavoritesPanel({
                 href={favoriteSearchHref(professional)}
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-emerald-700 bg-emerald-700 px-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
               >
-                Buscar horario
+                Buscar horário
               </Link>
               <button
                 type="button"
@@ -1467,12 +1485,12 @@ function ProfessionalInquiriesPanel({
         <div>
           <p className="text-sm font-semibold text-emerald-700">Mensagens</p>
           <h2 className="mt-1 text-2xl font-semibold text-slate-950">
-            {isProfessional ? "Duvidas antes do pedido" : "Conversas antes do atendimento"}
+            {isProfessional ? "Dúvidas antes do pedido" : "Conversas antes do atendimento"}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {isProfessional
-              ? "Pacientes podem tirar duvidas antes de abrir uma solicitacao formal."
-              : "Use esta area para acompanhar duvidas enviadas antes de agendar um atendimento."}
+              ? "Pacientes podem tirar dúvidas antes de abrir uma solicitação formal."
+              : "Use esta área para acompanhar dúvidas enviadas antes de agendar um atendimento."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1512,6 +1530,12 @@ function ProfessionalInquiriesPanel({
                 {inquiry.unreadCount > 0 ? (
                   <span className="rounded-lg bg-emerald-700 px-2 py-1 text-xs font-semibold text-white">Nova</span>
                 ) : null}
+                {inquiry.fixedContractRequested ? (
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">
+                    <BriefcaseBusiness aria-hidden="true" className="h-3.5 w-3.5" />
+                    Rotina fixa
+                  </span>
+                ) : null}
               </div>
               <p className="mt-1 text-sm text-slate-600">
                 {isProfessional
@@ -1520,7 +1544,7 @@ function ProfessionalInquiriesPanel({
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">{inquiry.lastMessage}</p>
               <p className="mt-2 text-xs font-semibold text-slate-400">
-                Ultima mensagem: {formatBrasiliaDateTime(inquiry.lastMessageAt)}
+                Última mensagem: {formatBrasiliaDateTime(inquiry.lastMessageAt)}
               </p>
             </div>
             <div className="flex flex-wrap items-start gap-2 md:justify-end">
@@ -1558,7 +1582,7 @@ function SubscriptionStatusPanel({ dashboard }: { dashboard: CareDashboardData }
         : "bg-rose-50 text-rose-800 ring-rose-100";
   const billingDates = [
     dashboard.subscription.startedAt ? { label: "Inicio", value: formatBrasiliaDateTime(dashboard.subscription.startedAt) } : null,
-    dashboard.subscription.trialEndsAt ? { label: "Teste ate", value: formatBrasiliaDateTime(dashboard.subscription.trialEndsAt) } : null,
+    dashboard.subscription.trialEndsAt ? { label: "Teste até", value: formatBrasiliaDateTime(dashboard.subscription.trialEndsAt) } : null,
     dashboard.subscription.renewsAt ? { label: "Renova em", value: formatBrasiliaDateTime(dashboard.subscription.renewsAt) } : null,
     dashboard.subscription.canceledAt ? { label: "Cancelado em", value: formatBrasiliaDateTime(dashboard.subscription.canceledAt) } : null
   ].filter(Boolean) as Array<{ label: string; value: string }>;
@@ -1657,23 +1681,23 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
   const requestViewTitle =
     requestView === "active"
       ? isProfessional
-        ? "Solicitacoes ativas"
+        ? "Solicitações ativas"
         : "Pedidos em andamento"
       : requestView === "completed"
-        ? "Atendimentos concluidos"
+        ? "Atendimentos concluídos"
         : requestView === "canceled"
           ? "Atendimentos cancelados"
           : "Atendimentos arquivados";
   const requestViewEmpty =
     requestView === "active"
       ? isProfessional
-        ? "Nenhuma solicitacao ativa agora. Quando um atendimento for pedido, ele aparece aqui."
-        : "Nenhum pedido em andamento agora. Quando voce solicitar atendimento, o status aparece aqui."
+        ? "Nenhuma solicitação ativa agora. Quando um atendimento for pedido, ele aparece aqui."
+        : "Nenhum pedido em andamento agora. Quando você solicitar atendimento, o status aparece aqui."
       : requestView === "completed"
-        ? "Nenhum atendimento concluido nesse periodo."
+        ? "Nenhum atendimento concluído nesse período."
         : requestView === "canceled"
-          ? "Nenhum atendimento cancelado nesse periodo."
-          : "Nenhum atendimento arquivado nesse periodo.";
+          ? "Nenhum atendimento cancelado nesse período."
+          : "Nenhum atendimento arquivado nesse período.";
   const requestTabs: Array<{ key: RequestView; label: string; count: number }> = [
     { key: "active", label: "Ativos", count: dashboard.requests.length },
     { key: "completed", label: "Concluidos", count: completedRequests.length },
@@ -1682,10 +1706,10 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
   ];
   const summaryCards = [
     { label: "Perfil", value: dashboard.summary.accountTypeLabel, icon: UserRoundCheck },
-    { label: isProfessional ? "Solicitacoes" : "Pedidos", value: String(dashboard.summary.requests), icon: ClipboardList },
+    { label: isProfessional ? "Solicitações" : "Pedidos", value: String(dashboard.summary.requests), icon: ClipboardList },
     { label: "Agendados", value: String(dashboard.summary.scheduled), icon: CalendarCheck },
     {
-      label: "Notificacoes",
+      label: "Notificações",
       value: String(dashboard.summary.unreadNotifications),
       icon: Bell
     },
@@ -1709,7 +1733,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setActionError(data.error || "Nao foi possivel atualizar a solicitacao.");
+        setActionError(data.error || "Não foi possível atualizar a solicitação.");
         setUpdatingId("");
         return;
       }
@@ -1732,7 +1756,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setActionError(data.error || "Nao foi possivel arquivar o atendimento.");
+        setActionError(data.error || "Não foi possível arquivar o atendimento.");
         setUpdatingId("");
         return;
       }
@@ -1755,7 +1779,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setActionError(data.error || "Nao foi possivel restaurar o atendimento.");
+        setActionError(data.error || "Não foi possível restaurar o atendimento.");
         setUpdatingId("");
         return;
       }
@@ -1767,7 +1791,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
 
   function deleteRequestFromHistory(requestId: string) {
     const confirmed = window.confirm(
-      "Voce tem certeza que quer excluir este atendimento do seu historico? Ele nao vai aparecer mais para voce. Esta acao nao cancela atendimento nem apaga o registro administrativo da plataforma."
+      "Você tem certeza que quer excluir este atendimento do seu histórico? Ele não vai aparecer mais para você. Esta ação não cancela atendimento nem apaga o registro administrativo da plataforma."
     );
 
     if (!confirmed) return;
@@ -1784,7 +1808,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setActionError(data.error || "Nao foi possivel excluir o atendimento do historico.");
+        setActionError(data.error || "Não foi possível excluir o atendimento do histórico.");
         setUpdatingId("");
         return;
       }
@@ -1807,7 +1831,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setFavoriteError(data.error || "Nao foi possivel remover o favorito.");
+        setFavoriteError(data.error || "Não foi possível remover o favorito.");
         setRemovingFavoriteId("");
         return;
       }
@@ -1830,7 +1854,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setNotificationError(data.error || "Nao foi possivel atualizar a notificacao.");
+        setNotificationError(data.error || "Não foi possível atualizar a notificação.");
         setReadingNotificationId("");
         return;
       }
@@ -1853,7 +1877,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setNotificationError(data.error || "Nao foi possivel atualizar as notificacoes.");
+        setNotificationError(data.error || "Não foi possível atualizar as notificações.");
         setReadingNotificationId("");
         return;
       }
@@ -1876,7 +1900,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setNotificationError(data.error || "Nao foi possivel arquivar a notificacao.");
+        setNotificationError(data.error || "Não foi possível arquivar a notificação.");
         setReadingNotificationId("");
         return;
       }
@@ -1899,7 +1923,7 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
       const data = await response.json();
 
       if (!response.ok) {
-        setNotificationError(data.error || "Nao foi possivel arquivar as notificacoes lidas.");
+        setNotificationError(data.error || "Não foi possível arquivar as notificações lidas.");
         setReadingNotificationId("");
         return;
       }
@@ -2083,15 +2107,21 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
                 </p>
                 {request.addressComplement ? <p className="mt-1 text-sm text-slate-500">{request.addressComplement}</p> : null}
                 {request.requesterPhone ? <p className="mt-1 text-sm text-slate-500">Telefone: {request.requesterPhone}</p> : null}
-                <p className="mt-1 text-sm text-slate-500">Duracao: {formatDurationHours(request.durationHours)}</p>
+                <p className="mt-1 text-sm text-slate-500">Duração: {formatDurationHours(request.durationHours)}</p>
                 <p className="mt-1 text-sm text-slate-500">{request.paymentAgreementLabel}</p>
+                {request.fixedContractRequested ? (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+                    <BriefcaseBusiness aria-hidden="true" className="h-4 w-4" />
+                    Interesse em rotina fixa/contrato fixo
+                  </div>
+                ) : null}
                 {request.travelRequested ? (
                   <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm leading-6 text-sky-950">
                     <p className="inline-flex items-center gap-2 font-semibold">
                       <Plane aria-hidden="true" className="h-4 w-4" />
                       Acompanhamento em viagem
                     </p>
-                    <p>Destino: {request.travelDestination || "Nao informado"}</p>
+                    <p>Destino: {request.travelDestination || "Não informado"}</p>
                     <p>{request.isInternationalTravel ? "Viagem internacional" : "Viagem nacional ou local"}{request.needsUsVisa ? " - visto EUA necessario" : ""}</p>
                     {request.travelNotes ? <p>{request.travelNotes}</p> : null}
                   </div>

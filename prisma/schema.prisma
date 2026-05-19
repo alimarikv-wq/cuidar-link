@@ -234,6 +234,7 @@ model ProfessionalProfile {
   verificationReviewedAt         DateTime?
   photoUrl                       String?
   acceptsTravel                  Boolean                        @default(false)
+  acceptsFixedContract           Boolean                        @default(false)
   hasPassport                    Boolean                        @default(false)
   hasUsVisa                      Boolean                        @default(false)
   travelNotes                    String?
@@ -260,6 +261,7 @@ model ProfessionalProfile {
   @@index([gender])
   @@index([neighborhood])
   @@index([isActive])
+  @@index([acceptsFixedContract])
 }
 
 model ProfessionalFavorite {
@@ -358,6 +360,7 @@ model CareRequest {
   longitude         Decimal?             @db.Decimal(9, 6)
   notes             String?
   travelRequested   Boolean              @default(false)
+  fixedContractRequested Boolean          @default(false)
   travelDestination String?
   isInternationalTravel Boolean           @default(false)
   needsUsVisa       Boolean               @default(false)
@@ -410,6 +413,7 @@ model ProfessionalInquiry {
   requesterName          String
   requesterEmail         String?
   requesterPhone         String?
+  fixedContractRequested Boolean                   @default(false)
   status                 ProfessionalInquiryStatus @default(ABERTA)
   patientArchivedAt      DateTime?
   professionalArchivedAt DateTime?

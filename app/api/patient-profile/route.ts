@@ -2,7 +2,7 @@ import { GenderPreference, TransferSupportLevel } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
-import { updatePatientProfileForUser } from "@/lib/care-data";
+import { getPatientProfileForUser, updatePatientProfileForUser } from "@/lib/care-data";
 
 const optionalText = (schema: z.ZodTypeAny = z.string()) =>
   z.preprocess((value) => (value === null ? "" : value), schema.optional().or(z.literal("")));
@@ -11,7 +11,7 @@ const updateSchema = z.object({
   name: z.string().trim().min(2, "Informe seu nome.").max(120, "Nome muito longo."),
   phone: optionalText(z.string().max(30, "Telefone muito longo.")),
   neighborhood: z.string().trim().min(2, "Informe o bairro."),
-  addressLine: optionalText(z.string().max(160, "Endereco muito longo.")),
+  addressLine: optionalText(z.string().max(160, "Endereço muito longo.")),
   addressNumber: optionalText(z.string().max(20, "Numero muito longo.")),
   addressComplement: optionalText(z.string().max(80, "Complemento muito longo.")),
   postalCode: optionalText(z.string().max(12, "CEP muito longo.")),
@@ -20,8 +20,18 @@ const updateSchema = z.object({
   approximateWeightKg: z.coerce.number().int().min(1).max(400).nullable().optional(),
   preferredGender: z.nativeEnum(GenderPreference),
   transferNeed: z.nativeEnum(TransferSupportLevel),
-  mobilityNotes: optionalText(z.string().max(600, "As observacoes devem ter no maximo 600 caracteres."))
+  mobilityNotes: optionalText(z.string().max(600, "As observações devem ter no máximo 600 caracteres."))
 });
+
+export async function GET(request: NextRequest) {
+  const session = await getSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ authenticated: false, profile: null });
+  }
+
+  const profile = await getPatientProfileForUser(session.userId);
+  return NextResponse.json({ authenticated: true, profile });
+}
 
 export async function PATCH(request: NextRequest) {
   const session = await getSessionFromRequest(request);

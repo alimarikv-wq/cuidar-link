@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const center = hasBrowserLocation
     ? {
         ...defaultCenter,
-        neighborhood: "Sua localizacao",
+        neighborhood: "Sua localização",
         latitude: requestedLatitude,
         longitude: requestedLongitude
       }
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     availability: parseAvailability(searchParams.get("availability")),
     radiusKm: Number(searchParams.get("radiusKm") || "8"),
     travelRequested: searchParams.get("travelRequested") === "true",
+    fixedContractRequested: searchParams.get("fixedContractRequested") === "true",
     ageMin: typeof ageMin === "number" && Number.isFinite(ageMin) ? ageMin : undefined,
     ageMax: typeof ageMax === "number" && Number.isFinite(ageMax) ? ageMax : undefined,
     latitude: center.latitude,
@@ -55,10 +56,10 @@ export async function GET(request: NextRequest) {
         results: getDemoCareProfessionals(query),
         center,
         source: "demo",
-        warning: "Banco indisponivel. Exibindo profissionais demonstrativos."
+        warning: "Banco indisponível. Exibindo profissionais demonstrativos."
       });
     }
 
-    return NextResponse.json({ error: "Nao foi possivel buscar profissionais agora." }, { status: 503 });
+    return NextResponse.json({ error: "Não foi possível buscar profissionais agora." }, { status: 503 });
   }
 }

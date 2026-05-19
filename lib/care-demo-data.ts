@@ -8,6 +8,7 @@ type DemoSearchParams = {
   supportNeed: TransferSupportLevel;
   radiusKm: number;
   travelRequested?: boolean;
+  fixedContractRequested?: boolean;
   ageMin?: number;
   ageMax?: number;
 };
@@ -23,7 +24,7 @@ const demoProfessionals: CareProfessional[] = [
     id: "demo-ana",
     name: "Ana Martins",
     professionalType: "TECNICO_ENFERMAGEM",
-    roleLabel: "Tecnico de enfermagem",
+    roleLabel: "Técnico de enfermagem",
     gender: "FEMININO",
     genderLabel: "Feminino",
     age: 34,
@@ -40,15 +41,16 @@ const demoProfessionals: CareProfessional[] = [
     availableIn: "Hoje",
     responseTimeLabel: "8 min",
     supportLevel: "ALTO",
-    supportLevelLabel: "Porte fisico forte",
-    mobilitySupport: "Transferencia cadeira-cama, banho assistido e uso de guincho simples.",
+    supportLevelLabel: "Porte físico forte",
+    mobilitySupport: "Transferência cadeira-cama, banho assistido e uso de guincho simples.",
     acceptsTravel: true,
+    acceptsFixedContract: true,
     hasPassport: true,
     hasUsVisa: false,
-    travelNotes: "Aceita viagens nacionais e consultas fora da cidade com combinacao previa.",
+    travelNotes: "Aceita viagens nacionais e consultas fora da cidade com combinação prévia.",
     services: ["BANHO", "TRANSFERENCIA", "MEDICACAO", "CURATIVOS"],
-    serviceLabels: ["Banho", "Transferencia", "Medicacao", "Curativos"],
-    credentials: ["COREN ativo", "BLS", "Experiencia bariatrica"],
+    serviceLabels: ["Banho", "Transferência", "Medicação", "Curativos"],
+    credentials: ["COREN ativo", "BLS", "Experiência bariátrica"],
     bio: "Atua em cuidado domiciliar para PCD, pos-operatorio e rotina de higiene com privacidade.",
     isVerified: true,
     matchScore: 97,
@@ -75,16 +77,17 @@ const demoProfessionals: CareProfessional[] = [
     availableIn: "Hoje",
     responseTimeLabel: "5 min",
     supportLevel: "ALTO",
-    supportLevelLabel: "Porte fisico forte",
-    mobilitySupport: "Apoio fisico forte, banho no leito, troca e organizacao do ambiente.",
+    supportLevelLabel: "Porte físico forte",
+    mobilitySupport: "Apoio físico forte, banho no leito, troca e organização do ambiente.",
     acceptsTravel: true,
+    acceptsFixedContract: true,
     hasPassport: false,
     hasUsVisa: false,
     travelNotes: "Disponivel para viagens curtas no RS e acompanhamento em eventos.",
     services: ["BANHO", "TRANSFERENCIA", "COMPANHIA", "REFEICAO"],
-    serviceLabels: ["Banho", "Transferencia", "Companhia", "Refeicao"],
-    credentials: ["Curso de cuidador", "Referencias verificadas", "Treino de transferencia"],
-    bio: "Especializada em plantao curto para banho, higiene e apoio de rotina em Porto Alegre.",
+    serviceLabels: ["Banho", "Transferência", "Companhia", "Refeição"],
+    credentials: ["Curso de cuidador", "Referências verificadas", "Treino de transferência"],
+    bio: "Especializada em plantão curto para banho, higiene e apoio de rotina em Porto Alegre.",
     isVerified: true,
     matchScore: 95,
     recentReviews: []
@@ -113,13 +116,14 @@ const demoProfessionals: CareProfessional[] = [
     supportLevelLabel: "Duas pessoas",
     mobilitySupport: "Mobilidade funcional, transferencia com segunda pessoa e treino de marcha.",
     acceptsTravel: false,
+    acceptsFixedContract: false,
     hasPassport: false,
     hasUsVisa: false,
     travelNotes: null,
     services: ["FISIOTERAPIA", "TRANSFERENCIA", "AVALIACAO", "FORTALECIMENTO"],
-    serviceLabels: ["Fisioterapia", "Transferencia", "Avaliacao", "Fortalecimento"],
+    serviceLabels: ["Fisioterapia", "Transferência", "Avaliação", "Fortalecimento"],
     credentials: ["CREFITO ativo", "Neurofuncional", "Atendimento PCD adulto"],
-    bio: "Foco em seguranca de transferencia, condicionamento e autonomia para atividades diarias.",
+    bio: "Foco em segurança de transferência, condicionamento e autonomia para atividades diárias.",
     isVerified: true,
     matchScore: 90,
     recentReviews: []
@@ -145,15 +149,16 @@ const demoProfessionals: CareProfessional[] = [
     availableIn: "Hoje",
     responseTimeLabel: "10 min",
     supportLevel: "ALTO",
-    supportLevelLabel: "Porte fisico forte",
-    mobilitySupport: "Banho assistido, preparo de rotina e apoio fisico para paciente pesado.",
+    supportLevelLabel: "Porte físico forte",
+    mobilitySupport: "Banho assistido, preparo de rotina e apoio físico para paciente pesado.",
     acceptsTravel: false,
+    acceptsFixedContract: true,
     hasPassport: false,
     hasUsVisa: false,
     travelNotes: null,
     services: ["BANHO", "COMPANHIA", "REFEICAO", "TRANSFERENCIA"],
-    serviceLabels: ["Banho", "Companhia", "Refeicao", "Transferencia"],
-    credentials: ["Curso de cuidador", "Treino PCD", "Plantao noturno"],
+    serviceLabels: ["Banho", "Companhia", "Refeição", "Transferência"],
+    credentials: ["Curso de cuidador", "Treino PCD", "Plantão noturno"],
     bio: "Atendimento direto e organizado para demandas pontuais ou recorrentes na zona sul.",
     isVerified: true,
     matchScore: 88,
@@ -171,6 +176,7 @@ export function getDemoCareProfessionals(params: DemoSearchParams) {
     .filter((professional) => !params.professionalType || professional.professionalType === params.professionalType)
     .filter((professional) => params.genderPreference === "QUALQUER" || professional.gender === params.genderPreference)
     .filter((professional) => !params.travelRequested || professional.acceptsTravel)
+    .filter((professional) => !params.fixedContractRequested || professional.acceptsFixedContract)
     .filter((professional) => supportWeight[professional.supportLevel] >= supportWeight[params.supportNeed])
     .filter((professional) => !params.ageMin || professional.age >= params.ageMin)
     .filter((professional) => !params.ageMax || professional.age <= params.ageMax)

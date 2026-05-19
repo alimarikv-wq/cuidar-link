@@ -9,6 +9,7 @@ const inquirySchema = z.object({
   requesterName: z.string().trim().min(2).max(120),
   requesterEmail: z.string().trim().email().optional().or(z.literal("")),
   requesterPhone: z.string().trim().max(30).optional().or(z.literal("")),
+  fixedContractRequested: z.boolean().optional(),
   body: z.string().trim().min(1).max(1000)
 });
 

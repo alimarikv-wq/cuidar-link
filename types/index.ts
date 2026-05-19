@@ -130,6 +130,7 @@ export type CareProfessional = {
   supportLevelLabel: string;
   mobilitySupport: string;
   acceptsTravel: boolean;
+  acceptsFixedContract: boolean;
   hasPassport: boolean;
   hasUsVisa: boolean;
   travelNotes: string | null;
@@ -189,6 +190,7 @@ export type CareRequestRecord = {
   state: string | null;
   notes: string | null;
   travelRequested: boolean;
+  fixedContractRequested: boolean;
   travelDestination: string | null;
   isInternationalTravel: boolean;
   needsUsVisa: boolean;
@@ -234,6 +236,7 @@ export type ProfessionalInquirySummary = {
   requesterName: string;
   requesterEmail: string | null;
   requesterPhone: string | null;
+  fixedContractRequested: boolean;
   lastMessage: string;
   lastMessageAt: string;
   createdAt: string;
@@ -282,6 +285,7 @@ export type CareRequestDetailsData = CareRequestRecord & {
     bio: string;
     isVerified: boolean;
     acceptsTravel: boolean;
+    acceptsFixedContract: boolean;
     hasPassport: boolean;
     hasUsVisa: boolean;
     travelNotes: string | null;
@@ -480,6 +484,7 @@ export type ProfessionalSettingsData = {
   mobilitySupport: string;
   supportLevel: TransferSupportCode;
   acceptsTravel: boolean;
+  acceptsFixedContract: boolean;
   hasPassport: boolean;
   hasUsVisa: boolean;
   travelNotes: string | null;

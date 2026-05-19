@@ -93,7 +93,7 @@ function getRequestActions(request: CareRequestDetailsData): StatusAction[] {
           label: "Concluir",
           status: "CONCLUIDO",
           variant: "primary",
-          disabledReason: request.canCompleteNow ? null : request.completionGateLabel || "Conclusao ainda nao liberada."
+          disabledReason: request.canCompleteNow ? null : request.completionGateLabel || "Conclusão ainda não liberada."
         },
         { label: "Cancelar", status: "CANCELADO", variant: "danger" }
       ];
@@ -108,32 +108,32 @@ function getRequestActions(request: CareRequestDetailsData): StatusAction[] {
 }
 
 function guidanceFor(request: CareRequestDetailsData) {
-  if (request.archivedAt) return "Este atendimento esta arquivado no seu historico. Voce pode restaurar se quiser acompanhar novamente no painel.";
+  if (request.archivedAt) return "Este atendimento está arquivado no seu histórico. Você pode restaurar se quiser acompanhar novamente no painel.";
   if (request.status === "CANCELADO") return "Este pedido foi cancelado. Combine um novo atendimento somente se ainda houver necessidade.";
-  if (request.status === "CONCLUIDO") return "Este atendimento foi marcado como concluido.";
+  if (request.status === "CONCLUIDO") return "Este atendimento foi marcado como concluído.";
 
   if (request.viewer.canActAsProfessional) {
-    if (request.status === "ENVIADO") return "Confira os dados do paciente e confirme se voce consegue atender neste horario e endereco.";
-    if (request.status === "ACEITO") return "Pedido aceito. Use Agendar quando o horario estiver confirmado com o paciente.";
+    if (request.status === "ENVIADO") return "Confira os dados do paciente e confirme se você consegue atender neste horário e endereço.";
+    if (request.status === "ACEITO") return "Pedido aceito. Use Agendar quando o horário estiver confirmado com o paciente.";
     if (request.status === "AGENDADO") {
       return request.canCompleteNow
-        ? "Atendimento agendado. Se o cuidado ja foi realizado, marque como concluido."
-        : `Atendimento agendado. ${request.completionGateLabel || "A conclusao sera liberada depois do horario final."}`;
+        ? "Atendimento agendado. Se o cuidado já foi realizado, marque como concluído."
+        : `Atendimento agendado. ${request.completionGateLabel || "A conclusão será liberada depois do horário final."}`;
     }
   }
 
   if (request.status === "ENVIADO") return "Pedido enviado. Aguarde a resposta do profissional antes de considerar o atendimento confirmado.";
-  if (request.status === "ACEITO") return "O profissional aceitou o pedido. Agora confirme os combinados de horario e seguranca.";
+  if (request.status === "ACEITO") return "O profissional aceitou o pedido. Agora confirme os combinados de horário e segurança.";
   if (request.status === "AGENDADO") return "Atendimento agendado. Mantenha telefone e e-mail acessiveis para qualquer ajuste.";
 
-  return "Acompanhe aqui as atualizacoes deste atendimento.";
+  return "Acompanhe aqui as atualizações deste atendimento.";
 }
 
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-1 text-sm font-semibold text-slate-950">{value || "Nao informado"}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-950">{value || "Não informado"}</div>
     </div>
   );
 }
@@ -188,7 +188,7 @@ function StatusTimeline({ request }: { request: CareRequestDetailsData }) {
         {
           rank: 1,
           label: "Pedido enviado",
-          description: "Solicitacao criada e registrada na plataforma.",
+          description: "Solicitação criada e registrada na plataforma.",
           date: request.createdAt
         },
         {
@@ -202,7 +202,7 @@ function StatusTimeline({ request }: { request: CareRequestDetailsData }) {
         {
           rank: 1,
           label: "Pedido enviado",
-          description: "Solicitacao criada e registrada na plataforma.",
+          description: "Solicitação criada e registrada na plataforma.",
           date: request.createdAt
         },
         {
@@ -213,7 +213,7 @@ function StatusTimeline({ request }: { request: CareRequestDetailsData }) {
         {
           rank: 3,
           label: "Agendado",
-          description: "Horario confirmado para o atendimento.",
+          description: "Horário confirmado para o atendimento.",
           date: request.status === "AGENDADO" ? request.updatedAt : null
         },
         {
@@ -274,7 +274,7 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
           setMessages(data.messages);
         }
       } catch {
-        // A conversa continua funcional mesmo se uma consulta de atualizacao falhar.
+        // A conversa continua funcional mesmo se uma consulta de atualização falhar.
       }
     }
 
@@ -304,7 +304,7 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel enviar a mensagem.");
+        setError(data.error || "Não foi possível enviar a mensagem.");
         return;
       }
 
@@ -320,7 +320,7 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
           <p className="text-sm font-semibold text-emerald-700">Mensagens</p>
           <h2 className="mt-1 text-2xl font-semibold text-slate-950">Conversa do atendimento</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Use este espaco para combinar horario, endereco, acesso ao local, pagamento direto e cuidados de seguranca.
+            Use este espaço para combinar horário, endereço, acesso ao local, pagamento direto e cuidados de segurança.
           </p>
         </div>
         <MessageSquareText aria-hidden="true" className="h-6 w-6 text-emerald-700" />
@@ -343,7 +343,7 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
             }`}
           >
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-              <span>{message.isOwn ? "Voce" : message.senderName}</span>
+              <span>{message.isOwn ? "Você" : message.senderName}</span>
               <span>{formatBrasiliaDateTime(message.createdAt)}</span>
             </div>
             <p className="whitespace-pre-line">{message.body}</p>
@@ -362,7 +362,7 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
             }}
             rows={4}
             maxLength={1000}
-            placeholder="Ex.: Oi, podemos confirmar o horario e combinar detalhes de chegada?"
+            placeholder="Ex.: Oi, podemos confirmar o horário e combinar detalhes de chegada?"
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
           />
         </label>
@@ -411,7 +411,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel atualizar este atendimento.");
+        setError(data.error || "Não foi possível atualizar este atendimento.");
         setUpdatingStatus("");
         return;
       }
@@ -434,7 +434,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel arquivar este atendimento.");
+        setError(data.error || "Não foi possível arquivar este atendimento.");
         setUpdatingStatus("");
         return;
       }
@@ -457,7 +457,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel restaurar este atendimento.");
+        setError(data.error || "Não foi possível restaurar este atendimento.");
         setUpdatingStatus("");
         return;
       }
@@ -469,7 +469,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
 
   function deleteRequestFromHistory() {
     const confirmed = window.confirm(
-      "Voce tem certeza que quer excluir este atendimento do seu historico? Ele nao vai aparecer mais para voce. Esta acao nao cancela atendimento nem apaga o registro administrativo da plataforma."
+      "Você tem certeza que quer excluir este atendimento do seu histórico? Ele não vai aparecer mais para você. Esta ação não cancela atendimento nem apaga o registro administrativo da plataforma."
     );
 
     if (!confirmed) return;
@@ -486,7 +486,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Nao foi possivel excluir este atendimento do historico.");
+        setError(data.error || "Não foi possível excluir este atendimento do histórico.");
         setUpdatingStatus("");
         return;
       }
@@ -508,7 +508,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
       const data = await response.json();
 
       if (!response.ok) {
-        setReviewError(data.error || "Nao foi possivel salvar a avaliacao.");
+        setReviewError(data.error || "Não foi possível salvar a avaliação.");
         return;
       }
 
@@ -555,12 +555,12 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
         <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-emerald-700">Avaliacao</p>
+              <p className="text-sm font-semibold text-emerald-700">Avaliação</p>
               <h2 className="mt-1 text-2xl font-semibold text-slate-950">
                 {review ? "Atendimento avaliado" : "Como foi o atendimento?"}
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                A nota ajuda outros pacientes a escolherem com mais seguranca e melhora a qualidade da rede.
+                A nota ajuda outros pacientes a escolherem com mais segurança e melhora a qualidade da rede.
               </p>
             </div>
             {review ? (
@@ -622,7 +622,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:w-fit"
               >
                 <Star aria-hidden="true" className="h-4 w-4" />
-                {isReviewPending ? "Salvando..." : "Enviar avaliacao"}
+                {isReviewPending ? "Salvando..." : "Enviar avaliação"}
               </button>
             </div>
           ) : null}
@@ -634,22 +634,23 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <CalendarClock aria-hidden="true" className="h-5 w-5 text-emerald-700" />
-              <h2 className="text-xl font-semibold text-slate-950">Horario e cuidado</h2>
+              <h2 className="text-xl font-semibold text-slate-950">Horário e cuidado</h2>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <InfoRow label="Data e hora" value={request.scheduledFor ? formatBrasiliaDateTime(request.scheduledFor) : "A combinar"} />
-              <InfoRow label="Duracao" value={formatDurationHours(request.durationHours)} />
+              <InfoRow label="Duração" value={formatDurationHours(request.durationHours)} />
               <InfoRow label="Fim previsto" value={request.scheduledEndAt ? formatBrasiliaDateTime(request.scheduledEndAt) : "A combinar"} />
               <InfoRow
-                label="Conclusao liberada"
-                value={request.completionAvailableAt ? formatBrasiliaDateTime(request.completionAvailableAt) : "Apos agendamento"}
+                label="Conclusão liberada"
+                value={request.completionAvailableAt ? formatBrasiliaDateTime(request.completionAvailableAt) : "Após agendamento"}
               />
               <InfoRow label="Apoio solicitado" value={request.supportNeedLabel} />
-              <InfoRow label="Preferencia no cuidado" value={request.preferredGenderLabel} />
+              <InfoRow label="Preferência no cuidado" value={request.preferredGenderLabel} />
               <InfoRow label="Pagamento" value={request.paymentAgreementLabel} />
+              <InfoRow label="Rotina fixa" value={request.fixedContractRequested ? "Paciente demonstrou interesse" : "Não informado"} />
               <InfoRow
                 label="Regras aceitas"
-                value={request.rulesAcceptedAt ? `${formatBrasiliaDateTime(request.rulesAcceptedAt)} - versao ${request.rulesVersion || "registrada"}` : "Nao registrado"}
+                value={request.rulesAcceptedAt ? `${formatBrasiliaDateTime(request.rulesAcceptedAt)} - versão ${request.rulesVersion || "registrada"}` : "Não registrado"}
               />
             </div>
           </article>
@@ -663,8 +664,8 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <InfoRow label="Destino" value={request.travelDestination} />
                 <InfoRow label="Tipo" value={request.isInternationalTravel ? "Viagem internacional" : "Viagem nacional ou local"} />
-                <InfoRow label="Visto EUA" value={request.needsUsVisa ? "Necessario" : "Nao informado como necessario"} />
-                <InfoRow label="Observacoes" value={request.travelNotes || "Nenhuma observacao especifica."} />
+                <InfoRow label="Visto EUA" value={request.needsUsVisa ? "Necessário" : "Não informado como necessário"} />
+                <InfoRow label="Observações" value={request.travelNotes || "Nenhuma observação específica."} />
               </div>
             </article>
           ) : null}
@@ -672,10 +673,10 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <Home aria-hidden="true" className="h-5 w-5 text-emerald-700" />
-              <h2 className="text-xl font-semibold text-slate-950">Endereco</h2>
+              <h2 className="text-xl font-semibold text-slate-950">Endereço</h2>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <InfoRow label="Endereco completo" value={fullAddress(request)} />
+              <InfoRow label="Endereço completo" value={fullAddress(request)} />
               <InfoRow label="CEP" value={request.postalCode} />
             </div>
           </article>
@@ -683,10 +684,10 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <ShieldCheck aria-hidden="true" className="h-5 w-5 text-emerald-700" />
-              <h2 className="text-xl font-semibold text-slate-950">Observacoes de seguranca</h2>
+              <h2 className="text-xl font-semibold text-slate-950">Observações de segurança</h2>
             </div>
             <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-              {request.notes || "Nenhuma observacao informada."}
+              {request.notes || "Nenhuma observação informada."}
             </p>
           </article>
         </div>
@@ -695,7 +696,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <ClipboardList aria-hidden="true" className="h-5 w-5 text-emerald-700" />
-              <h2 className="text-xl font-semibold text-slate-950">Acoes</h2>
+              <h2 className="text-xl font-semibold text-slate-950">Ações</h2>
             </div>
 
             {error ? <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
@@ -703,7 +704,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
             <div className="mt-4 grid gap-2">
               {!hasAnyAction ? (
                 <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                  Nenhuma acao disponivel neste status.
+                  Nenhuma ação disponível neste status.
                 </p>
               ) : null}
 
@@ -757,13 +758,13 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
                 >
                   <Trash2 aria-hidden="true" className="h-4 w-4" />
-                  {isPending && updatingStatus === "delete" ? "Excluindo..." : "Excluir do meu historico"}
+                  {isPending && updatingStatus === "delete" ? "Excluindo..." : "Excluir do meu histórico"}
                 </button>
               ) : null}
             </div>
 
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-              Pagamento combinado diretamente entre paciente e profissional. A plataforma ainda nao processa pagamento online.
+              Pagamento combinado diretamente entre paciente e profissional. A plataforma ainda não processa pagamento online.
             </div>
           </article>
 
@@ -797,7 +798,7 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                 label="Local"
                 value={<span className="inline-flex items-center gap-1"><MapPin aria-hidden="true" className="h-4 w-4 text-emerald-700" />{request.professional.neighborhood}, {request.professional.city}</span>}
               />
-              <InfoRow label="Apoio fisico" value={request.professional.supportLevelLabel} />
+              <InfoRow label="Apoio físico" value={request.professional.supportLevelLabel} />
               {request.professional.acceptsTravel ? (
                 <InfoRow
                   label="Viagens"
@@ -810,8 +811,11 @@ export function CareRequestDetails({ request }: { request: CareRequestDetailsDat
                     .join(" - ")}
                 />
               ) : null}
+              {request.professional.acceptsFixedContract ? (
+                <InfoRow label="Contrato fixo" value="Profissional marcou disponibilidade para rotina fixa." />
+              ) : null}
               <InfoRow label="Experiencia" value={request.professional.bio} />
-              {request.professional.travelNotes ? <InfoRow label="Observacoes sobre viagem" value={request.professional.travelNotes} /> : null}
+              {request.professional.travelNotes ? <InfoRow label="Observações sobre viagem" value={request.professional.travelNotes} /> : null}
             </div>
           </article>
         </aside>

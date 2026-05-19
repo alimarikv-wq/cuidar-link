@@ -96,21 +96,21 @@ const supportWeight: Record<TransferSupportLevel, number> = {
 
 const professionalTypeLabel: Record<ProfessionalType, string> = {
   CUIDADOR: "Cuidador",
-  TECNICO_ENFERMAGEM: "Tecnico de enfermagem",
+  TECNICO_ENFERMAGEM: "Técnico de enfermagem",
   ENFERMEIRO: "Enfermeiro",
   FISIOTERAPEUTA: "Fisioterapeuta"
 };
 
 const serviceLabel: Record<CareService, string> = {
   BANHO: "Banho",
-  TRANSFERENCIA: "Transferencia",
-  MEDICACAO: "Medicacao",
+  TRANSFERENCIA: "Transferência",
+  MEDICACAO: "Medicação",
   CURATIVOS: "Curativos",
   FISIOTERAPIA: "Fisioterapia",
   COMPANHIA: "Companhia",
-  REFEICAO: "Refeicao",
+  REFEICAO: "Refeição",
   SINAIS_VITAIS: "Sinais vitais",
-  AVALIACAO: "Avaliacao",
+  AVALIACAO: "Avaliação",
   FORTALECIMENTO: "Fortalecimento",
   OUTRO: "Outro atendimento"
 };
@@ -128,8 +128,8 @@ const genderPreferenceLabel: Record<GenderPreference, string> = {
 };
 
 const supportLabel: Record<TransferSupportLevel, string> = {
-  MODERADO: "Sem preferencia de porte fisico",
-  ALTO: "Porte fisico forte",
+  MODERADO: "Sem preferência de porte físico",
+  ALTO: "Porte físico forte",
   DUPLA: "Duas pessoas"
 };
 
@@ -138,7 +138,7 @@ const statusLabel: Record<CareRequestStatus, string> = {
   ENVIADO: "Enviado",
   ACEITO: "Aceito",
   AGENDADO: "Agendado",
-  CONCLUIDO: "Concluido",
+  CONCLUIDO: "Concluído",
   CANCELADO: "Cancelado"
 };
 
@@ -146,11 +146,11 @@ const documentTypeLabel: Record<DocumentType, string> = {
   RG: "RG",
   CNH: "CNH",
   CPF: "CPF",
-  COMPROVANTE_RESIDENCIA: "Comprovante de residencia",
+  COMPROVANTE_RESIDENCIA: "Comprovante de residência",
   COREN: "COREN",
   CREFITO: "CREFITO",
   CERTIFICADO: "Certificado",
-  REFERENCIA: "Referencia"
+  REFERENCIA: "Referência"
 };
 
 const verificationStatusLabel: Record<VerificationStatus, string> = {
@@ -161,7 +161,7 @@ const verificationStatusLabel: Record<VerificationStatus, string> = {
 
 const professionalVerificationStatusLabel: Record<ProfessionalVerificationStatus, string> = {
   PENDENTE: "Pendente",
-  EM_ANALISE: "Em analise",
+  EM_ANALISE: "Em análise",
   APROVADO: "Aprovado",
   REPROVADO: "Reprovado"
 };
@@ -203,13 +203,13 @@ function toReadinessChecks(checks: AppHealthChecks): CareAdminOverview["readines
       key: "emailNotifications",
       label: "E-mails automaticos",
       status: checks.emailNotifications ? "OK" : "WARNING",
-      detail: checks.emailNotifications ? "Pedidos e atualizacoes podem disparar e-mail." : "Configure Resend antes de testes com usuarios externos."
+      detail: checks.emailNotifications ? "Pedidos e atualizações podem disparar e-mail." : "Configure Resend antes de testes com usuários externos."
     },
     {
       key: "demoFallback",
-      label: "Modo demonstracao",
+      label: "Modo demonstração",
       status: checks.demoFallback ? "WARNING" : "OK",
-      detail: checks.demoFallback ? "Desative para nao misturar dados ficticios com producao." : "Desativado em producao."
+      detail: checks.demoFallback ? "Desative para não misturar dados fictícios com produção." : "Desativado em produção."
     },
     {
       key: "appleOAuth",
@@ -256,7 +256,7 @@ function toOperationalAlerts(input: {
       key: "pending-documents",
       severity: "ACTION",
       title: "Documentos para revisar",
-      detail: `${input.pendingDocuments} documento(s) aguardando revisao administrativa.`,
+      detail: `${input.pendingDocuments} documento(s) aguardando revisão administrativa.`,
       actionLabel: "Revisar documentos",
       actionHref: "/admin#documentos"
     });
@@ -267,7 +267,7 @@ function toOperationalAlerts(input: {
       key: "unverified-professionals",
       severity: "WARNING",
       title: "Profissionais ainda sem selo",
-      detail: `${input.unverifiedActiveProfessionals} profissional(is) ativo(s) ainda nao aparecem como verificados.`,
+      detail: `${input.unverifiedActiveProfessionals} profissional(is) ativo(s) ainda não aparecem como verificados.`,
       actionLabel: "Ver documentos",
       actionHref: "/admin#documentos"
     });
@@ -278,7 +278,7 @@ function toOperationalAlerts(input: {
       key: "professionals-without-availability",
       severity: "WARNING",
       title: "Profissionais sem agenda",
-      detail: `${input.professionalsWithoutAvailability} profissional(is) ativo(s) nao tem horario cadastrado. Eles quase nao aparecem em buscas por horario.`,
+      detail: `${input.professionalsWithoutAvailability} profissional(is) ativo(s) não têm horário cadastrado. Eles quase não aparecem em buscas por horário.`,
       actionLabel: "Ver profissionais",
       actionHref: "/admin#profissionais-operacao"
     });
@@ -289,7 +289,7 @@ function toOperationalAlerts(input: {
       key: "professionals-without-photo",
       severity: "INFO",
       title: "Perfis sem foto",
-      detail: `${input.activeProfessionalsMissingPhoto} profissional(is) ativo(s) ainda nao colocaram foto. Isso reduz confianca na busca.`,
+      detail: `${input.activeProfessionalsMissingPhoto} profissional(is) ativo(s) ainda não colocaram foto. Isso reduz confiança na busca.`,
       actionLabel: "Ver profissionais",
       actionHref: "/admin#profissionais-operacao"
     });
@@ -300,7 +300,7 @@ function toOperationalAlerts(input: {
       key: "email-notifications",
       severity: "ACTION",
       title: "E-mail automatico desligado",
-      detail: "Pedidos e atualizacoes ficam menos confiaveis sem notificacao por e-mail.",
+      detail: "Pedidos e atualizações ficam menos confiáveis sem notificação por e-mail.",
       actionLabel: "Testar e-mail",
       actionHref: "/admin#email"
     });
@@ -310,8 +310,8 @@ function toOperationalAlerts(input: {
     alerts.push({
       key: "operational-ok",
       severity: "OK",
-      title: "Operacao sem alerta critico",
-      detail: "Nenhum pedido parado, documento pendente ou configuracao critica encontrada agora.",
+      title: "Operação sem alerta crítico",
+      detail: "Nenhum pedido parado, documento pendente ou configuração crítica encontrada agora.",
       actionLabel: null,
       actionHref: null
     });
@@ -328,6 +328,7 @@ export type CareSearchParams = {
   availability: AvailabilityFilter;
   radiusKm: number;
   travelRequested?: boolean;
+  fixedContractRequested?: boolean;
   ageMin?: number;
   ageMax?: number;
   latitude?: number;
@@ -355,6 +356,7 @@ export type CreateCareRequestInput = {
   longitude?: number;
   notes?: string;
   travelRequested?: boolean;
+  fixedContractRequested?: boolean;
   travelDestination?: string;
   isInternationalTravel?: boolean;
   needsUsVisa?: boolean;
@@ -367,6 +369,7 @@ export type CreateProfessionalInquiryInput = {
   requesterName: string;
   requesterEmail?: string;
   requesterPhone?: string;
+  fixedContractRequested?: boolean;
   body: string;
 };
 
@@ -411,6 +414,7 @@ type UpdateProfessionalProfileInput = {
   mobilitySupport: string;
   supportLevel: TransferSupportLevel;
   acceptsTravel: boolean;
+  acceptsFixedContract: boolean;
   hasPassport: boolean;
   hasUsVisa: boolean;
   travelNotes?: string | null;
@@ -730,9 +734,9 @@ function completionGateLabelFor(request: {
   durationHours: number | Prisma.Decimal;
 }) {
   const availableAt = requestCompletionAvailableAt(request);
-  if (!availableAt) return "Informe data e horario para liberar conclusao.";
+  if (!availableAt) return "Informe data e horário para liberar conclusão.";
   if (Date.now() >= availableAt.getTime()) return null;
-  return `Conclusao liberada a partir de ${formatBrasiliaDateTime(availableAt)}.`;
+  return `Conclusão liberada a partir de ${formatBrasiliaDateTime(availableAt)}.`;
 }
 
 function rangesOverlap(startA: Date, endA: Date, startB: Date, endB: Date) {
@@ -843,20 +847,20 @@ export async function getNextAvailableCareRequestSlots(professionalId: string, d
 }
 
 async function validateCareRequestSchedule(professionalId: string, scheduledFor: Date | null, durationHours: number) {
-  if (!scheduledFor) return { ok: false as const, error: "Informe data e horario do atendimento." };
-  if (scheduledFor <= new Date()) return { ok: false as const, error: "Escolha um horario futuro." };
+  if (!scheduledFor) return { ok: false as const, error: "Informe data e horário do atendimento." };
+  if (scheduledFor <= new Date()) return { ok: false as const, error: "Escolha um horário futuro." };
 
   const professional = await prisma.professionalProfile.findUnique({
     where: { id: professionalId },
     include: { availability: true }
   });
 
-  if (!professional || !professional.isActive) return { ok: false as const, error: "Profissional indisponivel no momento." };
+  if (!professional || !professional.isActive) return { ok: false as const, error: "Profissional indisponível no momento." };
 
   if (!isCoveredByAvailability(professional.availability, scheduledFor, durationHours)) {
     return {
       ok: false as const,
-      error: "Esse horario nao esta dentro da agenda cadastrada pelo profissional. Escolha outro horario disponivel."
+      error: "Esse horário não está dentro da agenda cadastrada pelo profissional. Escolha outro horário disponível."
     };
   }
 
@@ -870,7 +874,7 @@ async function validateCareRequestSchedule(professionalId: string, scheduledFor:
   });
 
   if (hasConflict) {
-    return { ok: false as const, error: "Esse horario acabou de ficar ocupado. Escolha outro horario disponivel." };
+    return { ok: false as const, error: "Esse horário acabou de ficar ocupado. Escolha outro horário disponível." };
   }
 
   return { ok: true as const };
@@ -924,6 +928,7 @@ function calculateScore(
   if (hasAvailability) score += 8;
   if (professional.isVerified) score += 4;
   if (params.travelRequested && professional.acceptsTravel) score += 6;
+  if (params.fixedContractRequested && professional.acceptsFixedContract) score += 6;
   score += Math.max(0, 10 - distance);
   score += Number(professional.rating) - 4.5;
   return Math.round(Math.min(score, 99));
@@ -958,6 +963,7 @@ function toCareProfessional(professional: ProfessionalWithRelations, params: Car
     supportLevelLabel: supportLabel[professional.supportLevel],
     mobilitySupport: professional.mobilitySupport,
     acceptsTravel: professional.acceptsTravel,
+    acceptsFixedContract: professional.acceptsFixedContract,
     hasPassport: professional.hasPassport,
     hasUsVisa: professional.hasUsVisa,
     travelNotes: professional.travelNotes,
@@ -1036,7 +1042,8 @@ export async function searchCareProfessionals(params: CareSearchParams) {
           : params.genderPreference === GenderPreference.FEMININO
             ? Gender.FEMININO
             : Gender.MASCULINO,
-      acceptsTravel: params.travelRequested ? true : undefined
+      acceptsTravel: params.travelRequested ? true : undefined,
+      acceptsFixedContract: params.fixedContractRequested ? true : undefined
     },
     include: {
       user: true,
@@ -1068,6 +1075,7 @@ export async function searchCareProfessionals(params: CareSearchParams) {
         distance <= professional.serviceRadiusKm &&
         canSupport(professional.supportLevel, params.supportNeed) &&
         (!params.travelRequested || professional.acceptsTravel) &&
+        (!params.fixedContractRequested || professional.acceptsFixedContract) &&
         hasAvailability
       );
     })
@@ -1116,15 +1124,26 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
     });
 
     if (!professionalTravel?.acceptsTravel) {
-      return { ok: false as const, status: 409, error: "Esse profissional nao marcou disponibilidade para viagens." };
+      return { ok: false as const, status: 409, error: "Esse profissional não marcou disponibilidade para viagens." };
     }
 
     if (input.isInternationalTravel && !professionalTravel.hasPassport) {
-      return { ok: false as const, status: 409, error: "Esse profissional nao informou passaporte para viagem internacional." };
+      return { ok: false as const, status: 409, error: "Esse profissional não informou passaporte para viagem internacional." };
     }
 
     if (input.needsUsVisa && !professionalTravel.hasUsVisa) {
-      return { ok: false as const, status: 409, error: "Esse profissional nao informou visto americano." };
+      return { ok: false as const, status: 409, error: "Esse profissional não informou visto americano." };
+    }
+  }
+
+  if (input.fixedContractRequested) {
+    const professionalContract = await prisma.professionalProfile.findUnique({
+      where: { id: input.professionalId },
+      select: { acceptsFixedContract: true }
+    });
+
+    if (!professionalContract?.acceptsFixedContract) {
+      return { ok: false as const, status: 409, error: "Esse profissional não marcou disponibilidade para contrato fixo." };
     }
   }
 
@@ -1153,6 +1172,7 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
       longitude: input.longitude,
       notes: input.notes,
       travelRequested: Boolean(input.travelRequested),
+      fixedContractRequested: Boolean(input.fixedContractRequested),
       travelDestination: input.travelRequested ? input.travelDestination : null,
       isInternationalTravel: Boolean(input.isInternationalTravel),
       needsUsVisa: Boolean(input.needsUsVisa),
@@ -1172,13 +1192,13 @@ export async function createCareRequest(input: CreateCareRequestInput, userId?: 
   try {
     await notifyNewCareRequest(request);
   } catch (error) {
-    console.error("Nao foi possivel criar notificacao interna do novo atendimento.", error);
+    console.error("Não foi possível criar notificação interna do novo atendimento.", error);
   }
 
   try {
     await sendNewCareRequestNotifications(request);
   } catch (error) {
-    console.error("Nao foi possivel enviar notificacao do novo atendimento.", error);
+    console.error("Não foi possível enviar notificação do novo atendimento.", error);
   }
 
   return { ok: true as const, request };
@@ -1220,6 +1240,7 @@ function toRequestRecord(
     state: request.state,
     notes: request.notes,
     travelRequested: request.travelRequested,
+    fixedContractRequested: request.fixedContractRequested,
     travelDestination: request.travelDestination,
     isInternationalTravel: request.isInternationalTravel,
     needsUsVisa: request.needsUsVisa,
@@ -1280,6 +1301,7 @@ function toRequestDetailsData(
       bio: request.professional.bio,
       isVerified: request.professional.isVerified,
       acceptsTravel: request.professional.acceptsTravel,
+      acceptsFixedContract: request.professional.acceptsFixedContract,
       hasPassport: request.professional.hasPassport,
       hasUsVisa: request.professional.hasUsVisa,
       travelNotes: request.professional.travelNotes
@@ -1356,6 +1378,7 @@ function toProfessionalInquirySummary(
     requesterName: inquiry.requesterName,
     requesterEmail: inquiry.requesterEmail,
     requesterPhone: inquiry.requesterPhone,
+    fixedContractRequested: inquiry.fixedContractRequested,
     lastMessage: lastMessageBody.length > 180 ? `${lastMessageBody.slice(0, 180)}...` : lastMessageBody,
     lastMessageAt: (lastMessage?.createdAt || inquiry.updatedAt).toISOString(),
     createdAt: inquiry.createdAt.toISOString(),
@@ -1414,7 +1437,7 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
   }
 
   if (body.length < 1 || body.length > 1000) {
-    return { ok: false as const, status: 400, error: "Escreva uma mensagem de ate 1000 caracteres." };
+    return { ok: false as const, status: 400, error: "Escreva uma mensagem de até 1000 caracteres." };
   }
 
   const [user, professional] = await Promise.all([
@@ -1431,7 +1454,11 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
   ]);
 
   if (!professional || !professional.isActive) {
-    return { ok: false as const, status: 404, error: "Profissional nao encontrado." };
+    return { ok: false as const, status: 404, error: "Profissional não encontrado." };
+  }
+
+  if (input.fixedContractRequested && !professional.acceptsFixedContract) {
+    return { ok: false as const, status: 409, error: "Esse profissional não marcou disponibilidade para contrato fixo." };
   }
 
   const inquiry = await prisma.professionalInquiry.create({
@@ -1441,6 +1468,7 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
       requesterName,
       requesterEmail: requesterEmail || user?.email || null,
       requesterPhone: requesterPhone || user?.patientProfile?.phone || null,
+      fixedContractRequested: Boolean(input.fixedContractRequested),
       status: ProfessionalInquiryStatus.ABERTA,
       messages: {
         create: {
@@ -1462,11 +1490,11 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
       userId: professional.userId,
       type: "PROFESSIONAL_INQUIRY_CREATED",
       title: "Nova mensagem antes do pedido",
-      body: `${requesterName} enviou uma duvida antes de solicitar atendimento.`,
+      body: `${requesterName} enviou uma dúvida antes de solicitar atendimento.`,
       actionUrl: `/dashboard/mensagens/${inquiry.id}`
     });
   } catch (error) {
-    console.error("Nao foi possivel criar notificacao interna de mensagem inicial.", error);
+    console.error("Não foi possível criar notificação interna de mensagem inicial.", error);
   }
 
   try {
@@ -1480,7 +1508,7 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
       body
     });
   } catch (error) {
-    console.error("Nao foi possivel enviar e-mail de mensagem inicial.", error);
+    console.error("Não foi possível enviar e-mail de mensagem inicial.", error);
   }
 
   return {
@@ -1538,7 +1566,7 @@ export async function getProfessionalInquiryDetailsForUser(inquiryId: string, us
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const inquiry = await prisma.professionalInquiry.findUnique({
     where: { id: inquiryId },
@@ -1552,7 +1580,7 @@ export async function getProfessionalInquiryDetailsForUser(inquiryId: string, us
     }
   });
 
-  if (!inquiry) return { ok: false as const, status: 404, error: "Conversa nao encontrada." };
+  if (!inquiry) return { ok: false as const, status: 404, error: "Conversa não encontrada." };
 
   const canActAsProfessional = user.professionalProfile?.id === inquiry.professionalId;
   const canActAsPatient = Boolean(
@@ -1562,7 +1590,7 @@ export async function getProfessionalInquiryDetailsForUser(inquiryId: string, us
   const canView = user.role === UserRole.ADMIN || canActAsProfessional || canActAsPatient;
 
   if (!canView) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para ver esta conversa." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para ver esta conversa." };
   }
 
   await prisma.professionalInquiryMessage.updateMany({
@@ -1589,7 +1617,7 @@ export async function createProfessionalInquiryMessageForUser(inquiryId: string,
   const trimmedBody = body.trim();
 
   if (trimmedBody.length < 1 || trimmedBody.length > 1000) {
-    return { ok: false as const, status: 400, error: "Escreva uma mensagem de ate 1000 caracteres." };
+    return { ok: false as const, status: 400, error: "Escreva uma mensagem de até 1000 caracteres." };
   }
 
   const user = await prisma.user.findUnique({
@@ -1600,7 +1628,7 @@ export async function createProfessionalInquiryMessageForUser(inquiryId: string,
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const inquiry = await prisma.professionalInquiry.findUnique({
     where: { id: inquiryId },
@@ -1610,7 +1638,7 @@ export async function createProfessionalInquiryMessageForUser(inquiryId: string,
     }
   });
 
-  if (!inquiry) return { ok: false as const, status: 404, error: "Conversa nao encontrada." };
+  if (!inquiry) return { ok: false as const, status: 404, error: "Conversa não encontrada." };
 
   const canActAsProfessional = user.professionalProfile?.id === inquiry.professionalId;
   const canActAsPatient = Boolean(
@@ -1620,7 +1648,7 @@ export async function createProfessionalInquiryMessageForUser(inquiryId: string,
   const canMessage = user.role === UserRole.ADMIN || canActAsProfessional || canActAsPatient;
 
   if (!canMessage) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para responder esta conversa." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para responder esta conversa." };
   }
 
   const recipientUser =
@@ -1678,7 +1706,7 @@ export async function createProfessionalInquiryMessageForUser(inquiryId: string,
         actionUrl: `/dashboard/mensagens/${inquiry.id}`
       });
     } catch (error) {
-      console.error("Nao foi possivel criar notificacao interna de resposta da conversa.", error);
+      console.error("Não foi possível criar notificação interna de resposta da conversa.", error);
     }
   }
 
@@ -1692,7 +1720,7 @@ export async function createProfessionalInquiryMessageForUser(inquiryId: string,
         body: trimmedBody
       });
     } catch (error) {
-      console.error("Nao foi possivel enviar e-mail de resposta da conversa.", error);
+      console.error("Não foi possível enviar e-mail de resposta da conversa.", error);
     }
   }
 
@@ -1708,7 +1736,7 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const request = await prisma.careRequest.findUnique({
     where: { id: requestId },
@@ -1731,7 +1759,7 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
     }
   });
 
-  if (!request) return { ok: false as const, status: 404, error: "Atendimento nao encontrado." };
+  if (!request) return { ok: false as const, status: 404, error: "Atendimento não encontrado." };
 
   const canActAsProfessional = user.professionalProfile?.id === request.professionalId;
   const canCancelAsPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
@@ -1744,12 +1772,12 @@ export async function getCareRequestDetailsForUser(requestId: string, userId: st
     (canCancelAsPatient || canViewByEmail);
 
   if (!canView) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para ver este atendimento." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para ver este atendimento." };
   }
 
   const viewerDeletedAt = canActAsProfessional ? request.professionalDeletedAt : request.patientDeletedAt;
   if (user.role !== UserRole.ADMIN && viewerDeletedAt) {
-    return { ok: false as const, status: 404, error: "Atendimento nao encontrado no seu historico." };
+    return { ok: false as const, status: 404, error: "Atendimento não encontrado no seu histórico." };
   }
 
   await prisma.careMessage.updateMany({
@@ -1781,7 +1809,7 @@ export async function createCareRequestMessageForUser(requestId: string, userId:
   }
 
   if (trimmedBody.length > 1000) {
-    return { ok: false as const, status: 400, error: "Mensagem muito longa. Use ate 1000 caracteres." };
+    return { ok: false as const, status: 400, error: "Mensagem muito longa. Use até 1000 caracteres." };
   }
 
   const user = await prisma.user.findUnique({
@@ -1792,7 +1820,7 @@ export async function createCareRequestMessageForUser(requestId: string, userId:
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const request = await prisma.careRequest.findUnique({
     where: { id: requestId },
@@ -1806,7 +1834,7 @@ export async function createCareRequestMessageForUser(requestId: string, userId:
     }
   });
 
-  if (!request) return { ok: false as const, status: 404, error: "Atendimento nao encontrado." };
+  if (!request) return { ok: false as const, status: 404, error: "Atendimento não encontrado." };
 
   const canActAsProfessional = user.professionalProfile?.id === request.professionalId;
   const canActAsPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
@@ -1814,12 +1842,12 @@ export async function createCareRequestMessageForUser(requestId: string, userId:
   const canMessage = user.role === UserRole.ADMIN || canActAsProfessional || canActAsPatient || canViewByEmail;
 
   if (!canMessage) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para enviar mensagem neste atendimento." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para enviar mensagem neste atendimento." };
   }
 
   const viewerDeletedAt = canActAsProfessional ? request.professionalDeletedAt : request.patientDeletedAt;
   if (user.role !== UserRole.ADMIN && viewerDeletedAt) {
-    return { ok: false as const, status: 404, error: "Atendimento nao encontrado no seu historico." };
+    return { ok: false as const, status: 404, error: "Atendimento não encontrado no seu histórico." };
   }
 
   const recipientUser =
@@ -1860,7 +1888,7 @@ export async function createCareRequestMessageForUser(requestId: string, userId:
     try {
       await notifyCareMessageReceived(recipientUser.id, request.id, user.name);
     } catch (error) {
-      console.error("Nao foi possivel criar notificacao interna de mensagem.", error);
+      console.error("Não foi possível criar notificação interna de mensagem.", error);
     }
   }
 
@@ -1874,7 +1902,7 @@ export async function createCareRequestMessageForUser(requestId: string, userId:
         body: trimmedBody
       });
     } catch (error) {
-      console.error("Nao foi possivel enviar e-mail de mensagem do atendimento.", error);
+      console.error("Não foi possível enviar e-mail de mensagem do atendimento.", error);
     }
   }
 
@@ -1897,7 +1925,7 @@ export async function createCareRequestReview(requestId: string, userId: string,
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const request = await prisma.careRequest.findUnique({
     where: { id: requestId },
@@ -1912,9 +1940,9 @@ export async function createCareRequestReview(requestId: string, userId: string,
     }
   });
 
-  if (!request) return { ok: false as const, status: 404, error: "Atendimento nao encontrado." };
+  if (!request) return { ok: false as const, status: 404, error: "Atendimento não encontrado." };
   if (request.status !== CareRequestStatus.CONCLUIDO) {
-    return { ok: false as const, status: 409, error: "A avaliacao fica disponivel depois que o atendimento for concluido." };
+    return { ok: false as const, status: 409, error: "A avaliação fica disponível depois que o atendimento for concluído." };
   }
   if (request.review) {
     return { ok: false as const, status: 409, error: "Este atendimento ja foi avaliado." };
@@ -1960,7 +1988,7 @@ export async function createCareRequestReview(requestId: string, userId: string,
     try {
       await notifyProfessionalReview(request.professional.userId, request.id, request.requesterName, rating);
     } catch (error) {
-      console.error("Nao foi possivel criar notificacao interna de avaliacao.", error);
+      console.error("Não foi possível criar notificação interna de avaliação.", error);
     }
 
     return {
@@ -2028,7 +2056,7 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const request = await prisma.careRequest.findUnique({
     where: { id: requestId },
@@ -2038,13 +2066,13 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
     }
   });
 
-  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+  if (!request) return { ok: false as const, status: 404, error: "Solicitação não encontrada." };
 
   const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
   const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
 
   if (!isAssignedProfessional && !(isRequestPatient && nextStatus === CareRequestStatus.CANCELADO)) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para alterar esta solicitacao." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para alterar esta solicitação." };
   }
 
   const professionalAllowed: Record<CareRequestStatus, CareRequestStatus[]> = {
@@ -2066,7 +2094,7 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
   const allowed = isAssignedProfessional ? professionalAllowed[request.status] : patientAllowed[request.status];
 
   if (!allowed.includes(nextStatus)) {
-    return { ok: false as const, status: 400, error: "Mudanca de status nao permitida para esta solicitacao." };
+    return { ok: false as const, status: 400, error: "Mudança de status não permitida para esta solicitação." };
   }
 
   const updateData: Prisma.CareRequestUpdateInput = { status: nextStatus };
@@ -2084,7 +2112,7 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
       return {
         ok: false as const,
         status: 409,
-        error: "Defina data e horario do atendimento antes de marcar como concluido."
+        error: "Defina data e horário do atendimento antes de marcar como concluído."
       };
     }
 
@@ -2121,13 +2149,13 @@ export async function updateCareRequestStatus(requestId: string, userId: string,
       await notifyCareRequestStatusForPatient(updatedRequest);
     }
   } catch (error) {
-    console.error("Nao foi possivel criar notificacao interna de status do atendimento.", error);
+    console.error("Não foi possível criar notificação interna de status do atendimento.", error);
   }
 
   try {
     await sendCareRequestStatusNotification(updatedRequest);
   } catch (error) {
-    console.error("Nao foi possivel enviar notificacao de status do atendimento.", error);
+    console.error("Não foi possível enviar notificação de status do atendimento.", error);
   }
 
   return { ok: true as const, request: toRequestRecord(updatedRequest) };
@@ -2142,23 +2170,23 @@ export async function archiveCareRequestForUser(requestId: string, userId: strin
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const request = await prisma.careRequest.findUnique({
     where: { id: requestId }
   });
 
-  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+  if (!request) return { ok: false as const, status: 404, error: "Solicitação não encontrada." };
 
   const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
   const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
 
   if (!isAssignedProfessional && !isRequestPatient) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para arquivar esta solicitacao." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para arquivar esta solicitação." };
   }
 
   if (request.status !== CareRequestStatus.CONCLUIDO && request.status !== CareRequestStatus.CANCELADO) {
-    return { ok: false as const, status: 400, error: "Arquive apenas atendimentos concluidos ou cancelados." };
+    return { ok: false as const, status: 400, error: "Arquive apenas atendimentos concluídos ou cancelados." };
   }
 
   await prisma.careRequest.update({
@@ -2178,19 +2206,19 @@ export async function restoreCareRequestForUser(requestId: string, userId: strin
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const request = await prisma.careRequest.findUnique({
     where: { id: requestId }
   });
 
-  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+  if (!request) return { ok: false as const, status: 404, error: "Solicitação não encontrada." };
 
   const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
   const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
 
   if (!isAssignedProfessional && !isRequestPatient) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para restaurar esta solicitacao." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para restaurar esta solicitação." };
   }
 
   await prisma.careRequest.update({
@@ -2210,24 +2238,24 @@ export async function deleteCareRequestFromHistoryForUser(requestId: string, use
     }
   });
 
-  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
 
   const request = await prisma.careRequest.findUnique({
     where: { id: requestId }
   });
 
-  if (!request) return { ok: false as const, status: 404, error: "Solicitacao nao encontrada." };
+  if (!request) return { ok: false as const, status: 404, error: "Solicitação não encontrada." };
 
   const isAssignedProfessional = user.professionalProfile?.id === request.professionalId;
   const isRequestPatient = Boolean(user.patientProfile?.id && user.patientProfile.id === request.patientProfileId);
 
   if (!isAssignedProfessional && !isRequestPatient) {
-    return { ok: false as const, status: 403, error: "Voce nao tem permissao para excluir esta solicitacao." };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para excluir esta solicitação." };
   }
 
   const archivedAt = isAssignedProfessional ? request.professionalArchivedAt : request.patientArchivedAt;
   if (!archivedAt) {
-    return { ok: false as const, status: 400, error: "Arquive o atendimento antes de excluir do historico." };
+    return { ok: false as const, status: 400, error: "Arquive o atendimento antes de excluir do histórico." };
   }
 
   await prisma.careRequest.update({
@@ -2245,7 +2273,7 @@ export async function updateProfessionalProfileForUser(userId: string, input: Up
   });
 
   if (!user?.professionalProfile) {
-    return { ok: false as const, status: 403, error: "Perfil profissional nao encontrado." };
+    return { ok: false as const, status: 403, error: "Perfil profissional não encontrado." };
   }
 
   const coordinates = coordinatesFor(input.neighborhood);
@@ -2271,6 +2299,7 @@ export async function updateProfessionalProfileForUser(userId: string, input: Up
         mobilitySupport: input.mobilitySupport,
         supportLevel: input.supportLevel,
         acceptsTravel: input.acceptsTravel,
+        acceptsFixedContract: input.acceptsFixedContract,
         hasPassport: input.acceptsTravel ? input.hasPassport : false,
         hasUsVisa: input.acceptsTravel ? input.hasUsVisa : false,
         travelNotes: input.acceptsTravel ? input.travelNotes || null : null,
@@ -2305,7 +2334,7 @@ export async function updatePatientProfileForUser(userId: string, input: UpdateP
   });
 
   if (!user || user.accountType !== AccountType.PATIENT) {
-    return { ok: false as const, status: 403, error: "Perfil de paciente nao encontrado." };
+    return { ok: false as const, status: 403, error: "Perfil de paciente não encontrado." };
   }
 
   const coordinates = coordinatesFor(input.neighborhood);
@@ -2356,6 +2385,31 @@ export async function updatePatientProfileForUser(userId: string, input: UpdateP
   return { ok: true as const };
 }
 
+export async function getPatientProfileForUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { patientProfile: true }
+  });
+
+  if (!user) return null;
+
+  return {
+    name: user.name,
+    email: user.email,
+    phone: user.patientProfile?.phone || null,
+    neighborhood: user.patientProfile?.neighborhood || "",
+    addressLine: user.patientProfile?.addressLine || null,
+    addressNumber: user.patientProfile?.addressNumber || null,
+    addressComplement: user.patientProfile?.addressComplement || null,
+    postalCode: user.patientProfile?.postalCode || null,
+    city: user.patientProfile?.city || defaultCenter.city,
+    state: user.patientProfile?.state || "RS",
+    preferredGender: user.patientProfile?.preferredGender || GenderPreference.QUALQUER,
+    transferNeed: user.patientProfile?.transferNeed || TransferSupportLevel.MODERADO,
+    mobilityNotes: user.patientProfile?.mobilityNotes || null
+  };
+}
+
 export async function createProfessionalDocumentForUser(userId: string, input: CreateProfessionalDocumentInput) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -2363,7 +2417,7 @@ export async function createProfessionalDocumentForUser(userId: string, input: C
   });
 
   if (!user?.professionalProfile) {
-    return { ok: false as const, status: 403, error: "Perfil profissional nao encontrado." };
+    return { ok: false as const, status: 403, error: "Perfil profissional não encontrado." };
   }
 
   const externalCheck =
@@ -2425,7 +2479,7 @@ export async function updateProfessionalDocumentType(adminUserId: string, docume
   });
 
   if (!existingDocument) {
-    throw new Error("Documento nao encontrado.");
+    throw new Error("Documento não encontrado.");
   }
 
   const documentNumberLooksLikeCpf = Boolean(
@@ -2472,7 +2526,7 @@ export async function reviewProfessionalDocument(adminUserId: string, documentId
   });
 
   if (!existingDocument) {
-    throw new Error("Documento nao encontrado.");
+    throw new Error("Documento não encontrado.");
   }
 
   const document = await prisma.$transaction(async (tx) => {
@@ -2506,7 +2560,7 @@ export async function reviewProfessionalDocument(adminUserId: string, documentId
     try {
       await notifyProfessionalDocumentReview(existingDocument.professional.userId, document.label, status);
     } catch (error) {
-      console.error("Nao foi possivel criar notificacao interna de documento.", error);
+      console.error("Não foi possível criar notificação interna de documento.", error);
     }
   }
 
@@ -2519,7 +2573,7 @@ export async function reviewProfessionalRegistration(adminUserId: string, profes
   });
 
   if (!existingProfessional) {
-    throw new Error("Profissional nao encontrado.");
+    throw new Error("Profissional não encontrado.");
   }
 
   const professional = await prisma.$transaction(async (tx) => {
@@ -2552,7 +2606,7 @@ export async function reviewProfessionalRegistration(adminUserId: string, profes
     try {
       await notifyProfessionalVerificationReview(professional.userId, status);
     } catch (error) {
-      console.error("Nao foi possivel criar notificacao interna de cadastro profissional.", error);
+      console.error("Não foi possível criar notificação interna de cadastro profissional.", error);
     }
   }
 
@@ -2774,6 +2828,7 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
           mobilitySupport: user.professionalProfile.mobilitySupport,
           supportLevel: user.professionalProfile.supportLevel,
           acceptsTravel: user.professionalProfile.acceptsTravel,
+          acceptsFixedContract: user.professionalProfile.acceptsFixedContract,
           hasPassport: user.professionalProfile.hasPassport,
           hasUsVisa: user.professionalProfile.hasUsVisa,
           travelNotes: user.professionalProfile.travelNotes,
@@ -2984,7 +3039,7 @@ export async function getCareAdminOverview(): Promise<CareAdminOverview> {
         professional.photoUrl ? null : "Sem foto",
         pendingDocumentCount > 0 ? `${pendingDocumentCount} doc pendente(s)` : null,
         missingRequiredDocuments.length > 0 ? `${missingRequiredDocuments.length} doc obrigatorio(s)` : null,
-        professional.services.length > 0 ? null : "Sem servicos"
+        professional.services.length > 0 ? null : "Sem serviços"
       ].filter(Boolean) as string[];
 
       return {

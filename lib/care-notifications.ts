@@ -25,6 +25,7 @@ type CareRequestNotificationData = {
   city: string;
   state: string | null;
   notes: string | null;
+  fixedContractRequested: boolean;
   professional: {
     user: {
       name: string;
@@ -35,21 +36,21 @@ type CareRequestNotificationData = {
 
 const serviceLabel: Record<CareService, string> = {
   BANHO: "Banho",
-  TRANSFERENCIA: "Transferencia",
-  MEDICACAO: "Medicacao",
+  TRANSFERENCIA: "Transferência",
+  MEDICACAO: "Medicação",
   CURATIVOS: "Curativos",
   FISIOTERAPIA: "Fisioterapia",
   COMPANHIA: "Companhia",
-  REFEICAO: "Refeicao",
+  REFEICAO: "Refeição",
   SINAIS_VITAIS: "Sinais vitais",
-  AVALIACAO: "Avaliacao",
+  AVALIACAO: "Avaliação",
   FORTALECIMENTO: "Fortalecimento",
   OUTRO: "Outro atendimento"
 };
 
 const supportLabel: Record<TransferSupportLevel, string> = {
-  MODERADO: "Sem preferencia de porte fisico",
-  ALTO: "Porte fisico forte",
+  MODERADO: "Sem preferência de porte físico",
+  ALTO: "Porte físico forte",
   DUPLA: "Duas pessoas"
 };
 
@@ -58,7 +59,7 @@ const statusLabel: Record<CareRequestStatus, string> = {
   ENVIADO: "Enviado",
   ACEITO: "Aceito",
   AGENDADO: "Agendado",
-  CONCLUIDO: "Concluido",
+  CONCLUIDO: "Concluído",
   CANCELADO: "Cancelado"
 };
 
@@ -103,13 +104,14 @@ function formatAddress(request: CareRequestNotificationData) {
 function requestDetailsText(request: CareRequestNotificationData) {
   return [
     `Paciente: ${request.requesterName}`,
-    `Telefone: ${request.requesterPhone || "Nao informado"}`,
-    `Servico: ${serviceLabel[request.service]}`,
+    `Telefone: ${request.requesterPhone || "Não informado"}`,
+    `Serviço: ${serviceLabel[request.service]}`,
     `Apoio: ${supportLabel[request.supportNeed]}`,
-    `Horario: ${formatDate(request.scheduledFor)}`,
-    `Endereco: ${formatAddress(request)}`,
+    `Horário: ${formatDate(request.scheduledFor)}`,
+    `Endereço: ${formatAddress(request)}`,
     `Pagamento: ${CARE_REQUEST_PAYMENT_LABEL}`,
-    request.notes ? `Observacoes: ${request.notes}` : "",
+    request.fixedContractRequested ? "Rotina fixa: paciente tem interesse em contrato fixo, escala recorrente ou CLT." : "",
+    request.notes ? `Observações: ${request.notes}` : "",
     "",
     "Regras principais:",
     careRequestRulesText(),
@@ -122,13 +124,14 @@ function requestDetailsText(request: CareRequestNotificationData) {
 function requestDetailsHtml(request: CareRequestNotificationData) {
   const rows = [
     ["Paciente", request.requesterName],
-    ["Telefone", request.requesterPhone || "Nao informado"],
-    ["Servico", serviceLabel[request.service]],
+    ["Telefone", request.requesterPhone || "Não informado"],
+    ["Serviço", serviceLabel[request.service]],
     ["Apoio", supportLabel[request.supportNeed]],
-    ["Horario", formatDate(request.scheduledFor)],
-    ["Endereco", formatAddress(request)],
+    ["Horário", formatDate(request.scheduledFor)],
+    ["Endereço", formatAddress(request)],
     ["Pagamento", CARE_REQUEST_PAYMENT_LABEL],
-    ["Observacoes", request.notes || "Sem observacoes"]
+    ["Rotina fixa", request.fixedContractRequested ? "Paciente tem interesse em contrato fixo, escala recorrente ou CLT." : "Não informado"],
+    ["Observações", request.notes || "Sem observações"]
   ];
 
   return `
@@ -166,7 +169,7 @@ export async function sendEmail(input: EmailPayload) {
   const from = process.env.RESEND_FROM_EMAIL;
 
   if (!apiKey || !from) {
-    return { ok: false as const, skipped: true as const, error: "Notificacoes por e-mail nao configuradas." };
+    return { ok: false as const, skipped: true as const, error: "Notificações por e-mail não configuradas." };
   }
 
   const response = await fetch("https://api.resend.com/emails", {
@@ -195,21 +198,21 @@ export async function sendEmailConfigurationTest(primaryRecipient: string) {
   const recipients = Array.from(new Set([primaryRecipient, ...parseEmails(process.env.CARE_ADMIN_EMAILS)].filter(Boolean)));
 
   if (recipients.length === 0) {
-    return { ok: false as const, skipped: true as const, error: "Nenhum destinatario configurado para teste." };
+    return { ok: false as const, skipped: true as const, error: "Nenhum destinatário configurado para teste." };
   }
 
   return sendEmail({
     to: recipients,
-    subject: "Teste CuidarLink - notificacoes por e-mail",
+    subject: "Teste CuidarLink - notificações por e-mail",
     text: [
-      "CuidarLink: este e-mail confirma que o envio de notificacoes esta funcionando.",
+      "CuidarLink: este e-mail confirma que o envio de notificações está funcionando.",
       "",
       `Painel: ${appUrl()}/admin`
     ].join("\n"),
     html: `
       <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
         <h1 style="font-size:20px;margin:0 0 12px">CuidarLink</h1>
-        <p>Este e-mail confirma que o envio de notificacoes esta funcionando.</p>
+        <p>Este e-mail confirma que o envio de notificações está funcionando.</p>
         <p style="margin:16px 0 0">
           <a href="${appUrl()}/admin" style="color:#047857;font-weight:700">Abrir painel admin</a>
         </p>
@@ -269,7 +272,7 @@ export async function sendProfessionalInquiryNotification(input: {
     to: input.to,
     subject,
     text: [
-      `${input.requesterName} enviou uma duvida antes de solicitar atendimento.`,
+      `${input.requesterName} enviou uma dúvida antes de solicitar atendimento.`,
       input.requesterEmail ? `E-mail: ${input.requesterEmail}` : "",
       input.requesterPhone ? `Telefone: ${input.requesterPhone}` : "",
       "",
@@ -282,15 +285,15 @@ export async function sendProfessionalInquiryNotification(input: {
     html: `
       <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
         <h1 style="font-size:20px;margin:0 0 12px">Nova mensagem antes do pedido</h1>
-        <p><strong>${escapeHtml(input.requesterName)}</strong> enviou uma duvida para <strong>${escapeHtml(input.professionalName)}</strong>.</p>
+        <p><strong>${escapeHtml(input.requesterName)}</strong> enviou uma dúvida para <strong>${escapeHtml(input.professionalName)}</strong>.</p>
         <table style="width:100%;border-collapse:collapse;margin-top:12px">
           <tr>
             <td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#475569;font-weight:700">E-mail</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeHtml(input.requesterEmail || "Nao informado")}</td>
+            <td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeHtml(input.requesterEmail || "Não informado")}</td>
           </tr>
           <tr>
             <td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#475569;font-weight:700">Telefone</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeHtml(input.requesterPhone || "Nao informado")}</td>
+            <td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeHtml(input.requesterPhone || "Não informado")}</td>
           </tr>
         </table>
         <div style="margin:16px 0;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;white-space:pre-line">${escapeHtml(preview)}</div>
@@ -364,7 +367,7 @@ export async function sendCareRequestStatusNotification(request: CareRequestNoti
   if (!request.requesterEmail) return;
 
   const status = statusLabel[request.status];
-  const subject = `Atualizacao do atendimento: ${status}`;
+  const subject = `Atualização do atendimento: ${status}`;
   const text = [
     `O atendimento com ${request.professional.user.name} foi atualizado para: ${status}.`,
     "",
@@ -372,7 +375,7 @@ export async function sendCareRequestStatusNotification(request: CareRequestNoti
   ].join("\n");
   const html = `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
-      <h1 style="font-size:20px;margin:0 0 12px">Atualizacao do atendimento</h1>
+      <h1 style="font-size:20px;margin:0 0 12px">Atualização do atendimento</h1>
       <p>O atendimento com <strong>${escapeHtml(request.professional.user.name)}</strong> foi atualizado para <strong>${escapeHtml(status)}</strong>.</p>
       ${requestDetailsHtml(request)}
     </div>
