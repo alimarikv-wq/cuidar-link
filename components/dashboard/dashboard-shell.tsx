@@ -1712,12 +1712,49 @@ function PatientFavoritesPanel({
 
 function ProfessionalInquiriesPanel({
   inquiries,
+  archivedInquiries,
   isProfessional
 }: {
   inquiries: ProfessionalInquirySummary[];
+  archivedInquiries: ProfessionalInquirySummary[];
   isProfessional: boolean;
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [view, setView] = useState<"active" | "archived">("active");
+  const [updatingInquiryId, setUpdatingInquiryId] = useState("");
+  const [error, setError] = useState("");
   const unreadCount = inquiries.reduce((total, inquiry) => total + inquiry.unreadCount, 0);
+  const visibleInquiries = view === "active" ? inquiries : archivedInquiries;
+  const emptyMessage =
+    view === "active"
+      ? "Nenhuma conversa inicial ainda. Quando alguém clicar em Mensagem na busca, ela aparece aqui."
+      : "Nenhuma conversa arquivada ainda.";
+
+  function updateInquiryArchive(inquiryId: string, archive: boolean) {
+    if (archive && !window.confirm("Arquivar esta conversa? Ela sai da lista principal, mas pode ser restaurada depois.")) return;
+
+    setError("");
+    setUpdatingInquiryId(inquiryId);
+
+    startTransition(async () => {
+      const response = await fetch(`/api/professional-inquiries/${inquiryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive })
+      });
+      const data = await response.json().catch(() => ({ error: "" }));
+
+      if (!response.ok) {
+        setError(data.error || "Não foi possível atualizar esta conversa.");
+        setUpdatingInquiryId("");
+        return;
+      }
+
+      router.refresh();
+      setUpdatingInquiryId("");
+    });
+  }
 
   return (
     <article id="mensagens-iniciais" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -1745,14 +1782,36 @@ function ProfessionalInquiriesPanel({
         </div>
       </div>
 
+      <div className="mt-5 flex flex-wrap gap-2">
+        {[
+          { key: "active" as const, label: "Abertas", count: inquiries.length },
+          { key: "archived" as const, label: "Arquivadas", count: archivedInquiries.length }
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setView(tab.key)}
+            className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold transition ${
+              view === tab.key
+                ? "border-emerald-700 bg-emerald-700 text-white"
+                : "border-slate-300 bg-white text-slate-700 hover:border-emerald-500"
+            }`}
+          >
+            {tab.label} ({tab.count})
+          </button>
+        ))}
+      </div>
+
+      {error ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+
       <div className="mt-5 grid gap-3">
-        {inquiries.length === 0 ? (
+        {visibleInquiries.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            Nenhuma conversa inicial ainda. Quando alguem clicar em Mensagem na busca, ela aparece aqui.
+            {emptyMessage}
           </div>
         ) : null}
 
-        {inquiries.map((inquiry) => (
+        {visibleInquiries.map((inquiry) => (
           <div
             key={inquiry.id}
             className={`grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_auto] ${
@@ -1795,6 +1854,15 @@ function ProfessionalInquiriesPanel({
                 <MessageSquareText aria-hidden="true" className="h-3.5 w-3.5" />
                 Abrir conversa
               </Link>
+              <button
+                type="button"
+                onClick={() => updateInquiryArchive(inquiry.id, view === "active")}
+                disabled={isPending || updatingInquiryId === inquiry.id}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition hover:border-emerald-500 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Archive aria-hidden="true" className="h-3.5 w-3.5" />
+                {updatingInquiryId === inquiry.id ? "Salvando..." : view === "active" ? "Arquivar" : "Restaurar"}
+              </button>
               {!isProfessional ? (
                 <Link
                   href="/#busca"
@@ -2258,7 +2326,11 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
         onArchiveRead={archiveReadNotifications}
       />
 
-      <ProfessionalInquiriesPanel inquiries={dashboard.inquiries} isProfessional={isProfessional} />
+      <ProfessionalInquiriesPanel
+        inquiries={dashboard.inquiries}
+        archivedInquiries={dashboard.archivedInquiries}
+        isProfessional={isProfessional}
+      />
 
       {!isProfessional ? (
         <PatientFavoritesPanel

@@ -1761,6 +1761,11 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
 }
 
 export async function getProfessionalInquiriesForUser(userId: string) {
+  const collections = await getProfessionalInquiryCollectionsForUser(userId);
+  return collections.activeInquiries;
+}
+
+export async function getProfessionalInquiryCollectionsForUser(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -1769,35 +1774,114 @@ export async function getProfessionalInquiriesForUser(userId: string) {
     }
   });
 
-  if (!user) return [];
+  if (!user) return { activeInquiries: [], archivedInquiries: [] };
 
   const isProfessional = user.accountType === AccountType.PROFESSIONAL && user.professionalProfile;
-  const where = isProfessional
-    ? { professionalId: user.professionalProfile!.id, professionalArchivedAt: null }
+  const ownerWhere = isProfessional
+    ? { professionalId: user.professionalProfile!.id }
     : {
-        patientArchivedAt: null,
         OR: [
           ...(user.patientProfile?.id ? [{ patientProfileId: user.patientProfile.id }] : []),
           { requesterEmail: user.email.toLowerCase() }
         ]
       };
+  const archiveField = isProfessional ? "professionalArchivedAt" : "patientArchivedAt";
 
-  const inquiries = await prisma.professionalInquiry.findMany({
-    where,
-    include: {
-      professional: { include: { user: true } },
-      messages: {
-        include: { sender: true },
-        orderBy: { createdAt: "asc" }
+  const include = {
+    professional: { include: { user: true } },
+    messages: {
+      include: { sender: true },
+      orderBy: { createdAt: "asc" as const }
+    }
+  };
+
+  const [activeInquiries, archivedInquiries] = await Promise.all([
+    prisma.professionalInquiry.findMany({
+      where: {
+        ...ownerWhere,
+        [archiveField]: null
+      },
+      include,
+      orderBy: { updatedAt: "desc" },
+      take: 30
+    }),
+    prisma.professionalInquiry.findMany({
+      where: {
+        ...ownerWhere,
+        [archiveField]: { not: null }
+      },
+      include,
+      orderBy: [{ [archiveField]: "desc" }, { updatedAt: "desc" }],
+      take: 100
+    })
+  ]);
+
+  return {
+    activeInquiries: activeInquiries.map((inquiry) =>
+      toProfessionalInquirySummary(inquiry, user.id, isProfessional ? inquiry.professionalArchivedAt : inquiry.patientArchivedAt)
+    ),
+    archivedInquiries: archivedInquiries.map((inquiry) =>
+      toProfessionalInquirySummary(inquiry, user.id, isProfessional ? inquiry.professionalArchivedAt : inquiry.patientArchivedAt)
+    )
+  };
+}
+
+async function getProfessionalInquiryAccess(inquiryId: string, userId: string) {
+  const [user, inquiry] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        patientProfile: true,
+        professionalProfile: true
       }
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 30
+    }),
+    prisma.professionalInquiry.findUnique({
+      where: { id: inquiryId }
+    })
+  ]);
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessão inválida." };
+  if (!inquiry) return { ok: false as const, status: 404, error: "Conversa não encontrada." };
+
+  const canActAsProfessional = user.professionalProfile?.id === inquiry.professionalId;
+  const canActAsPatient = Boolean(
+    (user.patientProfile?.id && user.patientProfile.id === inquiry.patientProfileId) ||
+      (inquiry.requesterEmail && inquiry.requesterEmail.toLowerCase() === user.email.toLowerCase())
+  );
+
+  if (!canActAsProfessional && !canActAsPatient) {
+    return { ok: false as const, status: 403, error: "Você não tem permissão para alterar esta conversa." };
+  }
+
+  return {
+    ok: true as const,
+    canActAsProfessional,
+    canActAsPatient
+  };
+}
+
+export async function archiveProfessionalInquiryForUser(inquiryId: string, userId: string) {
+  const access = await getProfessionalInquiryAccess(inquiryId, userId);
+  if (!access.ok) return access;
+
+  await prisma.professionalInquiry.update({
+    where: { id: inquiryId },
+    data: access.canActAsProfessional ? { professionalArchivedAt: new Date() } : { patientArchivedAt: new Date() }
   });
 
-  return inquiries.map((inquiry) =>
-    toProfessionalInquirySummary(inquiry, user.id, isProfessional ? inquiry.professionalArchivedAt : inquiry.patientArchivedAt)
-  );
+  return { ok: true as const };
+}
+
+export async function restoreProfessionalInquiryForUser(inquiryId: string, userId: string) {
+  const access = await getProfessionalInquiryAccess(inquiryId, userId);
+  if (!access.ok) return access;
+
+  await prisma.professionalInquiry.update({
+    where: { id: inquiryId },
+    data: access.canActAsProfessional ? { professionalArchivedAt: null } : { patientArchivedAt: null }
+  });
+
+  return { ok: true as const };
 }
 
 export async function getProfessionalInquiryDetailsForUser(inquiryId: string, userId: string) {
@@ -2982,10 +3066,10 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
   const requestCollections = await getCareRequestCollectionsForUser(userId);
   const requests = requestCollections.activeRequests;
   const dashboardRequests = [...requestCollections.activeRequests, ...requestCollections.recentRequests, ...requestCollections.archivedRequests];
-  const [notifications, unreadNotifications, inquiries] = await Promise.all([
+  const [notifications, unreadNotifications, inquiryCollections] = await Promise.all([
     getCareNotificationsForUser(userId),
     getUnreadCareNotificationCount(userId),
-    getProfessionalInquiriesForUser(userId)
+    getProfessionalInquiryCollectionsForUser(userId)
   ]);
   const scheduled = dashboardRequests.filter((request) => ["ACEITO", "AGENDADO"].includes(request.status) && !request.archivedAt).length;
   const completed = dashboardRequests.filter((request) => request.status === "CONCLUIDO").length;
@@ -3029,7 +3113,8 @@ export async function getCareDashboardData(userId: string): Promise<CareDashboar
     recentRequests: requestCollections.recentRequests,
     archivedRequests: requestCollections.archivedRequests,
     notifications,
-    inquiries,
+    inquiries: inquiryCollections.activeInquiries,
+    archivedInquiries: inquiryCollections.archivedInquiries,
     favoriteProfessionals: user.professionalFavorites.map(toDashboardFavoriteProfessional),
     profileCompletion,
     patientSettings: user.accountType === AccountType.PATIENT

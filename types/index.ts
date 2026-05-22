@@ -563,6 +563,7 @@ export type CareDashboardData = {
   recentRequests: CareRequestRecord[];
   archivedRequests: CareRequestRecord[];
   inquiries: ProfessionalInquirySummary[];
+  archivedInquiries: ProfessionalInquirySummary[];
   favoriteProfessionals: DashboardFavoriteProfessional[];
   notifications: CareNotificationData[];
   profileCompletion: ProfileCompletionData;
