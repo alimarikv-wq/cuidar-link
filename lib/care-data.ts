@@ -1633,6 +1633,101 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
     return { ok: false as const, status: 409, error: "Esse profissional não marcou disponibilidade para contrato fixo." };
   }
 
+  const activeProfessional = professional;
+
+  async function notifyProfessional(inquiryId: string) {
+    if (activeProfessional.userId === user?.id) return;
+
+    try {
+      await createCareNotification({
+        userId: activeProfessional.userId,
+        type: "PROFESSIONAL_INQUIRY_CREATED",
+        title: "Nova mensagem antes do pedido",
+        body: `${requesterName} enviou uma dúvida antes de solicitar atendimento.`,
+        actionUrl: `/dashboard/mensagens/${inquiryId}`
+      });
+    } catch (error) {
+      console.error("Não foi possível criar notificação interna de mensagem inicial.", error);
+    }
+
+    try {
+      await sendProfessionalInquiryNotification({
+        to: activeProfessional.user.email,
+        professionalName: activeProfessional.user.name,
+        requesterName,
+        requesterEmail: requesterEmail || user?.email || null,
+        requesterPhone: requesterPhone || user?.patientProfile?.phone || null,
+        inquiryId,
+        body
+      });
+    } catch (error) {
+      console.error("Não foi possível enviar e-mail de mensagem inicial.", error);
+    }
+  }
+
+  if (user) {
+    const existingInquiry = await prisma.professionalInquiry.findFirst({
+      where: {
+        professionalId: activeProfessional.id,
+        status: { not: ProfessionalInquiryStatus.ARQUIVADA },
+        OR: [
+          ...(user.patientProfile?.id ? [{ patientProfileId: user.patientProfile.id }] : []),
+          { requesterEmail: user.email.toLowerCase() },
+          ...(requesterEmail ? [{ requesterEmail }] : [])
+        ]
+      },
+      orderBy: { updatedAt: "desc" }
+    });
+
+    if (existingInquiry) {
+      const inquiry = await prisma.$transaction(async (tx) => {
+        await tx.professionalInquiryMessage.updateMany({
+          where: {
+            inquiryId: existingInquiry.id,
+            senderId: { not: user.id },
+            readAt: null
+          },
+          data: { readAt: new Date() }
+        });
+
+        await tx.professionalInquiryMessage.create({
+          data: {
+            inquiryId: existingInquiry.id,
+            senderId: user.id,
+            senderName: user.name || requesterName,
+            senderEmail: user.email,
+            body
+          }
+        });
+
+        return tx.professionalInquiry.update({
+          where: { id: existingInquiry.id },
+          data: {
+            patientProfileId: user.patientProfile?.id || existingInquiry.patientProfileId,
+            requesterName,
+            requesterEmail: requesterEmail || user.email || existingInquiry.requesterEmail,
+            requesterPhone: requesterPhone || user.patientProfile?.phone || existingInquiry.requesterPhone,
+            fixedContractRequested: existingInquiry.fixedContractRequested || Boolean(input.fixedContractRequested),
+            status: ProfessionalInquiryStatus.ABERTA,
+            patientArchivedAt: null,
+            professionalArchivedAt: null
+          },
+          include: {
+            professional: { include: { user: true } },
+            messages: { include: { sender: true }, orderBy: { createdAt: "asc" } }
+          }
+        });
+      });
+
+      await notifyProfessional(inquiry.id);
+
+      return {
+        ok: true as const,
+        inquiry: toProfessionalInquirySummary(inquiry, user.id)
+      };
+    }
+  }
+
   const inquiry = await prisma.professionalInquiry.create({
     data: {
       patientProfileId: user?.patientProfile?.id || null,
@@ -1657,31 +1752,7 @@ export async function createProfessionalInquiryForUser(input: CreateProfessional
     }
   });
 
-  try {
-    await createCareNotification({
-      userId: professional.userId,
-      type: "PROFESSIONAL_INQUIRY_CREATED",
-      title: "Nova mensagem antes do pedido",
-      body: `${requesterName} enviou uma dúvida antes de solicitar atendimento.`,
-      actionUrl: `/dashboard/mensagens/${inquiry.id}`
-    });
-  } catch (error) {
-    console.error("Não foi possível criar notificação interna de mensagem inicial.", error);
-  }
-
-  try {
-    await sendProfessionalInquiryNotification({
-      to: professional.user.email,
-      professionalName: professional.user.name,
-      requesterName,
-      requesterEmail: requesterEmail || user?.email || null,
-      requesterPhone: requesterPhone || user?.patientProfile?.phone || null,
-      inquiryId: inquiry.id,
-      body
-    });
-  } catch (error) {
-    console.error("Não foi possível enviar e-mail de mensagem inicial.", error);
-  }
+  await notifyProfessional(inquiry.id);
 
   return {
     ok: true as const,

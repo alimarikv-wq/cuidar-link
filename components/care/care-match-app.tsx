@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import {
@@ -294,6 +295,7 @@ function formatValidationMessage(items: string[]) {
 }
 
 export function CareMatchApp() {
+  const router = useRouter();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const reviewsSectionRef = useRef<HTMLDivElement | null>(null);
@@ -367,6 +369,7 @@ export function CareMatchApp() {
   const [inquirySent, setInquirySent] = useState(false);
   const [inquiryPending, setInquiryPending] = useState(false);
   const [createdInquiryId, setCreatedInquiryId] = useState("");
+  const [hasAuthenticatedSession, setHasAuthenticatedSession] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
   const [favoritePendingId, setFavoritePendingId] = useState("");
   const [favoriteError, setFavoriteError] = useState("");
@@ -402,6 +405,9 @@ export function CareMatchApp() {
     fetch("/api/patient-profile", { cache: "no-store" })
       .then(async (response) => {
         const data = (await response.json()) as { authenticated?: boolean; profile?: PatientPrefillProfile | null };
+        if (!disposed && response.ok) {
+          setHasAuthenticatedSession(Boolean(data.authenticated));
+        }
         if (disposed || !response.ok || !data.authenticated || !data.profile) return;
 
         const profile = data.profile;
@@ -833,7 +839,14 @@ export function CareMatchApp() {
       return;
     }
 
-    setCreatedInquiryId(data.inquiry?.id || "");
+    const inquiryId = data.inquiry?.id || "";
+
+    if (hasAuthenticatedSession && inquiryId) {
+      router.push(`/dashboard/mensagens/${inquiryId}`);
+      return;
+    }
+
+    setCreatedInquiryId(inquiryId);
     setInquirySent(true);
   }
 
@@ -2246,7 +2259,7 @@ export function CareMatchApp() {
                       <p className="text-sm font-semibold text-emerald-700">{inquiryProfessional.roleLabel}</p>
                       <h2 className="mt-1 text-2xl font-semibold text-slate-950">{inquiryProfessional.name}</h2>
                       <p className="mt-2 text-sm leading-6 text-slate-600">
-                        Tire uma dúvida antes de solicitar atendimento. Se virar pedido, use o botão Ver detalhes para agendar com endereço e horário.
+                        Tire uma dúvida antes de solicitar atendimento. Se você estiver logado, a conversa abre no painel depois do envio.
                       </p>
                     </div>
                   </div>
@@ -2325,6 +2338,7 @@ export function CareMatchApp() {
                       </label>
                       <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
                         Esta etapa não agenda atendimento. Ela serve para alinhar dúvidas antes de abrir um pedido formal.
+                        {hasAuthenticatedSession ? " Depois de enviar, você vai para a conversa no painel." : " Para acompanhar respostas no painel, entre ou crie sua conta."}
                       </p>
                       {inquiryError ? <div className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{inquiryError}</div> : null}
                     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, MessageSquareText, Phone, Send, ShieldCheck, UserRound } from "lucide-react";
 import { formatBrasiliaDateTime } from "@/lib/date-time";
@@ -17,9 +17,11 @@ function ContactRow({ label, value }: { label: string; value: string | null }) {
 
 function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetailsData }) {
   const [isPending, startTransition] = useTransition();
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState(inquiry.messages);
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +35,7 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
 
         if (!cancelled && response.ok && Array.isArray(data.messages)) {
           setMessages(data.messages);
+          setLastSyncedAt(new Date().toISOString());
         }
       } catch {
         // A conversa continua funcional mesmo se uma consulta de atualização falhar.
@@ -40,12 +43,20 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
     }
 
     refreshMessages();
-    const interval = window.setInterval(refreshMessages, 5000);
+    const interval = window.setInterval(refreshMessages, 3000);
+    window.addEventListener("focus", refreshMessages);
+    document.addEventListener("visibilitychange", refreshMessages);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      window.removeEventListener("focus", refreshMessages);
+      document.removeEventListener("visibilitychange", refreshMessages);
     };
   }, [inquiry.id]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
 
   function sendMessage() {
     const trimmed = body.trim();
@@ -83,6 +94,10 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             Use esta conversa para tirar dúvidas. Quando os combinados estiverem claros, o paciente pode solicitar o atendimento completo.
           </p>
+          <p className="mt-2 text-xs font-semibold text-slate-500">
+            Atualiza automaticamente a cada poucos segundos
+            {lastSyncedAt ? ` - última checagem: ${formatBrasiliaDateTime(lastSyncedAt)}` : ""}.
+          </p>
         </div>
         <MessageSquareText aria-hidden="true" className="h-6 w-6 text-emerald-700" />
       </div>
@@ -104,6 +119,7 @@ function InquiryMessagesPanel({ inquiry }: { inquiry: ProfessionalInquiryDetails
             <p className="whitespace-pre-line">{message.body}</p>
           </div>
         ))}
+        <div ref={messagesEndRef} aria-hidden="true" />
       </div>
 
       <div className="mt-4 grid gap-3">

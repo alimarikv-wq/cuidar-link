@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -256,9 +256,11 @@ function StatusTimeline({ request }: { request: CareRequestDetailsData }) {
 
 function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
   const [isPending, startTransition] = useTransition();
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState(request.messages);
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -272,6 +274,7 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
 
         if (!cancelled && response.ok && Array.isArray(data.messages)) {
           setMessages(data.messages);
+          setLastSyncedAt(new Date().toISOString());
         }
       } catch {
         // A conversa continua funcional mesmo se uma consulta de atualização falhar.
@@ -279,12 +282,20 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
     }
 
     refreshMessages();
-    const interval = window.setInterval(refreshMessages, 5000);
+    const interval = window.setInterval(refreshMessages, 3000);
+    window.addEventListener("focus", refreshMessages);
+    document.addEventListener("visibilitychange", refreshMessages);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      window.removeEventListener("focus", refreshMessages);
+      document.removeEventListener("visibilitychange", refreshMessages);
     };
   }, [request.id]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
 
   function sendMessage() {
     const trimmed = body.trim();
@@ -322,6 +333,10 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             Use este espaço para combinar horário, endereço, acesso ao local, pagamento direto e cuidados de segurança.
           </p>
+          <p className="mt-2 text-xs font-semibold text-slate-500">
+            Atualiza automaticamente a cada poucos segundos
+            {lastSyncedAt ? ` - última checagem: ${formatBrasiliaDateTime(lastSyncedAt)}` : ""}.
+          </p>
         </div>
         <MessageSquareText aria-hidden="true" className="h-6 w-6 text-emerald-700" />
       </div>
@@ -349,6 +364,7 @@ function CareMessagesPanel({ request }: { request: CareRequestDetailsData }) {
             <p className="whitespace-pre-line">{message.body}</p>
           </div>
         ))}
+        <div ref={messagesEndRef} aria-hidden="true" />
       </div>
 
       <div className="mt-4 grid gap-3">

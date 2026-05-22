@@ -1960,6 +1960,32 @@ export function DashboardShell({ dashboard }: { dashboard: CareDashboardData }) 
     }
   ];
 
+  useEffect(() => {
+    function canRefreshDashboard() {
+      if (document.visibilityState === "hidden") return false;
+      const activeElement = document.activeElement;
+      return !(
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLSelectElement
+      );
+    }
+
+    function refreshDashboard() {
+      if (canRefreshDashboard()) router.refresh();
+    }
+
+    const interval = window.setInterval(refreshDashboard, 15000);
+    window.addEventListener("focus", refreshDashboard);
+    document.addEventListener("visibilitychange", refreshDashboard);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshDashboard);
+      document.removeEventListener("visibilitychange", refreshDashboard);
+    };
+  }, [router]);
+
   function updateStatus(requestId: string, nextStatus: RequestStatus) {
     setActionError("");
     setUpdatingId(requestId);
