@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth";
 import { getCareMarketplaceAccessForUser } from "@/lib/care-marketplace-access";
-import { createProfessionalInquiryForUser } from "@/lib/care-data";
+import { createProfessionalInquiryForUser, getExistingProfessionalInquiryForUser } from "@/lib/care-data";
 
 const inquirySchema = z.object({
   professionalId: z.string().min(1),
@@ -12,6 +12,28 @@ const inquirySchema = z.object({
   fixedContractRequested: z.boolean().optional(),
   body: z.string().trim().min(1).max(1000)
 });
+
+export async function GET(request: NextRequest) {
+  const session = await getSessionFromRequest(request);
+
+  if (!session) {
+    return NextResponse.json({ error: "Entre para acessar suas conversas." }, { status: 401 });
+  }
+
+  const professionalId = request.nextUrl.searchParams.get("professionalId")?.trim();
+
+  if (!professionalId) {
+    return NextResponse.json({ error: "Informe o profissional." }, { status: 400 });
+  }
+
+  const result = await getExistingProfessionalInquiryForUser(professionalId, session.userId);
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  return NextResponse.json({ inquiry: result.inquiry });
+}
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);

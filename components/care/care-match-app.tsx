@@ -368,6 +368,7 @@ export function CareMatchApp() {
   const [inquiryError, setInquiryError] = useState("");
   const [inquirySent, setInquirySent] = useState(false);
   const [inquiryPending, setInquiryPending] = useState(false);
+  const [inquiryLookupId, setInquiryLookupId] = useState("");
   const [createdInquiryId, setCreatedInquiryId] = useState("");
   const [hasAuthenticatedSession, setHasAuthenticatedSession] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
@@ -734,7 +735,7 @@ export function CareMatchApp() {
     setReviewsLoading(false);
   }
 
-  function openInquiry(professionalId: string) {
+  function prepareInquiryModal(professionalId: string) {
     const professional = results.find((item) => item.id === professionalId);
     setInquiryProfessionalId(professionalId);
     setInquiryName(requesterName);
@@ -748,6 +749,34 @@ export function CareMatchApp() {
     setInquirySent(false);
     setInquiryPending(false);
     setCreatedInquiryId("");
+  }
+
+  async function openInquiry(professionalId: string) {
+    if (!hasAuthenticatedSession) {
+      prepareInquiryModal(professionalId);
+      return;
+    }
+
+    setInquiryError("");
+    setInquiryLookupId(professionalId);
+
+    try {
+      const response = await fetch(`/api/professional-inquiries?professionalId=${encodeURIComponent(professionalId)}`, {
+        cache: "no-store"
+      });
+      const data = await response.json().catch(() => ({ inquiry: null }));
+
+      if (response.ok && data.inquiry?.id) {
+        router.push(`/dashboard/mensagens/${data.inquiry.id}`);
+        return;
+      }
+    } catch {
+      // Se a consulta falhar, mantemos o caminho normal de abrir a tela de mensagem.
+    } finally {
+      setInquiryLookupId("");
+    }
+
+    prepareInquiryModal(professionalId);
   }
 
   function closeInquiry() {
@@ -1522,10 +1551,11 @@ export function CareMatchApp() {
                           type="button"
                           variant="secondary"
                           onClick={() => openInquiry(professional.id)}
+                          disabled={inquiryLookupId === professional.id}
                           className="h-10 gap-2"
                         >
                           <MessageCircle aria-hidden="true" className="h-4 w-4" />
-                          Mensagem
+                          {inquiryLookupId === professional.id ? "Abrindo..." : "Mensagem"}
                         </Button>
                         {professional.whatsappUrl ? (
                           <a

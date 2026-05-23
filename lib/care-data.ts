@@ -1765,6 +1765,51 @@ export async function getProfessionalInquiriesForUser(userId: string) {
   return collections.activeInquiries;
 }
 
+export async function getExistingProfessionalInquiryForUser(professionalId: string, userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      patientProfile: true,
+      professionalProfile: true
+    }
+  });
+
+  if (!user) return { ok: false as const, status: 401, error: "Sessao invalida." };
+
+  const isProfessional = user.accountType === AccountType.PROFESSIONAL && user.professionalProfile?.id === professionalId;
+  const archiveField = isProfessional ? "professionalArchivedAt" : "patientArchivedAt";
+  const ownerWhere = isProfessional
+    ? { professionalId }
+    : {
+        OR: [
+          ...(user.patientProfile?.id ? [{ patientProfileId: user.patientProfile.id }] : []),
+          { requesterEmail: user.email.toLowerCase() }
+        ]
+      };
+
+  const inquiry = await prisma.professionalInquiry.findFirst({
+    where: {
+      professionalId,
+      status: { not: ProfessionalInquiryStatus.ARQUIVADA },
+      ...ownerWhere,
+      [archiveField]: null
+    },
+    include: {
+      professional: { include: { user: true } },
+      messages: {
+        include: { sender: true },
+        orderBy: { createdAt: "asc" }
+      }
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+
+  return {
+    ok: true as const,
+    inquiry: inquiry ? toProfessionalInquirySummary(inquiry, user.id, inquiry[archiveField]) : null
+  };
+}
+
 export async function getProfessionalInquiryCollectionsForUser(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
